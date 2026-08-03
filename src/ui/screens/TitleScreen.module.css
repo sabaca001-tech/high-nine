@@ -1,0 +1,153 @@
+.screen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-4);
+  padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+  background: radial-gradient(circle at 50% 30%, var(--bg-panel-2), var(--bg-base) 70%);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.logo {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.title {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.tagline {
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+  margin: 0 0 var(--sp-5);
+  text-align: center;
+}
+
+/*
+ * セーブの枠。
+ * 主要な操作なので画面下寄り（親指の届く範囲）に置く。
+ */
+.slots {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.slot {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-1);
+}
+
+.slotButton {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 64px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  text-align: left;
+  transition: transform 0.12s ease;
+}
+
+.slotButton:active {
+  transform: scale(0.97);
+}
+
+/* 空きの枠は控えめに。埋まっている枠のほうを目立たせる */
+.slotEmpty {
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  border: 1px dashed var(--line);
+}
+
+.slotNumber {
+  flex: 0 0 auto;
+  width: 24px;
+  text-align: center;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  opacity: 0.6;
+}
+
+.slotBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.slotName {
+  display: block;
+  font-size: var(--fs-md);
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slotMeta {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteSpacer {
+  flex: 0 0 auto;
+  width: var(--tap-min);
+}
+
+.deleteButton {
+  flex: 0 0 auto;
+  width: var(--tap-min);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+/* 削除は取り返しがつかないので必ず一度確認する */
+.confirmRow {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.confirmDelete,
+.confirmCancel {
+  flex: 1 1 0;
+  width: 56px;
+  border-radius: var(--radius);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.confirmDelete {
+  background: var(--bad);
+  color: var(--text-on-accent);
+}
+
+.confirmCancel {
+  background: var(--bg-raised);
+  color: var(--text-sub);
+}

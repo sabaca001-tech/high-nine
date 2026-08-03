@@ -1,0 +1,427 @@
+import { useState } from 'react'
+import type { ReactNode } from 'react'
+import { formatInnings } from '@/core/player/careerStats'
+import { overallRating, toRank } from '@/core/player/rating'
+import type { Player } from '@/core/types/player'
+import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
+import { formatRecord, hasMet, localRivals, nationalRivals } from '@/core/rival/rivals'
+import type { RivalSchool } from '@/core/rival/rivals'
+import type { ScoutResult } from '@/core/scout/scouting'
+import { TRAIT_LABELS } from '@/core/scout/scoutTraits'
+import { EQUIPMENTS } from '@/core/shop/equipmentDefs'
+import { findManager, groundName, GROUND_LEVEL_MAX } from '@/core/shop/facility'
+import { formatFunds, monthlyFunds } from '@/core/shop/funds'
+import { monthlyUpkeep } from '@/core/shop/upkeep'
+import { uniformName } from '@/core/team/uniforms'
+import { CAREER_PATH_LABELS } from '@/core/types/career'
+import type { GraduateRecord } from '@/core/types/season'
+import { handSizeFor, reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/types/season'
+import { findRegion, regionStrength, roundsFor } from '@/core/types/region'
+import { useGameStore } from '@/state/useGameStore'
+import { AppLayout } from '@/ui/components/AppLayout'
+import styles from './DataScreen.module.css'
+
+type Tab = 'team' | 'facility' | 'rivals' | 'draft' | 'scout'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'team', label: 'チーム' },
+  { id: 'facility', label: '設備' },
+  { id: 'rivals', label: '他校' },
+  { id: 'draft', label: '進路' },
+  { id: 'scout', label: 'スカウト' },
+]
+
+/**
+ * データ画面。
+ *
+ * 各画面に散っていた「いまどうなっているか」をここに集める。
+ * 編成のような**操作**は各画面へ送り、ここは読むための場所にする
+ * （同じ操作を2か所に置くと、どちらが正なのか分からなくなる）。
+ */
+export function DataScreen() {
+  const game = useGameStore((s) => s.game)
+  const [tab, setTab] = useState<Tab>('team')
+
+  if (!game) return null
+
+  return (
+    <AppLayout title="データ" subtitle={`${game.year}年目 ${game.month}月`} scrollable>
+      <div className={styles.tabs}>
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={tab === item.id ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'team' && <TeamTab />}
+      {tab === 'facility' && <FacilityTab />}
+      {tab === 'rivals' && <RivalsTab />}
+      {tab === 'draft' && <DraftTab />}
+      {tab === 'scout' && <ScoutTab />}
+    </AppLayout>
+  )
+}
+
+/** 見出しと本文の枠 */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>{title}</h2>
+      {children}
+    </section>
+  )
+}
+
+/** 「項目 …… 値」の1行 */
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.row}>
+      <span className={styles.rowLabel}>{label}</span>
+      <span className={styles.rowValue}>{value}</span>
+    </div>
+  )
+}
+
+/** チーム。編成への入口もここに置く */
+function TeamTab() {
+  const game = useGameStore((s) => s.game)!
+  const setScreen = useGameStore((s) => s.setScreen)
+
+  const region = findRegion(game.regionId)
+  const grade = reputationGrade(game.reputation)
+  const squad = new Set(game.squad)
+  const starters = new Set(game.lineup.slots.map((slot) => slot.playerId))
+  const injured = game.players.filter((player) => player.injuryMonths > 0).length
+  const average =
+    game.players.reduce((total, player) => total + overallRating(player), 0) /
+    Math.max(1, game.players.length)
+
+  return (
+    <>
+      <Section title="学校">
+        <Row label="学校名" value={game.schoolName} />
+        <Row label="ユニフォーム" value={uniformName(game.uniform)} />
+        <Row
+          label="所在地"
+          value={`${region.name}（${region.schools}校 / 優勝まで${roundsFor(region.schools)}勝）`}
+        />
+        <Row label="地区の激戦度" value={`相手の強さ ${signed(regionStrength(region))}`} />
+        <Row
+          label="評判"
+          value={`${grade} ${REPUTATION_GRADE_LABELS[grade]}（${game.reputation}）`}
+        />
+        <Row label="手札の枚数" value={`${handSizeFor(game.reputation)}枚`} />
+        <p className={styles.note}>
+          学校名・ユニフォーム・所在地は、年度が切り替わるときに変えられます。
+        </p>
+      </Section>
+
+      <Section title="部員">
+        <Row label="部員数" value={`${game.players.length}人`} />
+        <Row label="ベンチ入り" value={`${squad.size} / ${FIRST_SQUAD_SIZE}人`} />
+        <Row label="ベンチ外" value={`${game.players.length - squad.size}人`} />
+        <Row label="怪我で離脱中" value={`${injured}人`} />
+        <Row label="平均総合" value={average.toFixed(1)} />
+        <Row
+          label="スタメンの平均"
+          value={averageOf(game.players.filter((p) => starters.has(p.id))).toFixed(1)}
+        />
+      </Section>
+
+      <Section title="編成を変える">
+        <p className={styles.note}>
+          打順・守備位置・ベンチ入りは、まとめてスタメン画面で入れ替えます。
+        </p>
+        <button type="button" className={styles.link} onClick={() => setScreen('lineup')}>
+          スタメン／ベンチ入りを変える ▶
+        </button>
+        <button type="button" className={styles.link} onClick={() => setScreen('players')}>
+          部員一覧（能力・練習方針） ▶
+        </button>
+        <button type="button" className={styles.link} onClick={() => setScreen('records')}>
+          歴代記録（ベストナイン・通算記録） ▶
+        </button>
+      </Section>
+    </>
+  )
+}
+
+/** 設備・部費 */
+function FacilityTab() {
+  const game = useGameStore((s) => s.game)!
+  const setScreen = useGameStore((s) => s.setScreen)
+
+  const manager = findManager(game.managerId)
+  const upkeep = monthlyUpkeep(game.players.length, game.groundLevel)
+  const income = monthlyFunds(game.reputation)
+
+  return (
+    <>
+      <Section title="部費">
+        <Row label="残高" value={formatFunds(game.funds)} />
+        <Row label="毎月の支給" value={formatFunds(income)} />
+        <Row label="毎月の維持費" value={formatFunds(upkeep.total)} />
+        <Row label="差し引き" value={signedFunds(income - upkeep.total)} />
+        <p className={styles.note}>
+          維持費は部員数と設備の水準で決まります。払えないと道具が足りず、信頼度が下がります。
+        </p>
+      </Section>
+
+      <Section title="グラウンド">
+        <Row
+          label="整備段階"
+          value={`Lv${game.groundLevel} / ${GROUND_LEVEL_MAX}（${groundName(game.groundLevel)}）`}
+        />
+        <p className={styles.note}>
+          放っておくと荒れて下がります。段階が上がるほど下がりやすくなります。
+        </p>
+      </Section>
+
+      <Section title="マネージャー">
+        {manager ? (
+          <>
+            <Row label="在籍" value={manager.name} />
+            <p className={styles.note}>{manager.description}</p>
+          </>
+        ) : (
+          <p className={styles.note}>まだ在籍していません。</p>
+        )}
+      </Section>
+
+      <Section title="練習器具">
+        {EQUIPMENTS.map((equipment) => {
+          const owned = game.equipment.includes(equipment.id)
+          return (
+            <div key={equipment.id} className={styles.row}>
+              <span className={styles.rowLabel}>{equipment.name}</span>
+              <span className={owned ? styles.owned : styles.rowValue}>
+                {owned ? '所有' : '未所有'}
+              </span>
+            </div>
+          )
+        })}
+        <p className={styles.note}>
+          持っていると対応する練習カードが手札に出ます。使ううちに確率で壊れます。
+        </p>
+        <button type="button" className={styles.link} onClick={() => setScreen('shop')}>
+          ショップで買う ▶
+        </button>
+      </Section>
+    </>
+  )
+}
+
+/** ライバル校 */
+function RivalsTab() {
+  const game = useGameStore((s) => s.game)!
+
+  const local = [...localRivals(game.rivals, game.regionId)].sort(
+    (a, b) => b.strength - a.strength,
+  )
+  const national = [...nationalRivals(game.rivals, game.regionId)].sort(
+    (a, b) => b.strength - a.strength,
+  )
+
+  return (
+    <>
+      <Section title={`${findRegion(game.regionId).name}の学校`}>
+        {local.map((school) => (
+          <RivalRow key={school.id} school={school} />
+        ))}
+      </Section>
+
+      <Section title="全国の強豪">
+        {national.map((school) => (
+          <RivalRow key={school.id} school={school} showRegion />
+        ))}
+      </Section>
+    </>
+  )
+}
+
+function RivalRow({ school, showRegion }: { school: RivalSchool; showRegion?: boolean }) {
+  const best = school.stars.reduce(
+    (top, star) => (star.rating > top.rating ? star : top),
+    school.stars[0],
+  )
+
+  return (
+    <div className={styles.rival}>
+      <div className={styles.rivalHead}>
+        <span className={styles.rivalName}>
+          {school.name}
+          {showRegion && (
+            <span className={styles.rivalRegion}>{findRegion(school.regionId).name}</span>
+          )}
+        </span>
+        <span className={styles.rivalStrength}>戦力 {signed(school.strength)}</span>
+      </div>
+      <div className={styles.rivalMeta}>
+        {hasMet(school.record) ? (
+          <span className={styles.rivalRecord}>通算 {formatRecord(school.record)}</span>
+        ) : (
+          <span className={styles.rivalNone}>対戦なし</span>
+        )}
+        {best && (
+          <span className={styles.rivalStar}>
+            注目 {best.name}（{best.grade}年 / 総合{best.rating}）
+          </span>
+        )}
+        {school.trend !== 0 && (
+          <span className={school.trend > 0 ? styles.trendUp : styles.trendDown}>
+            前年比 {signed(school.trend)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** 卒業後の進路。ドラフト（プロ入り）を上に出す */
+function DraftTab() {
+  const game = useGameStore((s) => s.game)!
+  const setScreen = useGameStore((s) => s.setScreen)
+
+  const drafted = game.graduates.filter((graduate) => graduate.path === 'pro')
+  const others = game.graduates.filter((graduate) => graduate.path !== 'pro')
+
+  return (
+    <>
+      <Section title={`ドラフト指名（${drafted.length}人）`}>
+        {drafted.length === 0 ? (
+          <p className={styles.note}>まだプロ入りした選手はいません。</p>
+        ) : (
+          drafted.map((graduate) => <GraduateRow key={graduate.id} graduate={graduate} />)
+        )}
+      </Section>
+
+      <Section title={`その他の進路（${others.length}人）`}>
+        {others.length === 0 ? (
+          <p className={styles.note}>まだ卒業生がいません。</p>
+        ) : (
+          others.map((graduate) => <GraduateRow key={graduate.id} graduate={graduate} />)
+        )}
+      </Section>
+
+      <button type="button" className={styles.link} onClick={() => setScreen('alumni')}>
+        OB名鑑（その後の成績） ▶
+      </button>
+    </>
+  )
+}
+
+function GraduateRow({ graduate }: { graduate: GraduateRecord }) {
+  const stats = graduate.highSchool
+  const line = graduate.isPitcher
+    ? `${formatInnings(stats.pitching.outs)}回 ${stats.pitching.wins}勝${stats.pitching.losses}敗`
+    : `${stats.batting.games}試合 ${stats.batting.hits}安打 ${stats.batting.homeruns}本`
+
+  return (
+    <div className={styles.rival}>
+      <div className={styles.rivalHead}>
+        <span className={styles.rivalName}>{graduate.name}</span>
+        <span className={styles.rivalStrength}>
+          {toRank(graduate.rating)}（{graduate.rating}）
+        </span>
+      </div>
+      <div className={styles.rivalMeta}>
+        <span className={styles.rivalRecord}>
+          {graduate.year}年目卒 / {CAREER_PATH_LABELS[graduate.path]}
+          {graduate.team && ` / ${graduate.team}`}
+        </span>
+        <span className={styles.rivalNone}>高校通算 {line}</span>
+      </div>
+    </div>
+  )
+}
+
+/** スカウト。訪問した県と、そこで見た選手を残す */
+function ScoutTab() {
+  const game = useGameStore((s) => s.game)!
+  const setScreen = useGameStore((s) => s.setScreen)
+
+  const { regions, results } = game.scouting
+
+  return (
+    <>
+      <Section title={`今年度の視察（${regions.length}県）`}>
+        {regions.length === 0 ? (
+          <p className={styles.note}>まだどこにも視察に行っていません。</p>
+        ) : (
+          regions.map((region) => (
+            <div key={region.regionId} className={styles.rival}>
+              <div className={styles.rivalHead}>
+                <span className={styles.rivalName}>{findRegion(region.regionId).name}</span>
+                <span className={styles.rivalStrength}>{region.visits}回</span>
+              </div>
+              <div className={styles.rivalMeta}>
+                <span className={styles.rivalRecord}>
+                  {TRAIT_LABELS[game.scoutTraits[region.regionId] ?? 'contact']}
+                </span>
+                <span className={styles.rivalNone}>候補{region.prospects.length}人</span>
+              </div>
+              {region.prospects.map((prospect) => (
+                <div key={prospect.id} className={styles.prospect}>
+                  <span className={styles.prospectRank}>{toRank(prospect.rating)}</span>
+                  <span className={styles.prospectName}>{prospect.name}</span>
+                  <span className={styles.prospectMeta}>
+                    {prospect.junior.best}
+                    {prospect.approaches > 0 && ` / 訪問${prospect.approaches}回`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+        <button type="button" className={styles.link} onClick={() => setScreen('scout')}>
+          スカウトに行く ▶
+        </button>
+      </Section>
+
+      <Section title={`前年度の結果（${results.length}人）`}>
+        {results.length === 0 ? (
+          <p className={styles.note}>まだ結果がありません。</p>
+        ) : (
+          results.map((result) => <ScoutResultRow key={result.name} result={result} />)
+        )}
+      </Section>
+    </>
+  )
+}
+
+function ScoutResultRow({ result }: { result: ScoutResult }) {
+  return (
+    <div className={styles.prospect}>
+      <span className={result.joined ? styles.prospectJoined : styles.prospectRank}>
+        {result.joined ? '入部' : '他校'}
+      </span>
+      <span className={styles.prospectName}>{result.name}</span>
+      <span className={styles.prospectMeta}>
+        {result.joined
+          ? `総合${result.rating}${result.skillName ? ` / ${result.skillName}` : ''}`
+          : `${result.schoolName}（${result.regionName}）`}
+      </span>
+    </div>
+  )
+}
+
+function averageOf(players: Player[]): number {
+  if (players.length === 0) return 0
+  return players.reduce((total, player) => total + overallRating(player), 0) / players.length
+}
+
+/** 「+3」「-2」のように符号を付ける */
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`
+}
+
+/** 金額に符号を付ける。桁区切りは formatFunds に任せる */
+function signedFunds(value: number): string {
+  return value >= 0 ? `+${formatFunds(value)}` : `-${formatFunds(-value)}`
+}

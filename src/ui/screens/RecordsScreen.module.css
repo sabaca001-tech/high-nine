@@ -1,0 +1,132 @@
+/*
+ * 歴代記録。
+ * 縦画面なので表組みにはせず、1行1件で名前と数字だけを読ませる。
+ */
+.back {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+  padding: 0 var(--sp-3);
+}
+
+.section {
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--sp-2);
+  padding-left: var(--sp-2);
+  border-left: 3px solid var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+
+/* ベストナインの1行 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.position {
+  flex: 0 0 auto;
+  min-width: 3.2em;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.name {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  display: block;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.line {
+  flex: 1 0 100%;
+  padding-left: 3.2em;
+  font-size: 10px;
+  color: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 通算記録の1行 */
+.recordRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.recordRow:last-child {
+  border-bottom: none;
+}
+
+.recordLabel {
+  flex: 0 0 6.5em;
+  font-size: 10px;
+  color: var(--text-sub);
+}
+
+.recordName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.recordValue {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.recordEmpty {
+  flex: 1 1 auto;
+  font-size: 10px;
+  color: var(--text-dim);
+}

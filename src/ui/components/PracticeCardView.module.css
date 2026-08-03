@@ -1,0 +1,210 @@
+.wrapper {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.card {
+  position: relative;
+  /* タップ領域は最小44px（CLAUDE.md 3） */
+  min-width: 0;
+  min-height: var(--tap-min);
+  /* 8枚並ぶと1枚あたり40px前後になるので、高さも詰める */
+  height: clamp(72px, 22vw, 88px);
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) 2px var(--sp-3);
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 4px 8px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* 光沢。上半分にうっすら白をかけてカードらしい質感にする */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 55% 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.card:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.card:disabled {
+  opacity: 0.45;
+}
+
+/* 数字は左上のリボンに置く */
+.number {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 20px;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d2b24;
+  font-size: var(--fs-md);
+  font-weight: 800;
+  line-height: 1.25;
+  border-bottom-right-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.icon {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+  margin-top: 6px;
+}
+
+.kind {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 1px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+/* レアカード：金枠＋光が流れる */
+.rare {
+  border-color: var(--accent);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 0 14px rgba(255, 200, 87, 0.75);
+}
+
+.rare::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 60%;
+  height: 220%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(22deg);
+  animation: shine 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shine {
+  0%,
+  60% {
+    left: -60%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+
+.rareMark {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 0 4px var(--accent-strong);
+  z-index: 1;
+}
+
+/* 種別ごとの配色（色の実体は tokens.css） */
+.batting {
+  background: linear-gradient(150deg, var(--practice-batting-a), var(--practice-batting-b));
+}
+.running {
+  background: linear-gradient(150deg, var(--practice-running-a), var(--practice-running-b));
+}
+.fielding {
+  background: linear-gradient(150deg, var(--practice-fielding-a), var(--practice-fielding-b));
+}
+.shoulder {
+  background: linear-gradient(150deg, var(--practice-shoulder-a), var(--practice-shoulder-b));
+}
+.pitching {
+  background: linear-gradient(150deg, var(--practice-pitching-a), var(--practice-pitching-b));
+}
+.breaking {
+  background: linear-gradient(150deg, var(--practice-breaking-a), var(--practice-breaking-b));
+}
+.stamina {
+  background: linear-gradient(150deg, var(--practice-stamina-a), var(--practice-stamina-b));
+}
+.mental {
+  background: linear-gradient(150deg, var(--practice-mental-a), var(--practice-mental-b));
+}
+.rest {
+  background: linear-gradient(150deg, var(--practice-rest-a), var(--practice-rest-b));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rare::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ── 練習以外／派生のカード ── */
+.bunt {
+  background: linear-gradient(150deg, var(--practice-bunt-a), var(--practice-bunt-b));
+}
+.longToss {
+  background: linear-gradient(150deg, var(--practice-longtoss-a), var(--practice-longtoss-b));
+}
+.sprint {
+  background: linear-gradient(150deg, var(--practice-sprint-a), var(--practice-sprint-b));
+}
+.control {
+  background: linear-gradient(150deg, var(--practice-control-a), var(--practice-control-b));
+}
+.meeting {
+  background: linear-gradient(150deg, var(--practice-meeting-a), var(--practice-meeting-b));
+}
+.groundskeeping {
+  background: linear-gradient(150deg, var(--practice-groundskeeping-a), var(--practice-groundskeeping-b));
+}
+.medical {
+  background: linear-gradient(150deg, var(--practice-medical-a), var(--practice-medical-b));
+}
+.study {
+  background: linear-gradient(150deg, var(--practice-study-a), var(--practice-study-b));
+}
+.outing {
+  background: linear-gradient(150deg, var(--practice-outing-a), var(--practice-outing-b));
+}
+
+/* ── 練習器具が要るカード ── */
+.teeBatting {
+  background: linear-gradient(150deg, var(--practice-teebatting-a), var(--practice-teebatting-b));
+}
+.weight {
+  background: linear-gradient(150deg, var(--practice-weight-a), var(--practice-weight-b));
+}
+.agility {
+  background: linear-gradient(150deg, var(--practice-agility-a), var(--practice-agility-b));
+}
+.machineBatting {
+  background: linear-gradient(150deg, var(--practice-machinebatting-a), var(--practice-machinebatting-b));
+}
+.bullpen {
+  background: linear-gradient(150deg, var(--practice-bullpen-a), var(--practice-bullpen-b));
+}
+.videoStudy {
+  background: linear-gradient(150deg, var(--practice-videostudy-a), var(--practice-videostudy-b));
+}

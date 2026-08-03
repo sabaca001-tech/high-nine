@@ -1,0 +1,166 @@
+.sprite {
+  display: block;
+  overflow: visible;
+}
+
+/* 呼吸のような上下動。全ポーズ共通のベース */
+.body {
+  transform-origin: 20px 56px;
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* 打撃：体をひねってバットを振る */
+.batSwing {
+  transform-origin: 26px 36px;
+  animation: swing 1.6s ease-in-out infinite;
+}
+
+@keyframes swing {
+  0%,
+  45% {
+    transform: rotate(-40deg);
+  }
+  55% {
+    transform: rotate(70deg);
+  }
+  70% {
+    transform: rotate(80deg);
+  }
+  100% {
+    transform: rotate(-40deg);
+  }
+}
+
+/* 投球：腕を振り下ろす */
+.throwArm {
+  transform-origin: 24px 34px;
+  animation: throwing 1.8s ease-in-out infinite;
+}
+
+@keyframes throwing {
+  0%,
+  40% {
+    transform: rotate(-120deg);
+  }
+  55% {
+    transform: rotate(45deg);
+  }
+  75% {
+    transform: rotate(30deg);
+  }
+  100% {
+    transform: rotate(-120deg);
+  }
+}
+
+/* 走塁：脚を交互に動かす */
+.legFront {
+  transform-origin: 16px 46px;
+  animation: stride 0.5s ease-in-out infinite alternate;
+}
+
+.legBack {
+  transform-origin: 24px 46px;
+  animation: stride 0.5s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes stride {
+  from {
+    transform: rotate(-25deg);
+  }
+  to {
+    transform: rotate(25deg);
+  }
+}
+
+.runBody {
+  animation: runBob 0.5s ease-in-out infinite;
+}
+
+@keyframes runBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(-2.5px) rotate(-6deg);
+  }
+}
+
+/* 守備：低く構えて左右に揺れる */
+.crouch {
+  transform-origin: 20px 56px;
+  animation: ready 1.1s ease-in-out infinite;
+}
+
+@keyframes ready {
+  0%,
+  100% {
+    transform: translate(-1.5px, 6px) scaleY(0.88);
+  }
+  50% {
+    transform: translate(1.5px, 6px) scaleY(0.88);
+  }
+}
+
+/* 休養：座ってゆっくり呼吸 */
+.sit {
+  transform-origin: 20px 56px;
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: translateY(10px) scaleY(0.78);
+  }
+  50% {
+    transform: translateY(9px) scaleY(0.8);
+  }
+}
+
+/* ボールが手から離れる演出 */
+.ball {
+  animation: pitchBall 1.8s ease-in-out infinite;
+}
+
+@keyframes pitchBall {
+  0%,
+  50% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  56% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(26px, -10px);
+  }
+}
+
+/* 動きが苦手な人・電池節約のため、OS設定を尊重して静止させる */
+@media (prefers-reduced-motion: reduce) {
+  .body,
+  .batSwing,
+  .throwArm,
+  .legFront,
+  .legBack,
+  .runBody,
+  .crouch,
+  .sit,
+  .ball {
+    animation: none;
+  }
+}

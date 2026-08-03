@@ -1,0 +1,95 @@
+.wrapper {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-2);
+  background: linear-gradient(to bottom, #2a5a7a, var(--bg-panel));
+}
+
+.field {
+  display: block;
+}
+
+/* 塁。走者がいると光る */
+.base {
+  fill: rgba(255, 255, 255, 0.25);
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1.5;
+  transition: fill 0.25s ease;
+}
+
+.baseOccupied {
+  fill: var(--accent);
+  stroke: #fff;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.outs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.outMark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-dim);
+}
+
+.outFilled {
+  background: var(--bad);
+  border-color: var(--bad);
+}
+
+/* 打球の演出 */
+.ball {
+  fill: #fff;
+  stroke: var(--sprite-outline);
+  stroke-width: 1;
+}
+
+.ballHit {
+  animation: fly 0.7s ease-out;
+}
+
+@keyframes fly {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, -34px) scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* 得点時のフラッシュ */
+.flash {
+  animation: flash 0.6s ease-out;
+}
+
+@keyframes flash {
+  0% {
+    filter: brightness(2.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ballHit,
+  .flash {
+    animation: none;
+  }
+}

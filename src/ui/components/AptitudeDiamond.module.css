@@ -1,0 +1,53 @@
+/**
+ * ポジション適性をグラウンドの形で見せる。
+ * 守れる位置ほど明るい色にして、形で「外野型／内野型」が読めるようにする。
+ */
+.diamond {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.field {
+  fill: var(--field);
+  opacity: 0.35;
+}
+
+.infield {
+  fill: var(--dirt);
+  opacity: 0.5;
+}
+
+.letter {
+  font-size: 12px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.8);
+  stroke-width: 2.5px;
+  stroke-linejoin: round;
+}
+
+/* 本職の位置を丸で囲む */
+.mainMark {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+
+.tierS {
+  fill: var(--rank-s);
+}
+
+.tierGood {
+  fill: var(--rank-b);
+}
+
+.tierMid {
+  fill: var(--rank-d);
+}
+
+/* 守れない位置は沈ませる */
+.tierLow {
+  fill: var(--text-dim);
+  opacity: 0.75;
+}

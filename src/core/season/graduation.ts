@@ -1,0 +1,187 @@
+/**
+ * 世代交代。
+ * 3月から4月へ移るときに、3年生が卒業し、残りが進級し、新入生が加入する。
+ */
+
+import type { Rng } from '@/core/rng/random'
+import { advanceCareer, createAlumnus } from '@/core/career/career'
+import { createPlayer } from '@/core/player/createPlayer'
+import { overallRating } from '@/core/player/rating'
+import { draftBonus } from '@/core/player/u18'
+import type { Grade, Player } from '@/core/types/player'
+import type { GraduateRecord } from '@/core/types/season'
+import { REPUTATION_INITIAL } from '@/core/types/season'
+
+/** 部員数の目安。評判が高いほど多くの入部希望者が来る */
+const BASE_ROSTER_SIZE = 24
+
+/** 1年で入る新入生の下限・上限。強豪校ならベンチ入り争いが起きる規模になる */
+const MIN_RECRUITS = 4
+const MAX_RECRUITS = 16
+
+/**
+ * 評判から新入生の実力補正を求める。
+ *
+ * **初期評判(20)を基準の0にする。** ここをずらすと、何もしていないのに
+ * 新入生が毎年弱くなり、チームが年々衰退していく（実際に起きた）。
+ * 評判は「上げれば良くなる」ボーナスとして働かせ、罰にはしない。
+ */
+export function talentFromReputation(reputation: number): number {
+  return Math.round((reputation - REPUTATION_INITIAL) * REPUTATION_TALENT_RATE)
+}
+
+/**
+ * 評判1あたりの実力補正。
+ *
+ * 0.3にしていたところ、評判が上限近くまで伸びると新入生が
+ * **前の代の3年生と同じくらいの能力で入学**してしまい、
+ * 3年かけて育てる意味が薄れた（実測で6年後の平均総合が36→56）。
+ * 0.18に抑え、評判は「良い素材が来る」程度の効果に留める。
+ */
+const REPUTATION_TALENT_RATE = 0.18
+
+/** 評判が高いほど多くの新入生が来る */
+export function recruitCount(reputation: number, remaining: number): number {
+  const target = BASE_ROSTER_SIZE + Math.floor(reputation / 12)
+  return Math.max(MIN_RECRUITS, Math.min(MAX_RECRUITS, target - remaining))
+}
+
+/** 新入生を迎える。新規開始時と毎年4月の両方で使う */
+export function recruitFreshmen(
+  rng: Rng,
+  params: {
+    /** 在校生（進級後） */
+    players: Player[]
+    reputation: number
+    year: number
+    serial: number
+  },
+): {
+  newcomers: Player[]
+  recommendedIds: string[]
+  serial: number
+} {
+  const { players, reputation } = params
+
+  const count = recruitCount(reputation, players.length)
+  const baseTalent = talentFromReputation(reputation)
+
+  // 評判が高いと推薦の逸材が来ることがある
+  const hasRecommended = reputation >= 55 && rng.chance(reputation / 220)
+  const recommendedIndex = hasRecommended ? rng.int(0, count - 1) : -1
+
+  const newcomers: Player[] = []
+  const recommendedIds: string[] = []
+  let serial = params.serial
+
+  const pitchersLeft = players.filter((player) => player.isPitcher).length
+
+  for (let i = 0; i < count; i++) {
+    const isRecommended = i === recommendedIndex
+    const id = `p${serial++}`
+
+    const player = createPlayer(rng, {
+      id,
+      grade: 1,
+      enrolledAt: { year: params.year, month: 4 },
+      isPitcher:
+        pitchersLeft + newcomers.filter((p) => p.isPitcher).length < 3 ? true : undefined,
+      talentBonus: baseTalent + rng.int(-4, 4) + (isRecommended ? 14 : 0),
+      // 在校生と新入生の両方と同姓同名にならないようにする
+      takenNames: [...players, ...newcomers].map((player) => player.name),
+    })
+
+    newcomers.push(player)
+    if (isRecommended) recommendedIds.push(id)
+  }
+
+  return { newcomers, recommendedIds, serial }
+}
+
+export type SeasonChange = {
+  /** 進級後＋新入生を加えた新しい部員 */
+  players: Player[]
+  graduates: GraduateRecord[]
+  newcomers: Player[]
+  recommendedIds: string[]
+  /** 進路が進んだ既存のOB */
+  updatedAlumni: GraduateRecord[]
+  /** その年に起きた卒業生のニュース */
+  careerNews: string[]
+  /** 次に使う採番 */
+  serial: number
+}
+
+/**
+ * 学年を進め、卒業生を送り出し、新入生を迎える。
+ *
+ * @param year 新しい年（この年の4月が始まる）
+ * @param serial id の採番に使う通し番号
+ */
+export function advanceSeason(
+  rng: Rng,
+  params: {
+    players: Player[]
+    reputation: number
+    year: number
+    serial: number
+    /** OB名鑑。卒業後の進路を1年ぶん進めるために渡す */
+    alumni?: GraduateRecord[]
+  },
+): SeasonChange {
+  const { players, reputation, year, alumni = [] } = params
+
+  // 卒業生は進路（プロ・大学・社会人）まで決めて記録する
+  const graduates: GraduateRecord[] = players
+    .filter((player) => player.grade === 3)
+    .map((player) =>
+      createAlumnus(
+        rng,
+        {
+          id: player.id,
+          name: player.name,
+          isPitcher: player.isPitcher,
+          position: player.position,
+          year,
+          rating: overallRating(player),
+          skills: [...player.skills],
+          highSchool: player.stats,
+          u18Bonus: draftBonus(player.u18),
+        },
+        reputation,
+      ),
+    )
+
+  // 卒業しなかった選手を進級させる
+  const promoted = players
+    .filter((player) => player.grade < 3)
+    .map((player) => ({ ...player, grade: (player.grade + 1) as Grade }))
+
+  const recruited = recruitFreshmen(rng, {
+    players: promoted,
+    reputation,
+    year,
+    serial: params.serial,
+  })
+  const { newcomers, recommendedIds } = recruited
+  const serial = recruited.serial
+
+  // 既にいる卒業生のその後を1年ぶん進める
+  const updatedAlumni: GraduateRecord[] = []
+  const careerNews: string[] = []
+  for (const record of alumni) {
+    const update = advanceCareer(rng, record, year)
+    updatedAlumni.push(update.alumnus)
+    if (update.news) careerNews.push(update.news)
+  }
+
+  return {
+    players: [...promoted, ...newcomers],
+    graduates,
+    newcomers,
+    recommendedIds,
+    updatedAlumni,
+    careerNews,
+    serial,
+  }
+}

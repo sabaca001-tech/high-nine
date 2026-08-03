@@ -1,0 +1,1890 @@
+/**
+ * ゲームエンジン。core への唯一の入口。
+ *
+ * UI は applyCommand() にコマンドを渡し、返ってきた state で画面を差し替えるだけ。
+ * ルール計算を UI 側に書いてはいけない（CLAUDE.md 1.1 参照）。
+ */
+
+import { createRng, createSeed } from '@/core/rng/random'
+import type { Rng, RngState } from '@/core/rng/random'
+import {
+  addTournamentCell,
+  applyRoute,
+  clearTournamentCell,
+  createBoard,
+  dayOfTournament,
+  findRoute,
+  forcedStopBetween,
+  GOAL_INDEX,
+} from '@/core/board/boardDefs'
+import { formatDay, monthOfDay, monthsCrossed } from '@/core/calendar/days'
+import { SEASON_START_MONTH } from '@/core/calendar/days'
+import { resolveCell } from '@/core/board/resolveCell'
+import { PRACTICE_DEFS } from '@/core/card/cardDefs'
+import type { PracticeSpecial } from '@/core/card/cardDefs'
+import { drawHand, replaceBrokenCards, replaceCard } from '@/core/card/drawCards'
+import { autoLineup, repairLineup, validateLineup } from '@/core/lineup/autoLineup'
+import { createInitialRoster, createPlayer } from '@/core/player/createPlayer'
+import { recruitFreshmen } from '@/core/season/graduation'
+import { applyCardCost, clamp } from '@/core/player/growth'
+import { addBatting, addPitching } from '@/core/player/careerStats'
+import { applyMatchGrowth } from '@/core/player/matchGrowth'
+import {
+  applySubstitution,
+  finalizeMatch,
+  isMatchOver,
+  startMatchState,
+  stepHalfInning,
+} from '@/core/match/simulateGame'
+import { pickOpponentName } from '@/core/match/opponent'
+import {
+  addResult,
+  addStar,
+  advanceRival,
+  createRivals,
+  pickRivalFor,
+  localRivals,
+  nationalRivals,
+  schoolForProspect,
+  upperStarRatingAtRank,
+} from '@/core/rival/rivals'
+import type { RivalSchool } from '@/core/rival/rivals'
+import {
+  allProspects,
+  createProspects,
+  emptyScouting,
+  findScoutRegion,
+  MAX_APPROACHES,
+  prospectSkillName,
+  SCOUT_OPEN_MONTH,
+  successChance,
+} from '@/core/scout/scouting'
+import type { ScoutRegion, ScoutResult } from '@/core/scout/scouting'
+import { createTraits } from '@/core/scout/scoutTraits'
+import { playU18, selectU18, U18_SQUAD_SIZE } from '@/core/player/u18'
+import { applyCamp, findCampPlan, CAMP_AFTERGLOW } from '@/core/camp/campDefs'
+import { advanceSeason } from '@/core/season/graduation'
+import { applyStreaks } from '@/core/player/streak'
+import {
+  firstSquadSet,
+  repairSquad,
+  squadMultiplierOf,
+  trimSquad,
+} from '@/core/player/squad'
+import {
+  advanceConvert,
+  canConvert,
+  focusLabel,
+  withFocus,
+} from '@/core/player/trainingFocus'
+import type { TrainingFocus } from '@/core/player/trainingFocus'
+import { fixedEventFor } from '@/core/calendar/fixedEvents'
+import { formatFunds, FUNDS_MAX, monthlyFunds, tournamentPrize } from '@/core/shop/funds'
+import { scoutTripCost, tournamentTravel } from '@/core/shop/travel'
+import { monthlyUpkeep, UNPAID_TRUST_PENALTY } from '@/core/shop/upkeep'
+import {
+  findManager,
+  groundMultiplier,
+  managerConditionCost,
+  managerDefenseBonus,
+  managerFundsRate,
+  managerGrowthBonus,
+  managerRecovery,
+  clampGroundLevel,
+  GROUND_DECAY_STEPS,
+  GROUND_LEVEL_MIN,
+  groundDecayChance,
+  groundName,
+  groundUpgradeCostFor,
+} from '@/core/shop/facility'
+import { applyItem, findItem } from '@/core/shop/itemDefs'
+import { findEquipment, unlockedKinds } from '@/core/shop/equipmentDefs'
+import {
+  applyRoundResult,
+  createTournament,
+  opponentStrengthFor,
+  reputationGain,
+} from '@/core/tournament/tournament'
+import { PRACTICE_LABELS } from '@/core/types/card'
+import type { PracticeKind } from '@/core/types/card'
+import { ABILITY_LABELS, HISTORY_LIMIT, isAvailable, snapshotOf } from '@/core/types/player'
+import type { AbilityChange, Player } from '@/core/types/player'
+import type { GameEvent, LogEntry } from '@/core/types/event'
+import type { EngineResult, GameCommand, GameState, Month, PracticeBoost } from '@/core/types/game'
+import { GRADUATES_LIMIT, LOG_LIMIT, SAVE_VERSION } from '@/core/types/game'
+import type { Lineup } from '@/core/types/lineup'
+import { handSizeFor, REPUTATION_INITIAL, REPUTATION_MAX } from '@/core/types/season'
+import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
+import { DEFAULT_UNIFORM, normalizeUniform } from '@/core/team/uniforms'
+import type { UniformId } from '@/core/team/uniforms'
+import type { RegionId } from '@/core/types/region'
+import { isTournamentOver, roundName } from '@/core/types/tournament'
+
+export type NewGameOptions = {
+  schoolName?: string
+  /** ユニフォームの色。省略時は既定 */
+  uniform?: UniformId
+  /** 所在地。大会の回戦数が変わる */
+  regionId?: RegionId
+  /** 省略時はランダム。テストでは固定値を渡す */
+  seed?: RngState
+}
+
+/** 新規ゲームの初期状態を作る */
+export function createInitialState(options: NewGameOptions = {}): GameState {
+  const {
+    schoolName = 'さくら第一高校',
+    uniform = DEFAULT_UNIFORM,
+    regionId = DEFAULT_REGION_ID,
+    seed = createSeed(),
+  } = options
+  const rng = createRng(seed)
+
+  // 4月の入部から始める。在校生（2・3年）を用意し、新入生を迎える
+  const returning = createInitialRoster(rng, 8, [3, 2])
+  const recruited = recruitFreshmen(rng, {
+    players: returning,
+    reputation: REPUTATION_INITIAL,
+    year: 1,
+    serial: returning.length + 1,
+  })
+  const players = [...returning, ...recruited.newcomers]
+
+  const board = createBoard(rng)
+  const hand = drawHand(rng, 0, handSizeFor(REPUTATION_INITIAL))
+  const lineup = autoLineup(players)
+
+  return {
+    version: SAVE_VERSION,
+    rngState: rng.state,
+    schoolName,
+    uniform,
+    year: 1,
+    month: SEASON_START_MONTH,
+    // 入部の報告から始める
+    phase: 'newSeason',
+    players,
+    lineup,
+    // スタメンを先に入れてから総合上位で埋める。
+    // 総合だけで選ぶと、能力は低いが捕手適性のある選手などがスタメンなのに
+    // ベンチ外、という矛盾した状態になる
+    squad: repairSquad(
+      lineup.slots.map((slot) => slot.playerId),
+      players,
+    ),
+    captainId: null,
+    board,
+    boardPosition: 0,
+    hand,
+    serial: recruited.serial + hand.length,
+    practiceBoost: null,
+    matchSpeed: 'normal',
+    matchState: null,
+    pendingMatch: null,
+    pendingSetup: null,
+    regionId,
+    rivals: createRivals(rng, regionId),
+    scouting: emptyScouting(),
+    scoutTraits: createTraits(rng),
+    tournament: null,
+    nationalsBerth: false,
+    springBerth: false,
+    funds: monthlyFunds(REPUTATION_INITIAL),
+    groundLevel: 1,
+    managerId: null,
+    equipment: [],
+    pendingFork: false,
+    reputation: REPUTATION_INITIAL,
+    graduates: [],
+    pendingSeason: {
+      year: 1,
+      graduates: [],
+      newcomers: recruited.newcomers,
+      recommendedIds: recruited.recommendedIds,
+      scoutResults: [],
+      rivalNews: [],
+      careerNews: [],
+      reputationBefore: REPUTATION_INITIAL,
+      reputationAfter: REPUTATION_INITIAL,
+    },
+    log: [],
+  }
+}
+
+/** コマンドを適用して新しい状態を返す */
+export function applyCommand(state: GameState, command: GameCommand): EngineResult {
+  switch (command.type) {
+    case 'selectCard':
+      return selectCard(state, command.cardId)
+    case 'advanceYear':
+      return advanceYear(state)
+    case 'setLineup':
+      return setLineup(state, command.lineup)
+    case 'autoLineup':
+      return setLineup(state, autoLineup(state.players))
+    case 'setSquad':
+      return setSquad(state, command.squad)
+    case 'setMatchSpeed':
+      // スキップは「この試合だけ飛ばす」操作なので設定としては覚えない。
+      // 覚えてしまうと、一度スキップしたあと全試合が飛んでしまう
+      return command.speed === 'skip'
+        ? { state, events: [] }
+        : { state: { ...state, matchSpeed: command.speed }, events: [] }
+    case 'startMatch':
+      return startMatch(state)
+    case 'advanceMatch':
+      return advanceMatch(state, command.toEnd === true)
+    case 'substitutePlayer':
+      return substitutePlayer(state, command.slotIndex, command.playerId)
+    case 'finishMatch':
+      return finishMatch(state)
+    case 'finishSeason':
+      return finishSeason(state, {
+        ...(command.schoolName !== undefined ? { schoolName: command.schoolName } : {}),
+        ...(command.uniform !== undefined ? { uniform: command.uniform } : {}),
+        ...(command.regionId !== undefined ? { regionId: command.regionId } : {}),
+      })
+    case 'playTournamentMatch':
+      return playTournamentMatch(state)
+    case 'finishTournament':
+      return finishTournament(state)
+    case 'chooseCampPlan':
+      return chooseCampPlan(state, command.planId)
+    case 'buyItem':
+      return buyItem(state, command.itemId)
+    case 'setTrainingFocus':
+      return setTrainingFocus(state, command.playerId, command.focus)
+    case 'upgradeGround':
+      return upgradeGround(state, command.steps ?? 1)
+    case 'hireManager':
+      return hireManager(state, command.managerId)
+    case 'buyEquipment':
+      return buyEquipment(state, command.equipmentId)
+    case 'visitScoutRegion':
+      return visitScoutRegion(state, command.regionId)
+    case 'approachProspect':
+      return approachProspect(state, command.prospectId)
+    case 'chooseRoute':
+      return chooseRoute(state, command.routeId)
+  }
+}
+
+/** ルート分岐で道筋を選ぶ。この先のマスが選んだ方針で作り直される */
+function chooseRoute(state: GameState, routeId: string): EngineResult {
+  const route = findRoute(routeId)
+  if (state.phase !== 'fork' || !route) {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+  const board = applyRoute(rng, state.board, state.boardPosition, route)
+
+  const events: GameEvent[] = [
+    { type: 'message', text: `${route.label}を選んだ`, tone: 'normal' },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      board,
+      pendingFork: false,
+      serial,
+      phase: 'cardSelect',
+      log,
+    },
+    events,
+  }
+}
+
+/** グラウンドを1段階整備する。恒久的に練習効率が上がる */
+function upgradeGround(state: GameState, steps: number): EngineResult {
+  const wanted = Math.max(1, Math.round(steps))
+  const quote = groundUpgradeCostFor(state.groundLevel, wanted)
+
+  if (quote.steps === 0 || state.funds < quote.cost) {
+    return { state, events: [] }
+  }
+
+  const level = clampGroundLevel(state.groundLevel + quote.steps)
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `グラウンドを整備した（Lv${state.groundLevel} → Lv${level} ${groundName(level)}）`,
+      tone: 'good',
+    },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      groundLevel: level,
+      funds: state.funds - quote.cost,
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 練習器具を買う。
+ * 買うと対応する練習カードが手札に出るようになる。
+ * すでに持っているものは買えない（壊れて失ってから買い直す）。
+ */
+function buyEquipment(state: GameState, equipmentId: string): EngineResult {
+  const equipment = findEquipment(equipmentId)
+  if (!equipment || state.equipment.includes(equipmentId) || state.funds < equipment.price) {
+    return { state, events: [] }
+  }
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `${equipment.name}を購入した。「${PRACTICE_LABELS[equipment.unlocks]}」が選べるようになった`,
+      tone: 'good',
+    },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      equipment: [...state.equipment, equipmentId],
+      funds: state.funds - equipment.price,
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/** マネージャーを雇う。1人だけ在籍できる */
+function hireManager(state: GameState, managerId: string): EngineResult {
+  const manager = findManager(managerId)
+  if (!manager || state.managerId === managerId || state.funds < manager.hireCost) {
+    return { state, events: [] }
+  }
+
+  const events: GameEvent[] = [
+    { type: 'message', text: `${manager.name}がマネージャーに就任した`, tone: 'good' },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      managerId: manager.id,
+      funds: state.funds - manager.hireCost,
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/** ショップでアイテムを買う。効果はその場で出る */
+function buyItem(state: GameState, itemId: string): EngineResult {
+  const item = findItem(itemId)
+  if (!item || state.funds < item.price) {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+  const outcome = applyItem(rng, state.players, item)
+
+  const events: GameEvent[] = [
+    { type: 'message', text: `${item.name}を購入した`, tone: 'normal' },
+    { type: 'message', text: outcome.text, tone: 'good' },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      players: outcome.players,
+      funds: state.funds - item.price,
+      // 買った練習器具のバフは、既にあるものより強ければ上書きする
+      practiceBoost: nextBoost(state.practiceBoost, outcome.boost, false),
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 選手の練習方針を決める。
+ *
+ * 部費ではなく練習で守備位置を覚える形にしたので、コンバートもここで指示する。
+ * いつでも変更できるが、**変えるとコンバートの進捗はやり直し**になる。
+ */
+function setTrainingFocus(
+  state: GameState,
+  playerId: string,
+  focus: TrainingFocus,
+): EngineResult {
+  const player = state.players.find((p) => p.id === playerId)
+  if (!player) return { state, events: [] }
+
+  // 上限に届いている位置は指定できない
+  if (focus.type === 'convert' && !canConvert(player, focus.position)) {
+    return { state, events: [] }
+  }
+
+  const updated = withFocus(player, focus)
+  if (updated === player) return { state, events: [] }
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `${player.name}の練習方針：${focusLabel(focus, ABILITY_LABELS)}`,
+      tone: 'normal',
+    },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      players: state.players.map((p) => (p.id === playerId ? updated : p)),
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * コンバート練習を1回ぶん進める。
+ * 一定回数積み上がると適性が1段階上がる。
+ */
+function applyConvertTraining(players: GameState['players']): {
+  players: GameState['players']
+  events: GameEvent[]
+} {
+  const events: GameEvent[] = []
+
+  const updated = players.map((player) => {
+    // 離脱中は練習していない
+    if (player.focus?.type !== 'convert' || !isAvailable(player)) return player
+
+    const step = advanceConvert(player)
+    if (step.promoted) {
+      events.push({
+        type: 'message',
+        text: `${player.name}の${step.promoted.position}適性が上がった（${step.promoted.from} → ${step.promoted.to}）`,
+        tone: 'good',
+      })
+    }
+    return step.player
+  })
+
+  return { players: updated, events }
+}
+
+/** 冬合宿の方針を決めて実施する */
+function chooseCampPlan(state: GameState, planId: string): EngineResult {
+  const plan = findCampPlan(planId)
+  if (state.phase !== 'camp' || !plan) {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+  const firstSquad = firstSquadSet(state.squad)
+  const { players, changes } = applyCamp(
+    rng,
+    state.players,
+    plan,
+    groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managerId),
+    (player) => squadMultiplierOf(player.id, firstSquad),
+  )
+
+  const events: GameEvent[] = [
+    { type: 'message', text: `冬合宿：${plan.label}に打ち込んだ`, tone: 'good' },
+  ]
+  if (changes.length > 0) events.push({ type: 'ability', changes })
+
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      players,
+      // 合宿の成果はしばらく練習にも効く
+      practiceBoost: CAMP_AFTERGLOW,
+      serial,
+      phase: 'cardSelect',
+      log,
+    },
+    events,
+  }
+}
+
+/** 大会の次の試合を行う。結果の反映は finishMatch 側 */
+function playTournamentMatch(state: GameState): EngineResult {
+  const tournament = state.tournament
+  if (state.phase !== 'tournament' || !tournament || isTournamentOver(tournament)) {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+
+  // 回戦ごとの難易度の曲線は変えず、それに近い戦力の学校を当てる。
+  // 地区大会は県内の学校、全国大会は県外の全国クラスから引く
+  const base = opponentStrengthFor(tournament, findRegion(state.regionId))
+  const local = tournament.kind === 'summerPref' || tournament.kind === 'autumnPref'
+  const pool = local
+    ? localRivals(state.rivals, state.regionId)
+    : nationalRivals(state.rivals, state.regionId)
+  const rival = pickRivalFor(rng, pool, base)
+
+  // ここでは試合をせず、スタメンを確認する画面へ送る
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      pendingSetup: {
+        kind: 'friendly',
+        opponentName: rival?.name ?? pickOpponentName(rng),
+        ...(rival ? { opponentSchoolId: rival.id } : {}),
+        opponentStrength: rival?.strength ?? base,
+        // 全国大会では相手がどこの代表かを出す（甲子園の実感）
+        ...(local || !rival ? {} : { opponentRegionName: findRegion(rival.regionId).name }),
+        // トーナメントなので引き分けはあり得ない
+        decisive: true,
+        roundName: roundName(tournament.round, tournament.totalRounds),
+      },
+      phase: 'lineupCheck',
+    },
+    events: [],
+  }
+}
+
+/**
+ * 試合に連れて行ける選手。
+ *
+ * **ベンチ入り（squad）とスタメンだけ。** 部員全員を渡していた頃は、
+ * ベンチ外の選手が代打や継投で出てきてしまい、ベンチ入りを決める意味が無かった。
+ */
+export function matchRoster(state: GameState): Player[] {
+  const ids = new Set(state.squad)
+  for (const slot of state.lineup.slots) ids.add(slot.playerId)
+  return state.players.filter((player) => ids.has(player.id))
+}
+
+/**
+ * スタメンの確認を終えて試合を始める。
+ *
+ * **ここで初めて試合が動き出す。** 確認画面で組み替えた
+ * スタメンがそのまま結果に反映される。
+ * ここではまだ1球も投げず、`advanceMatch` で半回ずつ進める。
+ */
+function startMatch(state: GameState): EngineResult {
+  const setup = state.pendingSetup
+  if (state.phase !== 'lineupCheck' || !setup) {
+    return { state, events: [] }
+  }
+  // 成立していない編成のままでは始めさせない
+  if (validateLineup(state.lineup, state.players).length > 0) {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+  const matchState = startMatchState(rng, {
+    players: matchRoster(state),
+    lineup: state.lineup,
+    opponentName: setup.opponentName,
+    ...(setup.opponentSchoolId ? { opponentSchoolId: setup.opponentSchoolId } : {}),
+    opponentStrength: setup.opponentStrength,
+    kind: setup.kind,
+    ...(setup.decisive ? { decisive: true } : {}),
+    defenseBonus: managerDefenseBonus(state.managerId),
+  })
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      matchState,
+      pendingMatch: null,
+      pendingSetup: null,
+      phase: 'match',
+    },
+    events: [],
+  }
+}
+
+/**
+ * 試合を半回ぶん進める。
+ *
+ * `toEnd` なら決着まで一気に進める（スキップ観戦と自動プレイ用）。
+ * **どちらで進めても結果は同じ**。乱数の並びが変わらないため。
+ */
+function advanceMatch(state: GameState, toEnd: boolean): EngineResult {
+  if (state.phase !== 'match' || !state.matchState) return { state, events: [] }
+
+  const rng = createRng(state.rngState)
+  let matchState = stepHalfInning(rng, state.matchState)
+  while (toEnd && !isMatchOver(matchState)) {
+    matchState = stepHalfInning(rng, matchState)
+  }
+
+  if (!isMatchOver(matchState)) {
+    return { state: { ...state, rngState: rng.state, matchState }, events: [] }
+  }
+
+  // 決着したので結果にまとめる。ここから先は観戦の再生だけ
+  const match = finalizeMatch(rng, matchState)
+  return {
+    state: { ...state, rngState: rng.state, matchState: null, pendingMatch: match },
+    events: [],
+  }
+}
+
+/**
+ * 試合中の選手交代。回の切れ目でだけ行える。
+ *
+ * 退いた選手は戻れない（高校野球と同じ）。
+ * 投手の枠には投手能力を持つ選手しか入れられない。
+ */
+function substitutePlayer(
+  state: GameState,
+  slotIndex: number,
+  playerId: string,
+): EngineResult {
+  const matchState = state.matchState
+  if (state.phase !== 'match' || !matchState) return { state, events: [] }
+
+  const next = applySubstitution(matchState, slotIndex, playerId)
+  if (!next) return { state, events: [] }
+
+  // 交代はこの試合限り。次の試合のスタメンには持ち込まない
+  // （自動で出た代打まで登録スタメンを書き換えてしまうため）
+  return { state: { ...state, matchState: next }, events: [] }
+}
+
+/**
+ * 大会を終えて次の月へ進む。
+ * 評判の加算はここで一度だけ行う。
+ */
+function finishTournament(state: GameState): EngineResult {
+  const tournament = state.tournament
+  if (state.phase !== 'tournament' || !tournament || !isTournamentOver(tournament)) {
+    return { state, events: [] }
+  }
+
+  const gain = reputationGain(tournament)
+  const reputation = clamp(state.reputation + gain, 0, REPUTATION_MAX)
+  const prize = tournamentPrize(tournament)
+
+  // 遠征費は実際に行った試合数ぶんかかる。全国大会は補助も出る
+  const travel = tournamentTravel(
+    tournament.kind,
+    findRegion(state.regionId),
+    tournament.results.length,
+  )
+  // 部費は0を下回らせない（不足分は学校の立て替えという扱い）
+  const funds = clamp(state.funds + prize + travel.grant - travel.cost, 0, FUNDS_MAX)
+
+  // 夏の地区大会を制すと夏の全国大会へ、秋季大会を制すと春の全国大会へ進める
+  const nationalsBerth =
+    tournament.kind === 'summerPref' ? tournament.champion : state.nationalsBerth
+  const springBerth =
+    tournament.kind === 'autumnPref' ? tournament.champion : state.springBerth
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: tournament.champion
+        ? `${tournament.name} 優勝！`
+        : `${tournament.name} ${tournament.results.length}回戦で敗退`,
+      tone: tournament.champion ? 'good' : 'bad',
+    },
+  ]
+  if (gain > 0) {
+    events.push({ type: 'message', text: `学校の評判が ${gain} 上がった`, tone: 'good' })
+  }
+  if (prize > 0) {
+    events.push({
+      type: 'message',
+      text: `大会の成績で ${formatFunds(prize)} の部費が入った`,
+      tone: 'good',
+    })
+  }
+  if (travel.grant > 0) {
+    events.push({
+      type: 'message',
+      text: `後援会から遠征補助 ${formatFunds(travel.grant)} が出た`,
+      tone: 'good',
+    })
+  }
+  if (travel.cost > 0) {
+    events.push({
+      type: 'message',
+      text:
+        travel.nights > 0
+          ? `遠征費 ${formatFunds(travel.cost)} がかかった（移動と${travel.nights}泊ぶん）`
+          : `球場までの交通費 ${formatFunds(travel.cost)} がかかった`,
+      tone: 'bad',
+    })
+  }
+  if (tournament.kind === 'summerPref' && tournament.champion) {
+    events.push({ type: 'message', text: '夏の全国大会への出場が決まった！', tone: 'good' })
+  }
+  if (tournament.kind === 'autumnPref' && tournament.champion) {
+    events.push({ type: 'message', text: '春の全国大会への出場が決まった！', tone: 'good' })
+  }
+
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  // 大会が終わったマスは普通のマスに戻す。
+  // こうしないと同じ日にもう一度大会が始まってしまう
+  let board = clearTournamentCell(state.board, state.boardPosition)
+
+  // 全国大会の出場権を得たら、その大会マスを盤面に足す
+  if (tournament.kind === 'summerPref' && tournament.champion) {
+    board = addTournamentCell(board, 'nationals', state.boardPosition)
+    events.push({
+      type: 'message',
+      text: `${formatDay(dayOfTournament('nationals'))}に全国大会が待っている`,
+      tone: 'good',
+    })
+  }
+  if (tournament.kind === 'autumnPref' && tournament.champion) {
+    board = addTournamentCell(board, 'springNationals', state.boardPosition)
+    events.push({
+      type: 'message',
+      text: `${formatDay(dayOfTournament('springNationals'))}に春の全国大会が待っている`,
+      tone: 'good',
+    })
+  }
+
+  return {
+    state: {
+      ...state,
+      tournament: null,
+      board,
+      nationalsBerth,
+      springBerth,
+      reputation,
+      funds,
+      serial,
+      log,
+      // 大会が終わったらそのままカード選択に戻る（同じ日から再開）
+      phase: 'cardSelect',
+    },
+    events,
+  }
+}
+
+/** 世代交代の報告を閉じて新年度を始める */
+function finishSeason(
+  state: GameState,
+  change: { schoolName?: string; uniform?: UniformId; regionId?: RegionId } = {},
+): EngineResult {
+  if (state.phase !== 'newSeason') {
+    return { state, events: [] }
+  }
+
+  const events: GameEvent[] = []
+
+  const schoolName = change.schoolName?.trim()
+  const renamed = schoolName !== undefined && schoolName.length > 0 && schoolName !== state.schoolName
+  if (renamed) {
+    events.push({
+      type: 'message',
+      text: `校名が「${state.schoolName}」から「${schoolName}」に変わった`,
+      tone: 'normal',
+    })
+  }
+
+  const uniform = change.uniform ? normalizeUniform(change.uniform) : state.uniform
+  if (uniform !== state.uniform) {
+    events.push({ type: 'message', text: 'ユニフォームを新調した', tone: 'normal' })
+  }
+
+  // 所在地を変えると大会の回戦数も遠征費も変わる。
+  // ライバル校は県ごとに置いているので、**引っ越し先の顔ぶれに入れ替える**
+  const moved = change.regionId !== undefined && change.regionId !== state.regionId
+  const regionId = moved ? change.regionId! : state.regionId
+
+  let rivals = state.rivals
+  let rngState = state.rngState
+  if (moved) {
+    const rng = createRng(state.rngState)
+    // 引っ越し先の県内校を作り直す。県外の全国クラスはそのまま残す
+    // （甲子園で当たってきた相手を消してしまうと戦績が意味を失う）
+    const outside = state.rivals.filter((school) => school.regionId !== state.regionId)
+    const fresh = createRivals(rng, regionId).filter((school) => school.regionId === regionId)
+    rivals = [...fresh, ...outside.filter((school) => school.regionId !== regionId)]
+    rngState = rng.state
+
+    events.push({
+      type: 'message',
+      text: `${findRegion(state.regionId).name}から${findRegion(regionId).name}へ移転した`,
+      tone: 'normal',
+    })
+  }
+
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      ...(renamed ? { schoolName } : {}),
+      uniform,
+      regionId,
+      rivals,
+      rngState,
+      serial,
+      phase: 'cardSelect',
+      pendingSeason: null,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 観戦を終えて試合結果をチームに反映する。
+ *
+ * 能力や信頼度の変化をここで行うのは、観戦中に状態が変わると
+ * 途中で画面を離れたときに二重適用される恐れがあるため。
+ */
+function finishMatch(state: GameState): EngineResult {
+  const match = state.pendingMatch
+  if (state.phase !== 'match' || !match) {
+    return { state, events: [] }
+  }
+
+  const won = match.outcome === 'win'
+  const starters = new Set(state.lineup.slots.map((slot) => slot.playerId))
+  const battingById = new Map(match.battingLines.map((line) => [line.playerId, line]))
+  const pitchingById = new Map(match.pitchingLines.map((line) => [line.playerId, line]))
+
+  // 成長の判定に乱数を使うので、ここでカーソルを取り出す
+  const rng = createRng(state.rngState)
+  const growthChanges: AbilityChange[] = []
+
+  const players = state.players.map((player) => {
+    // 出場した選手ほど得るものが大きい
+    const batting = battingById.get(player.id)
+    const pitching = pitchingById.get(player.id)
+    const played = starters.has(player.id) || batting !== undefined || pitching !== undefined
+    const trustGain = (won ? 5 : 2) + (played ? 2 : 0) + (player.id === match.mvpPlayerId ? 3 : 0)
+    const conditionCost = played ? 14 : 6
+
+    // 通算成績を積む。出場していなければ何も足さない（試合数も増えない）
+    let stats = player.stats
+    if (batting) stats = addBatting(stats, batting)
+    if (pitching) stats = addPitching(stats, pitching)
+
+    // 活躍した選手はその場で伸びる。試合に出す判断に育成上の意味を持たせる
+    const grown = applyMatchGrowth(rng, player, {
+      ...(batting ? { batting } : {}),
+      ...(pitching ? { pitching } : {}),
+      won,
+      mvp: player.id === match.mvpPlayerId,
+    })
+    growthChanges.push(...grown.changes)
+
+    return {
+      ...grown.player,
+      stats,
+      trust: clamp(player.trust + trustGain, 0, 100),
+      condition: clamp(player.condition - conditionCost, 0, 100),
+    }
+  })
+
+  // 勝てば学校の評判が上がり、良い新入生が来やすくなる
+  const reputationDelta = won ? 2 : match.outcome === 'draw' ? 0 : -1
+  const reputation = clamp(state.reputation + reputationDelta, 0, REPUTATION_MAX)
+
+  // 相手がライバル校なら対戦成績を残す。「去年負けたあの学校」が分かるようになる
+  const rivals = match.opponentSchoolId
+    ? state.rivals.map((school) =>
+        school.id === match.opponentSchoolId
+          ? addResult(school, {
+              year: state.year,
+              label: state.tournament
+                ? `${state.tournament.name} ${roundName(state.tournament.round, state.tournament.totalRounds)}`
+                : '練習試合',
+              outcome: match.outcome,
+            })
+          : school,
+      )
+    : state.rivals
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `${match.opponentName}戦 ${match.finalScore.player}-${match.finalScore.opponent}で${
+        won ? '勝利' : match.outcome === 'draw' ? '引き分け' : '敗戦'
+      }`,
+      tone: won ? 'good' : match.outcome === 'draw' ? 'normal' : 'bad',
+    },
+  ]
+
+  if (growthChanges.length > 0) {
+    events.push({ type: 'ability', changes: growthChanges })
+    events.push({
+      type: 'message',
+      text: `試合での活躍で${new Set(growthChanges.map((c) => c.playerId)).size}人が成長した`,
+      tone: 'good',
+    })
+  }
+
+  // 大会の試合だった場合は、勝敗を大会に反映して大会画面へ戻る
+  if (state.tournament) {
+    const tournament = applyRoundResult(state.tournament, {
+      opponentName: match.opponentName,
+      scoreFor: match.finalScore.player,
+      scoreAgainst: match.finalScore.opponent,
+      won,
+    })
+    const { log, serial } = appendLog(state.log, events, state.serial)
+
+    return {
+      state: {
+        ...state,
+        rngState: rng.state,
+        players,
+        rivals,
+        pendingMatch: null,
+        // 大会の評判は finishTournament でまとめて加算する
+        tournament,
+        serial,
+        phase: 'tournament',
+        log,
+      },
+      events,
+    }
+  }
+
+  const reachedGoal = state.boardPosition >= GOAL_INDEX
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      players,
+      rivals,
+      pendingMatch: null,
+      reputation,
+      serial,
+      phase: reachedGoal ? 'yearEnd' : 'cardSelect',
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * ベンチ入りを差し替える。
+ * 在籍していない選手や重複は落とし、定員に足りなければ繰り上げる。
+ */
+function setSquad(state: GameState, squad: string[]): EngineResult {
+  // 足りなくても埋めない。埋めるとベンチ外へ落とした選手がその場で戻ってくる
+  const trimmed = trimSquad(squad, state.players)
+
+  // スタメンは必ずベンチ入りに含める（出場する選手がベンチ外というのは成立しない）
+  const withStarters = [...trimmed]
+  for (const slot of state.lineup.slots) {
+    if (!withStarters.includes(slot.playerId)) withStarters.push(slot.playerId)
+  }
+  const next = trimSquad(withStarters, state.players)
+
+  if (next.join(',') === state.squad.join(',')) return { state, events: [] }
+  return { state: { ...state, squad: next }, events: [] }
+}
+
+/** スタメンを差し替える。成立していない編成は受け付けない */
+function setLineup(state: GameState, lineup: Lineup): EngineResult {
+  if (validateLineup(lineup, state.players).length > 0) {
+    return { state, events: [] }
+  }
+  return { state: { ...state, lineup }, events: [] }
+}
+
+/**
+ * カードを1枚選んで、コマを進め、止まったマスを解決する。
+ *
+ * 盤面は1マス＝1日、1年で1本（365マス）。
+ * カードの数字は「進む日数」で、途中に大会や合宿があれば
+ * **飛び越えずに必ずそこで止まる**。
+ * 月をまたいだ場合は、またいだ月の処理（部費・体力回復・固定イベント）を
+ * その場でまとめて行う。
+ */
+function selectCard(state: GameState, cardId: string): EngineResult {
+  // 他のフェーズ中は操作を受け付けない（連打対策）
+  if (state.phase !== 'cardSelect') {
+    return { state, events: [] }
+  }
+
+  const card = state.hand.find((c) => c.id === cardId)
+  if (!card) {
+    throw new Error(`手札に存在しないカードが選択された: ${cardId}`)
+  }
+
+  const rng = createRng(state.rngState)
+  const events: GameEvent[] = []
+
+  const from = state.boardPosition
+  const wanted = Math.min(from + card.number, GOAL_INDEX)
+  // 大会・合宿は通り過ぎられない
+  const forced = forcedStopBetween(state.board, from, wanted)
+  const to = forced ?? wanted
+
+  events.push({ type: 'moved', from, to, steps: to - from })
+  if (forced !== null && forced < wanted) {
+    events.push({
+      type: 'message',
+      text: `${formatDay(forced)}。ここは飛ばせない`,
+      tone: 'normal',
+    })
+  }
+
+  // 止まったマスに関係なく、カードを使った時点で体力を消耗する
+  let players = applyCardCost(
+    state.players,
+    PRACTICE_DEFS[card.kind],
+    managerConditionCost(state.managerId),
+  )
+
+  // 自主練としてのコンバートは、どのマスに止まっても進む
+  const converted = applyConvertTraining(players)
+  players = converted.players
+  events.push(...converted.events)
+
+  // 練習以外のカード（ミーティング・整備・治療）の効果
+  const special = applyCardSpecial(state, players, PRACTICE_DEFS[card.kind].special)
+  players = special.players
+  events.push(...special.events)
+
+  // 月をまたいだぶんの処理をまとめて行う
+  const monthly = applyMonthChanges(
+    rng,
+    { ...state, players, groundLevel: special.groundLevel },
+    from,
+    to,
+  )
+  players = monthly.players
+  events.push(...monthly.events)
+
+  const cell = state.board[to]
+  events.push({ type: 'cell', cellIndex: to, cellKind: cell.kind })
+
+  const firstSquad = firstSquadSet(state.squad)
+
+  const outcome = resolveCell(rng, cell, card, {
+    players,
+    lineup: state.lineup,
+    boost: state.practiceBoost,
+    // ベンチ外は指導が行き届かないぶん伸びが鈍い
+    perPlayerMultiplier: (player) => squadMultiplierOf(player.id, firstSquad),
+    // グラウンド整備とマネージャーは常時かかる恒久的な倍率
+    facilityMultiplier:
+      groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managerId),
+    defenseBonus: managerDefenseBonus(state.managerId),
+    // 練習試合が他県への遠征になることがあるので、所在地と部費を渡す
+    region: findRegion(state.regionId),
+    funds: monthly.funds,
+    // 練習試合の相手はその土地の学校から引く（地元でも遠征先でも）
+    rivals: state.rivals,
+  })
+  events.push(...outcome.events)
+
+  const practiceBoost = nextBoost(state.practiceBoost, outcome.boost, outcome.boostConsumed)
+
+  // 使ったカードを補充する。評判が上がっていれば枠ごと増える
+  const handSize = handSizeFor(monthly.reputation)
+  const unlocked = unlockedKinds(monthly.equipment)
+  let serial = state.serial
+  const refilled = replaceCard(rng, state.hand, cardId, serial, handSize, unlocked)
+  serial += Math.max(1, handSize - (state.hand.length - 1))
+
+  // 器具が壊れたら、その練習のカードは手札からも引き直す
+  const hand = replaceBrokenCards(rng, refilled, monthly.lostKinds, serial, unlocked)
+  serial += monthly.lostKinds.length > 0 ? refilled.length : 0
+
+  // 止まったマスの種類でフェーズが決まる
+  const reachedGoal = to >= GOAL_INDEX
+  let tournament = state.tournament
+  let phase: GameState['phase']
+
+  if (outcome.matchSetup) {
+    phase = 'lineupCheck'
+  } else if (outcome.fork) {
+    phase = 'fork'
+  } else if (cell.kind === 'tournament' && cell.tournamentKind) {
+    // 大会マスに止まった。大会を作って観戦フェーズへ送り出す
+    tournament = createTournament(cell.tournamentKind, findRegion(state.regionId))
+    events.push({
+      type: 'message',
+      text: `${tournament.name}が開幕（${tournament.entrants}校・${tournament.totalRounds}回戦制）`,
+      tone: 'normal',
+    })
+    phase = 'tournament'
+  } else if (cell.kind === 'camp') {
+    phase = 'camp'
+  } else if (reachedGoal) {
+    events.push({ type: 'message', text: '年度末。1年が終わった', tone: 'normal' })
+    phase = 'yearEnd'
+  } else {
+    phase = 'cardSelect'
+  }
+
+  const { log, serial: nextSerial } = appendLog(state.log, events, serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      players: outcome.players,
+      // 部員の増減はないが、念のため編成の整合性を保つ
+      lineup: repairLineup(state.lineup, outcome.players),
+      boardPosition: to,
+      month: monthOfDay(to),
+      hand,
+      serial: nextSerial,
+      practiceBoost,
+      pendingMatch: null,
+      pendingSetup: outcome.matchSetup ?? null,
+      pendingFork: outcome.fork === true,
+      tournament,
+      // 遠征費などマスで発生した収支。部費は0を下回らせない
+      funds: clamp(monthly.funds + (outcome.fundsDelta ?? 0), 0, FUNDS_MAX),
+      groundLevel: monthly.groundLevel,
+      equipment: monthly.equipment,
+      scouting: monthly.scouting,
+      reputation: clamp(
+        monthly.reputation + (outcome.reputationDelta ?? 0),
+        0,
+        REPUTATION_MAX,
+      ),
+      phase,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 練習以外のカードの効果を適用する。
+ *
+ * 能力を伸ばすだけのカードばかりだと選択が単調になるので、
+ * やる気・設備・怪我といった**別の軸に効く**カードを混ぜている。
+ */
+function applyCardSpecial(
+  state: GameState,
+  players: GameState['players'],
+  special: PracticeSpecial | undefined,
+): { players: GameState['players']; groundLevel: number; events: GameEvent[] } {
+  if (!special) return { players, groundLevel: state.groundLevel, events: [] }
+
+  if (special === 'motivationUp') {
+    return {
+      players: players.map((player) => ({
+        ...player,
+        motivation: clamp(player.motivation + 1, -2, 2) as Player['motivation'],
+      })),
+      groundLevel: state.groundLevel,
+      events: [{ type: 'message', text: 'チームのやる気が上がった', tone: 'good' }],
+    }
+  }
+
+  if (special === 'groundUp') {
+    const level = clampGroundLevel(state.groundLevel + 1)
+    if (level === state.groundLevel) {
+      return {
+        players,
+        groundLevel: level,
+        events: [
+          { type: 'message', text: 'グラウンドはこれ以上ないほど整っている', tone: 'normal' },
+        ],
+      }
+    }
+    return {
+      players,
+      groundLevel: level,
+      events: [
+        {
+          type: 'message',
+          text: `部員総出でグラウンドを整備した（Lv${state.groundLevel} → Lv${level}）`,
+          tone: 'good',
+        },
+      ],
+    }
+  }
+
+  // heal: 離脱中の選手の復帰が早まる
+  const healed = players.filter((player) => player.injuryMonths > 0)
+  return {
+    players: players.map((player) =>
+      player.injuryMonths > 0 ? { ...player, injuryMonths: player.injuryMonths - 1 } : player,
+    ),
+    groundLevel: state.groundLevel,
+    events:
+      healed.length > 0
+        ? [
+            {
+              type: 'message',
+              text: `${healed.map((p) => p.name).join('・')}の治療が進んだ`,
+              tone: 'good',
+            },
+          ]
+        : [{ type: 'message', text: '幸い、怪我をしている部員はいなかった', tone: 'normal' }],
+  }
+}
+
+/** 月替わりでまとめて起きることの結果 */
+type MonthChangeResult = {
+  players: GameState['players']
+  funds: number
+  reputation: number
+  groundLevel: number
+  equipment: string[]
+  scouting: GameState['scouting']
+  /** 壊れて使えなくなった練習。手札から取り除くために返す */
+  lostKinds: PracticeKind[]
+  events: GameEvent[]
+}
+
+/**
+ * from の翌日から to までに月をまたいだぶんの処理をまとめて行う。
+ *
+ * 盤面が1年ぶりになり「月末に止まる」という区切りが無くなったので、
+ * **月をまたいだ瞬間**にここで月次処理を走らせる。
+ * カード1枚で2ヶ月ぶんまたぐこともあるため、またいだ月をすべて順に処理する。
+ */
+function applyMonthChanges(
+  rng: Rng,
+  state: GameState,
+  from: number,
+  to: number,
+): MonthChangeResult {
+  const crossed = monthsCrossed(from, to)
+  const events: GameEvent[] = []
+
+  let players = state.players
+  let funds = state.funds
+  let groundLevel = state.groundLevel
+  let equipment = state.equipment
+  let scouting = state.scouting
+  const reputation = state.reputation
+
+  for (const month of crossed) {
+    const result = applyOneMonth(
+      rng,
+      { ...state, players, funds, groundLevel, equipment, scouting },
+      month,
+    )
+    players = result.players
+    funds = result.funds
+    groundLevel = result.groundLevel
+    equipment = result.equipment
+    scouting = result.scouting
+    events.push(...result.events)
+  }
+
+  // 壊れた器具ぶんの練習は、この先もう引けない
+  const lostKinds = unlockedKinds(state.equipment).filter(
+    (kind) => !unlockedKinds(equipment).includes(kind),
+  )
+
+  return { players, funds, reputation, groundLevel, equipment, scouting, lostKinds, events }
+}
+
+/**
+ * 月が1つ変わったときにまとめて起きること。
+ *
+ * 部費の支給と維持費、体力回復、やる気の変動、急成長・スランプ、
+ * その月の学校行事、能力の記録。
+ * **4月（年度初め）も同じ処理を通す。** 通さないと入学式だけ起きない。
+ */
+export function applyOneMonth(
+  rng: Rng,
+  state: GameState,
+  month: Month,
+): {
+  players: GameState['players']
+  funds: number
+  groundLevel: number
+  equipment: string[]
+  scouting: GameState['scouting']
+  events: GameEvent[]
+} {
+  const events: GameEvent[] = []
+  let players = state.players
+  let funds = state.funds
+  let groundLevel = state.groundLevel
+  let equipment = state.equipment
+  let scouting = state.scouting
+
+  events.push({ type: 'monthAdvanced', year: state.year, month })
+  events.push({ type: 'message', text: `${state.year}年目 ${month}月`, tone: 'normal' })
+
+  // 月をまたぐと少しだけ体力が戻る。トレーナーが居るとさらに回復する
+  const recovery = 10 + managerRecovery(state.managerId)
+  players = players.map((player) => ({
+    ...player,
+    condition: Math.min(100, player.condition + recovery),
+    motivation: rollMonthlyMotivation(rng, player.motivation),
+    // 離脱期間は月をまたぐごとに1つ減る
+    injuryMonths: Math.max(0, player.injuryMonths - 1),
+  }))
+
+  // 怪我から復帰した選手を知らせる
+  for (const before of state.players) {
+    if (before.injuryMonths === 1) {
+      events.push({ type: 'message', text: `${before.name}が怪我から復帰した`, tone: 'good' })
+    }
+  }
+
+  // 月初に部費が支給され、設備と備品の維持費が引かれる
+  const income = Math.round(monthlyFunds(state.reputation) * managerFundsRate(state.managerId))
+  const upkeep = monthlyUpkeep(players.length, state.groundLevel)
+  const unpaid = funds + income < upkeep.total
+  funds = clamp(funds + income - upkeep.total, 0, FUNDS_MAX)
+
+  events.push({
+    type: 'message',
+    text: `部費 ${formatFunds(income)} が支給された`,
+    tone: 'normal',
+  })
+  events.push({
+    type: 'message',
+    text: `設備と備品の維持費 ${formatFunds(upkeep.total)} を支払った`,
+    tone: 'normal',
+  })
+
+  // 払えないと道具が足りず、部員の不満になる
+  if (unpaid) {
+    players = players.map((player) => ({
+      ...player,
+      trust: clamp(player.trust - UNPAID_TRUST_PENALTY, 0, 100),
+    }))
+    events.push({
+      type: 'message',
+      text: '維持費を払いきれず、道具が足りていない。部員の信頼度が下がった',
+      tone: 'bad',
+    })
+  }
+
+  // 練習器具は使ううちに壊れる。壊れるとその練習カードは出なくなる
+  const broken = equipment.filter((id) => {
+    const item = findEquipment(id)
+    return item !== undefined && rng.chance(item.breakChance)
+  })
+  if (broken.length > 0) {
+    equipment = equipment.filter((id) => !broken.includes(id))
+    for (const id of broken) {
+      const item = findEquipment(id)
+      if (item) {
+        events.push({
+          type: 'message',
+          text: `${item.name}が壊れてしまった。「${PRACTICE_LABELS[item.unlocks]}」は選べなくなる`,
+          tone: 'bad',
+        })
+      }
+    }
+  }
+
+  // グラウンドは放っておくと荒れる。維持費を払えなかった月は荒れやすい。
+  // これが無いと、部費が貯まった時点で最大段階に固定されてしまう
+  const decayChance = groundDecayChance(groundLevel) * (unpaid ? 2 : 1)
+  if (groundLevel > GROUND_LEVEL_MIN && rng.chance(decayChance)) {
+    const before = groundLevel
+    groundLevel = Math.max(GROUND_LEVEL_MIN, groundLevel - rng.int(1, GROUND_DECAY_STEPS))
+    events.push({
+      type: 'message',
+      text: `グラウンドが荒れてきた（Lv${before} → Lv${groundLevel}）`,
+      tone: 'bad',
+    })
+  }
+
+  // 急成長・スランプ。練習の積み上げとは別に偶発的に起きる
+  const streaks = applyStreaks(rng, players)
+  players = streaks.players
+  for (const streak of streaks.events) {
+    events.push({
+      type: 'message',
+      text: streak.text,
+      tone: streak.kind === 'breakout' ? 'good' : 'bad',
+    })
+    events.push({ type: 'ability', changes: streak.changes })
+  }
+
+  // その月の学校行事（毎年決まって起きる）
+  const fixedEvent = fixedEventFor(month)
+  if (fixedEvent) {
+    const applied = fixedEvent.apply(rng, players)
+    players = applied.players
+    events.push({ type: 'message', text: applied.text, tone: 'normal' })
+  }
+
+  // 秋：ここから世代交代までがスカウトの期間。
+  // 候補は**県を訪問した時点で**挙がるので、ここでは案内するだけ
+  if (month === SCOUT_OPEN_MONTH) {
+    events.push({
+      type: 'message',
+      text: '来年度のスカウトが解禁された。視察する県を選ぼう',
+      tone: 'normal',
+    })
+  }
+
+  // 冬前：U18日本代表の召集。県内の注目選手を上回っていることが条件
+  if (month === U18_SELECTION_MONTH) {
+    // 全国の注目選手（上級生）を並べて、代表枠のいちばん下を基準にする。
+    // 県内の1人と比べていた頃は、地区選択の難易度差が選考に乗っていた
+    const selected = selectU18(
+      players,
+      upperStarRatingAtRank(state.rivals, U18_SQUAD_SIZE - 1),
+    )
+    for (const player of selected) {
+      const outcome = playU18(rng, player, state.year)
+      players = players.map((p) => (p.id === player.id ? outcome.player : p))
+
+      events.push({
+        type: 'message',
+        text: `${player.name}がU18日本代表に選出された！`,
+        tone: 'good',
+      })
+      events.push({
+        type: 'message',
+        text:
+          outcome.performance >= 70
+            ? `${player.name}は国際大会で活躍し、スカウトの評価を大きく上げた`
+            : outcome.performance >= 35
+              ? `${player.name}は国際大会で経験を積んだ`
+              : `${player.name}は世界の壁を思い知らされた`,
+        tone: outcome.performance >= 35 ? 'good' : 'normal',
+      })
+      if (outcome.changes.length > 0) events.push({ type: 'ability', changes: outcome.changes })
+    }
+  }
+
+  // 月ごとに能力を記録して、あとから推移を追えるようにする
+  players = players.map((player) => ({
+    ...player,
+    history: [...player.history, snapshotOf(player, state.year, month)].slice(-HISTORY_LIMIT),
+  }))
+
+  return { players, funds, groundLevel, equipment, scouting, events }
+}
+
+/** U18日本代表が召集される月。冬の合宿の前 */
+const U18_SELECTION_MONTH = 11
+
+/**
+ * 練習効率バフの更新。
+ * 新しく得たバフは、残り効果量（倍率×残り回数）が大きい方を採用する。
+ */
+function nextBoost(
+  current: PracticeBoost | null,
+  gained: PracticeBoost | undefined,
+  consumed: boolean | undefined,
+): PracticeBoost | null {
+  let boost = current
+
+  if (consumed && boost) {
+    const remaining = boost.remaining - 1
+    boost = remaining > 0 ? { ...boost, remaining } : null
+  }
+
+  if (gained) {
+    const worth = (b: PracticeBoost) => b.multiplier * b.remaining
+    if (!boost || worth(gained) >= worth(boost)) return gained
+  }
+
+  return boost
+}
+
+/**
+ * 年度末（3月31日）の結果を確認して、次の年度を始める。
+ *
+ * 盤面が1年ぶんになったので、月ごとの区切りは無くなり
+ * **年度の切り替えだけ**がここに残る。
+ * 卒業・進級・新入生加入と、新しい1年ぶんの盤面の用意を行う。
+ */
+function advanceYear(state: GameState): EngineResult {
+  if (state.phase !== 'yearEnd') {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+  const year = state.year + 1
+
+  // 全国大会の出場権は年度をまたぐと失効する
+  const board = createBoard(rng)
+  const handSize = handSizeFor(state.reputation)
+  const hand = drawHand(rng, state.serial, handSize, unlockedKinds(state.equipment))
+  let serial = state.serial + handSize
+
+  const events: GameEvent[] = [
+    { type: 'monthAdvanced', year, month: SEASON_START_MONTH },
+    { type: 'message', text: `${year}年目 ${SEASON_START_MONTH}月`, tone: 'normal' },
+  ]
+
+  // スカウトの結果を出す。獲れた選手は新入生に加わり、
+  // 逃した選手は県内のライバル校へ進む
+  const scouted = resolveScouting(rng, state, year)
+  serial = scouted.serial
+
+  const change = advanceSeason(rng, {
+    players: state.players,
+    reputation: state.reputation,
+    year,
+    serial,
+    alumni: state.graduates,
+  })
+
+  const players = [...change.players, ...scouted.joined]
+  serial = change.serial
+
+  // ライバル校の1年を進める。強豪は強豪のまま、力をつける学校も出てくる
+  const rivals: RivalSchool[] = []
+  const rivalNews: string[] = []
+  for (const school of scouted.rivals) {
+    const update = advanceRival(rng, school, year)
+    rivals.push(update.school)
+    if (update.news) rivalNews.push(update.news)
+  }
+  // 新しい卒業生を先頭に、既存OBは進路が1年ぶん進んだものに差し替える
+  const graduates = [...change.graduates, ...change.updatedAlumni].slice(0, GRADUATES_LIMIT)
+
+  const pendingSeason = {
+    year,
+    graduates: change.graduates,
+    newcomers: change.newcomers,
+    recommendedIds: change.recommendedIds,
+    careerNews: change.careerNews,
+    scoutResults: scouted.results,
+    rivalNews,
+    reputationBefore: state.reputation,
+    reputationAfter: state.reputation,
+  }
+
+  events.push({
+    type: 'message',
+    text: `${change.graduates.length}人が卒業し、${change.newcomers.length}人が入部した`,
+    tone: 'normal',
+  })
+  for (const news of change.careerNews) {
+    events.push({ type: 'message', text: news, tone: 'good' })
+  }
+  // ログには会いに行った候補だけを出す。視察した県の全員を流すと埋まってしまう
+  for (const result of scouted.results.filter((entry) => entry.approached)) {
+    events.push({
+      type: 'message',
+      text: result.joined
+        ? `スカウトしていた${result.name}が入部した！${
+            result.skillName ? `「${result.skillName}」の持ち主だ` : ''
+          }`
+        : `${result.name}は${result.schoolName}（${result.regionName}）へ進んだ`,
+      tone: result.joined ? 'good' : 'bad',
+    })
+  }
+  for (const news of rivalNews) {
+    events.push({ type: 'message', text: news, tone: 'normal' })
+  }
+  // 4月も「月が変わった」ので、他の月と同じ処理を通す。
+  // 通さないと入学式（4月の行事）だけ起きない
+  const april = applyOneMonth(
+    rng,
+    { ...state, players, year, month: SEASON_START_MONTH, rivals },
+    SEASON_START_MONTH,
+  )
+  events.push(...april.events)
+
+  const nextLineup = repairLineup(state.lineup, april.players)
+  const { log, serial: nextSerial } = appendLog(state.log, events, serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      year,
+      month: SEASON_START_MONTH,
+      // 出場権は年度をまたぐと失効する
+      nationalsBerth: false,
+      springBerth: false,
+      phase: 'newSeason',
+      players: april.players,
+      funds: april.funds,
+      groundLevel: april.groundLevel,
+      equipment: april.equipment,
+      // 卒業で編成が崩れるので必ず組み直す
+      lineup: nextLineup,
+      // スタメンを先に入れてから埋める（スタメンがベンチ外、という状態を作らない）
+      squad: repairSquad(
+        [...nextLineup.slots.map((slot) => slot.playerId), ...state.squad],
+        april.players,
+      ),
+      graduates,
+      pendingSeason,
+      rivals,
+      // 訪問の記録と候補は使い切り。次の秋にまた視察して回る
+      scouting: { regions: [], visiting: null, results: scouted.results },
+      tournament: null,
+      board,
+      boardPosition: 0,
+      hand,
+      practiceBoost: null,
+      serial: nextSerial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * スカウトの結果を出す。
+ *
+ * 足を運んだ回数と学校の評判で決まる。獲れなかった選手は
+ * **県内のライバル校へ進む**ので、来年その選手と当たることになる。
+ */
+function resolveScouting(
+  rng: Rng,
+  state: GameState,
+  year: number,
+): {
+  joined: Player[]
+  results: ScoutResult[]
+  rivals: RivalSchool[]
+  serial: number
+} {
+  const results: ScoutResult[] = []
+  const joined: Player[] = []
+  let rivals = state.rivals
+  let serial = state.serial
+
+  // 訪問した県で挙がった候補は**全員**行き先が決まる。
+  // 会いに行かなかった選手も他校へ進むので、
+  // 「あのとき通っていれば」が後から分かる
+  for (const prospect of allProspects(state.scouting)) {
+    const approached = prospect.approaches > 0
+
+    if (approached && rng.chance(successChance(prospect, state.reputation))) {
+      const player = createPlayer(rng, {
+        id: `p${serial++}`,
+        grade: 1,
+        enrolledAt: { year, month: SEASON_START_MONTH },
+        isPitcher: prospect.isPitcher,
+        // スカウトした選手は素質どおりの能力で入学する
+        talentBonus: prospect.rating - 34,
+        takenNames: state.players.map((p) => p.name),
+      })
+      // 触れ込みの特殊能力を持って入学してくる。ここがスカウトの意味
+      joined.push({
+        ...player,
+        name: prospect.name,
+        skills: prospect.skillId ? [prospect.skillId] : [],
+      })
+      results.push({
+        name: prospect.name,
+        rating: prospect.rating,
+        regionName: findRegion(prospect.regionId).name,
+        approached: true,
+        joined: true,
+        skillName: prospectSkillName(prospect),
+        schoolName: null,
+      })
+      continue
+    }
+
+    const school = schoolForProspect(rng, rivals, prospect.rating, prospect.regionId)
+
+    // **素質の高い選手だけ**を他校の注目選手として残す。
+    // 10人×訪問県ぶんを全部抱えさせるとセーブが膨らむ
+    if (school && prospect.rating >= RIVAL_STAR_MIN_RATING) {
+      rivals = rivals.map((s) =>
+        s.id === school.id
+          ? addStar(s, {
+              id: `${school.id}-${prospect.id}`,
+              name: prospect.name,
+              grade: 1,
+              isPitcher: prospect.isPitcher,
+              rating: prospect.rating,
+            })
+          : s,
+      )
+    }
+
+    results.push({
+      name: prospect.name,
+      rating: prospect.rating,
+      regionName: findRegion(prospect.regionId).name,
+      approached,
+      joined: false,
+      skillName: prospectSkillName(prospect),
+      schoolName: school?.name ?? '地元の高校',
+    })
+  }
+
+  return { joined, results, rivals, serial }
+}
+
+/**
+ * 他校の注目選手として残す素質の下限。
+ * 全員を抱えさせるとセーブが膨らむので、覚えておく価値のある選手だけにする。
+ */
+const RIVAL_STAR_MIN_RATING = 50
+
+/**
+ * スカウトで県を訪問する。
+ *
+ * **出張費はここで決まる**（所在地からの距離）。
+ * 初めての県なら候補が挙がり、二度目以降は同じ顔ぶれに会いに行ける。
+ * 1回の出張で会えるのは1人だけ。
+ */
+function visitScoutRegion(state: GameState, regionId: RegionId): EngineResult {
+  if (state.month < SCOUT_OPEN_MONTH && state.month > 3) return { state, events: [] }
+  // すでに出張中なら、まず誰かに会う
+  if (state.scouting.visiting !== null) return { state, events: [] }
+
+  const home = findRegion(state.regionId)
+  const target = findRegion(regionId)
+  const cost = scoutTripCost(home, target)
+  if (state.funds < cost) return { state, events: [] }
+
+  const rng = createRng(state.rngState)
+  const existing = findScoutRegion(state.scouting, regionId)
+
+  const region: ScoutRegion = existing
+    ? { ...existing, visits: existing.visits + 1 }
+    : {
+        regionId,
+        visitedYear: state.year,
+        visits: 1,
+        prospects: createProspects(rng, {
+          reputation: state.reputation,
+          regionId,
+          trait: state.scoutTraits[regionId] ?? 'contact',
+          year: state.year,
+          serial: state.scouting.regions.length,
+        }),
+      }
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `${target.name}へ視察に出た（${formatFunds(cost)}）`,
+      tone: 'normal',
+    },
+  ]
+  if (!existing) {
+    events.push({
+      type: 'message',
+      text: `${target.name}で${region.prospects.length}人の候補が挙がった`,
+      tone: 'good',
+    })
+  }
+
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      funds: state.funds - cost,
+      scouting: {
+        ...state.scouting,
+        visiting: regionId,
+        regions: existing
+          ? state.scouting.regions.map((r) => (r.regionId === regionId ? region : r))
+          : [...state.scouting.regions, region],
+      },
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 候補に会いに行く。
+ *
+ * **費用は訪問の時点で払い済み**。ここでは出張を1回使い切る。
+ * もう1人に会いたければ、もう一度その県へ出張する。
+ */
+function approachProspect(state: GameState, prospectId: string): EngineResult {
+  const visiting = state.scouting.visiting
+  if (visiting === null) return { state, events: [] }
+
+  const region = findScoutRegion(state.scouting, visiting)
+  const prospect = region?.prospects.find((p) => p.id === prospectId)
+  if (!region || !prospect) return { state, events: [] }
+  if (prospect.approaches >= MAX_APPROACHES) return { state, events: [] }
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `${prospect.name}に会い、熱心に誘った`,
+      tone: 'normal',
+    },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      scouting: {
+        ...state.scouting,
+        // 出張はここで使い切る
+        visiting: null,
+        regions: state.scouting.regions.map((r) =>
+          r.regionId !== visiting
+            ? r
+            : {
+                ...r,
+                prospects: r.prospects.map((p) =>
+                  p.id === prospectId ? { ...p, approaches: p.approaches + 1 } : p,
+                ),
+              },
+        ),
+      },
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 月替わりでやる気が揺れる。
+ * 40%の確率で1段階上下し、それ以外は据え置き。
+ */
+function rollMonthlyMotivation(
+  rng: Rng,
+  current: number,
+): GameState['players'][number]['motivation'] {
+  if (!rng.chance(0.4)) return current as GameState['players'][number]['motivation']
+  const delta = rng.chance(0.5) ? 1 : -1
+  const next = Math.min(2, Math.max(-2, current + delta))
+  return next as GameState['players'][number]['motivation']
+}
+
+/** message イベントを画面ログに積む。古いものから捨てる */
+function appendLog(
+  log: LogEntry[],
+  events: GameEvent[],
+  startSerial: number,
+): { log: LogEntry[]; serial: number } {
+  let serial = startSerial
+  const added: LogEntry[] = []
+
+  for (const event of events) {
+    if (event.type !== 'message') continue
+    added.push({ id: `log-${serial}`, text: event.text, tone: event.tone })
+    serial += 1
+  }
+
+  return { log: [...log, ...added].slice(-LOG_LIMIT), serial }
+}

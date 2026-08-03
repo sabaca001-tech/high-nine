@@ -1,0 +1,394 @@
+.screen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  max-width: 560px;
+  margin: 0 auto;
+  background: var(--bg-base);
+}
+
+/* スコアボード */
+.scoreboard {
+  flex: 0 0 auto;
+  padding: var(--sp-2) var(--sp-3);
+  background: linear-gradient(to bottom, var(--bg-panel-2), var(--bg-panel));
+  border-bottom: 1px solid var(--line);
+}
+
+.total {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.teamName {
+  flex: 1 1 0;
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamNameLeft {
+  text-align: left;
+}
+
+.score {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.6em;
+  text-align: center;
+}
+
+.leading {
+  color: var(--accent);
+}
+
+.inningTable {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.inningTable::-webkit-scrollbar {
+  display: none;
+}
+
+.inningColumn {
+  flex: 0 0 auto;
+  min-width: 22px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.inningHead {
+  color: var(--text-dim);
+}
+
+.inningCell {
+  padding: 1px 0;
+  background: var(--bg-base);
+  border-radius: 3px;
+  margin-top: 1px;
+}
+
+.inningPending {
+  color: var(--text-dim);
+}
+
+/* 状況表示 */
+.situation {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  background: var(--bg-panel);
+}
+
+/* 実況の流れ */
+.feed {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.entry {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.entryInning {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--text-dim);
+  min-width: 3.4em;
+}
+
+.entryText {
+  flex: 1 1 auto;
+}
+
+.highlight {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.eventEntry {
+  color: var(--rank-d);
+  font-size: var(--fs-xs);
+}
+
+/* 結果パネル */
+.result {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.outcome {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.win {
+  color: var(--accent);
+}
+.lose {
+  color: var(--text-sub);
+}
+.draw {
+  color: var(--text-sub);
+}
+
+.mvp {
+  padding: var(--sp-2) var(--sp-3);
+  background: linear-gradient(120deg, rgba(255, 200, 87, 0.2), var(--bg-panel));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+
+.mvpName {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.statSection {
+  background: var(--bg-panel);
+  border-radius: var(--radius);
+  padding: var(--sp-2);
+}
+
+.statTitle {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  margin: 0 0 var(--sp-1);
+}
+
+.statTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.statTable th {
+  color: var(--text-dim);
+  font-weight: 400;
+  text-align: right;
+  padding: 2px 3px;
+}
+
+.statTable th:first-child {
+  text-align: left;
+}
+
+.statTable td {
+  text-align: right;
+  padding: 2px 3px;
+  border-top: 1px solid var(--line);
+}
+
+.statTable td:first-child {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7em;
+}
+
+/* 下部の操作。親指が届く位置に常時置く */
+.controls {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  padding-bottom: calc(var(--sp-2) + env(safe-area-inset-bottom));
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line);
+}
+
+.speedButton {
+  flex: 1 1 0;
+  min-height: var(--tap-min);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.speedActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.doneButton {
+  flex: 1 1 0;
+  min-height: 52px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(to bottom, var(--accent), var(--accent-strong));
+  color: var(--text-on-accent);
+  font-size: var(--fs-md);
+  font-weight: 800;
+  box-shadow: 0 4px 0 #b57a10;
+}
+
+.doneButton:active {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+/*
+ * 選手交代。
+ * 回の切れ目でだけ押せる。押している間は進行が止まる。
+ */
+.subButton {
+  flex: 0 0 auto;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-base);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* 交代の画面。下から重ねる */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.sheetBody {
+  width: 100%;
+  max-height: 82dvh;
+  overflow-y: auto;
+  padding: var(--sp-3);
+  padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-panel);
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+
+.sheetNote {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.sheetSection {
+  margin: var(--sp-3) 0 var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.slotList {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-1);
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.slotActive {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.slotOrder {
+  flex: 0 0 auto;
+  min-width: 14px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+
+.slotPos {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.slotName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.sheetClose {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* 勝敗投手の印 */
+.decision {
+  margin-left: 2px;
+  font-weight: 800;
+  color: var(--accent);
+}

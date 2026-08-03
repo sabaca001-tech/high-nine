@@ -1,0 +1,104 @@
+/* チーム状態は薄い1行にまとめ、シーンの表示領域を確保する */
+.teamStats {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+}
+
+.stat {
+  flex: 1 1 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 0;
+  background: var(--bg-panel);
+  border-radius: 6px;
+}
+
+.statLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.statValue {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.low {
+  color: var(--bad);
+}
+
+/*
+ * 手札エリア。画面下部＝親指の届く範囲に置く。
+ * 評判が上がると最大8枚まで増えるので、横に潰れても読めるようにする。
+ */
+.hand {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+}
+
+.handHint {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  text-align: center;
+  margin: 0;
+}
+
+.yearEnd {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.nextButton {
+  width: 100%;
+  min-height: 56px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(to bottom, var(--accent), var(--accent-strong));
+  color: var(--text-on-accent);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  box-shadow: 0 4px 0 #b57a10, 0 6px 10px rgba(0, 0, 0, 0.4);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.nextButton:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #b57a10, 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nextButton {
+    animation: none;
+  }
+}
+
+/* 今月末の大会予告 */
+.upcoming {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 3px var(--sp-2);
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255, 200, 87, 0.22), transparent);
+  border-left: 3px solid var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent);
+}

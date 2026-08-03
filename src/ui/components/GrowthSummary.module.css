@@ -1,0 +1,43 @@
+/*
+ * 成長の結果。件数が多い月があるので**高さに上限**を置く。
+ * 上限が無いと下にある手札を画面外へ押し出してしまう（実際に押し出された）。
+ */
+.panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 76px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  background: var(--bg-panel-2);
+  border-radius: var(--radius);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px var(--sp-2);
+  background: var(--bg-base);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.up {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.down {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.count {
+  color: var(--text-dim);
+}

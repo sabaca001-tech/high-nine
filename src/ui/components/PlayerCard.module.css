@@ -1,0 +1,205 @@
+/**
+ * 選手カード。
+ * 上段に名前と状態、下段に守備適性（グラウンド図）と能力（レーダー）。
+ * 一覧のままチーム構成を読めるようにするための形。
+ */
+.card {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  /* 左端にポジション系統の色を差して、並んだときに見分けやすくする */
+  overflow: hidden;
+}
+
+/* 左端の帯。border だとグラデーションを敷けないので疑似要素で描く */
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--card-accent);
+}
+
+.selected {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+/*
+ * 名前の行はカード幅（375px で2列＝約150px）の取り合いになる。
+ * 顔とランクを詰めて、名前に使える幅を最大限残す。
+ */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/*
+ * ネームプレート。
+ * 左が本職の系統の色、右に他に守れる系統の色が混ざる。
+ * 一覧を眺めたときに「どこを守れる選手か」が色の帯で読める。
+ */
+.plate {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px var(--sp-1);
+  border-radius: 4px;
+  color: var(--pos-text);
+}
+
+/*
+ * 名前。
+ * 「長谷川 龍之介」のような長い姓名でも苗字だけにならないよう、
+ * **文字数に応じて字面を縮める**（--name-size は PlayerCard が渡す）。
+ * 姓と名の区切りは空白ではなく僅かな間隔で表し、1文字ぶん幅を稼ぐ。
+ */
+.name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+  font-size: var(--name-size, var(--fs-sm));
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.family,
+.given {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  display: block;
+  font-size: 10px;
+  opacity: 0.72;
+}
+
+.rank {
+  flex: 0 0 auto;
+  min-width: 16px;
+  text-align: center;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--rank-color);
+}
+
+/* 体力とやる気 */
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  font-size: 10px;
+}
+
+.mood {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.moodMinus2 {
+  background: rgba(242, 112, 110, 0.2);
+  color: var(--bad);
+}
+
+.moodMinus1 {
+  background: rgba(242, 112, 110, 0.12);
+  color: var(--bad);
+}
+
+.mood0 {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-sub);
+}
+
+.mood1 {
+  background: rgba(95, 211, 154, 0.14);
+  color: var(--good);
+}
+
+.mood2 {
+  background: rgba(95, 211, 154, 0.24);
+  color: var(--good);
+}
+
+.gaugeTrack {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--bad), var(--rank-c), var(--good));
+  transition: width 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gaugeFill {
+    transition: none;
+  }
+}
+
+.gaugeValue {
+  min-width: 2.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-sub);
+}
+
+.injured {
+  margin: var(--sp-1) 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--bad);
+}
+
+/* 適性図と能力レーダーを左右に並べる */
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.chartBox {
+  display: block;
+  padding: var(--sp-1);
+  border-radius: 6px;
+  background: var(--bg-base);
+}
+
+.chartCaption {
+  display: block;
+  margin-top: 2px;
+  text-align: center;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+/* 自主練の内容。指定しているときだけ出す */
+.focus {
+  margin: var(--sp-1) 0 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 200, 87, 0.14);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+}

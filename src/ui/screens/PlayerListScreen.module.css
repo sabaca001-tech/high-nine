@@ -1,0 +1,228 @@
+.gradeHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-sub);
+  margin: var(--sp-3) 0 var(--sp-2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-base);
+  padding: var(--sp-1) 0;
+}
+
+.gradeHeading:first-child {
+  margin-top: 0;
+}
+
+/* 学年ごとに帯の色を変えて、一覧の中で位置が分かるようにする */
+.gradeBadge {
+  padding: 1px var(--sp-2);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--text-on-accent);
+}
+
+.grade3 {
+  background: var(--accent);
+}
+.grade2 {
+  background: var(--good);
+}
+.grade1 {
+  background: var(--rank-d);
+}
+
+.rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.row {
+  position: relative;
+  width: 100%;
+  min-height: var(--tap-min);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  background: linear-gradient(120deg, var(--bg-panel-2), var(--bg-panel) 60%);
+  border-radius: var(--radius);
+  border-left: 4px solid var(--row-accent);
+  text-align: left;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 0.1s ease;
+}
+
+.info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* 名前・学年・状態を1行にまとめる */
+.topLine {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.grade {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+
+.sectionNote {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin: 0 0 var(--sp-2);
+}
+
+/* OB名鑑への導線 */
+/* OB名鑑と歴代記録は並べて置く。どちらも「過去を見る」入口 */
+.links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.alumniLink {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-bottom: var(--sp-2);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+}
+
+.alumniLink:active {
+  background: var(--bg-panel-2);
+}
+
+.row:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.face {
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.position {
+  flex: 0 0 auto;
+  min-width: 2.4em;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-main);
+  background: var(--field);
+  border-radius: 4px;
+  padding: 2px 4px;
+  text-align: center;
+}
+
+.pitcher {
+  background: var(--dirt);
+}
+
+.nameBlock {
+  min-width: 0;
+}
+
+.name {
+  flex: 1 1 auto;
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.motivation {
+  flex: 0 0 auto;
+  font-size: 10px;
+  text-align: right;
+}
+
+.mood2 {
+  color: var(--good);
+}
+.mood1 {
+  color: var(--rank-c);
+}
+.mood0 {
+  color: var(--text-dim);
+}
+.moodMinus1 {
+  color: var(--rank-a);
+}
+.moodMinus2 {
+  color: var(--bad);
+}
+
+/* ランクの菱形バッジ */
+.rating {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--bg-base);
+  border: 2px solid var(--rank-color);
+  color: var(--rank-color);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* OB名鑑 */
+.graduated {
+  background: var(--text-dim);
+}
+
+.obRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  margin-bottom: var(--sp-1);
+  background: var(--bg-panel);
+  border-radius: var(--radius);
+  opacity: 0.75;
+}
+
+/* 怪我で離脱中 */
+.injured {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+/*
+ * 選手カードを並べるグリッド。
+ * 375px 幅で2列。カード内の図が潰れない下限として 150px を確保する。
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-2);
+}

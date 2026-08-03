@@ -1,0 +1,61 @@
+# GitHub Pages へ自動で公開する。
+#
+# main に push するたびにビルドして差し替える。
+# 追加費用はかからない（公開リポジトリなら GitHub Pages も Actions も無料枠内）。
+#
+# 配信先は https://<ユーザー名>.github.io/<リポジトリ名>/ という**サブパス**になるので、
+# BASE_PATH でビルド時のパスを合わせている（vite.config.ts 参照）。
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  # 手動でも実行できるようにしておく
+  workflow_dispatch:
+
+# Pages への書き込みに必要な権限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開は1つずつ。連続で push しても取り違えない
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # 壊れたものを公開しないよう、型・Lint・テストを通してからビルドする
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+
+      - run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

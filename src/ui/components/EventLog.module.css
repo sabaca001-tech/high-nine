@@ -1,0 +1,37 @@
+.log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-panel);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  -webkit-overflow-scrolling: touch;
+}
+
+.entry {
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+  padding: 2px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.entry:last-child {
+  border-bottom: none;
+}
+
+.good {
+  color: var(--good);
+}
+
+.bad {
+  color: var(--bad);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  margin: auto;
+}

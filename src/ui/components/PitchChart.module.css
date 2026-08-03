@@ -1,0 +1,53 @@
+/**
+ * 持ち球の変化方向図。
+ * 中心から各方向へ矢印を伸ばし、長さで変化量を表す。
+ */
+.wrap {
+  padding: var(--sp-2) 0;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+/* 変化量の目盛り */
+.guide {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.arrow {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.tip {
+  fill: var(--accent);
+}
+
+.origin {
+  fill: var(--text-main);
+}
+
+.label {
+  font-size: 11px;
+  fill: var(--text-sub);
+}
+
+.level {
+  fill: var(--accent);
+  font-weight: 700;
+}
+
+.empty {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  margin: 0;
+  padding: var(--sp-2) 0;
+}

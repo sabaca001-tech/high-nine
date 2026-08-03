@@ -1,0 +1,208 @@
+/*
+ * データ画面。
+ * 情報量が多いのでタブで分ける。1行1項目で、数字だけを右端に揃えて読ませる。
+ */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: var(--sp-2);
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--bg-base);
+}
+
+.tab {
+  flex: 1 1 0;
+  min-height: 38px;
+  border-radius: 6px;
+  color: var(--text-sub);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tabActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.section {
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--sp-1);
+  padding-left: var(--sp-2);
+  border-left: 3px solid var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+/* 「項目 …… 値」の1行 */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.row:last-of-type {
+  border-bottom: none;
+}
+
+.rowLabel {
+  flex: 0 0 7em;
+  font-size: 10px;
+  color: var(--text-sub);
+}
+
+.rowValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 所有している器具は目立たせる */
+.owned {
+  flex: 1 1 auto;
+  text-align: right;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--good);
+}
+
+.note {
+  margin: var(--sp-2) 0 0;
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+/* 他の画面への入口 */
+.link {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-top: var(--sp-1);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-main);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-align: left;
+}
+
+/* ライバル校・卒業生の1件 */
+.rival {
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rival:last-of-type {
+  border-bottom: none;
+}
+
+.rivalHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.rivalName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.rivalRegion {
+  margin-left: var(--sp-1);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.rivalStrength {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.rivalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.rivalRecord {
+  color: var(--text-sub);
+  font-weight: 700;
+}
+
+.rivalNone,
+.rivalStar {
+  color: var(--text-dim);
+}
+
+.trendUp {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.trendDown {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+/* スカウトの候補・結果の1行 */
+.prospect {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  padding: 2px 0;
+}
+
+.prospectRank {
+  flex: 0 0 2.4em;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+
+.prospectJoined {
+  flex: 0 0 2.4em;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--good);
+}
+
+.prospectName {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.prospectMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 9px;
+  color: var(--text-dim);
+}

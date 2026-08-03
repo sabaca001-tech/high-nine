@@ -1,0 +1,269 @@
+/*
+ * スカウト。
+ * 「見込み」と「費用」の2つだけで判断できるようにする。
+ * どちらも学校の評判と部費に直結していて、成長の実感になる。
+ */
+.empty,
+.note {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+
+.card {
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.rank {
+  flex: 0 0 auto;
+  min-width: 28px;
+  text-align: center;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--rank-color);
+}
+
+.identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.name {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.gaugeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+  font-size: 10px;
+}
+
+.gaugeLabel {
+  flex: 0 0 auto;
+  color: var(--text-sub);
+}
+
+.gaugeTrack {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--bad), var(--rank-c), var(--good));
+}
+
+.gaugeValue {
+  flex: 0 0 auto;
+  min-width: 2.6em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-sub);
+}
+
+.visits {
+  margin: var(--sp-1) 0 0;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.button {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-top: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.button:disabled {
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+/*
+ * 触れ込みの特殊能力。
+ * 「この選手を獲りたい」と思わせる唯一の材料なので、
+ * 能力値より目立つ位置に置く。
+ * 金・青の色分けは選手データ画面（PlayerDetailScreen）と揃える。
+ */
+.skill {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: 4px;
+  border-left: 3px solid var(--rank-d);
+  background: rgba(79, 195, 247, 0.12);
+  font-size: 10px;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+
+.skillGold {
+  border-left-color: var(--accent);
+  background: rgba(255, 200, 87, 0.14);
+}
+
+.skillName {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--rank-d);
+}
+
+.skillGold .skillName {
+  color: var(--accent);
+}
+
+/*
+ * 県の一覧。
+ * 出張費と傾向の2つで行き先を決めるので、その2つを大きく出す。
+ */
+.region {
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.regionHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.regionName {
+  flex: 0 0 auto;
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.trait {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.traitNote {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.visited {
+  margin: var(--sp-1) 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--good);
+}
+
+.regionActions {
+  display: flex;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+}
+
+.primary,
+.secondary {
+  flex: 1 1 0;
+  min-height: var(--tap-min);
+  border-radius: var(--radius);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.primary:disabled {
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+.secondary {
+  flex: 0 0 auto;
+  padding: 0 var(--sp-3);
+  background: var(--bg-raised);
+  color: var(--text-main);
+}
+
+.back {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-bottom: var(--sp-2);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+}
+
+/* 中学での成績。3列に並べて数字だけを読ませる */
+.junior {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+}
+
+.juniorCell {
+  padding: var(--sp-1);
+  border-radius: 4px;
+  background: var(--bg-base);
+  text-align: center;
+}
+
+.juniorLabel {
+  margin: 0;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.juniorValue {
+  margin: 1px 0 0;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,250 @@
+/**
+ * デザイントークン。
+ * 色・余白・文字サイズはここでのみ定義する。
+ * コンポーネント側で色を直書きしない（CLAUDE.md 2 参照）。
+ */
+
+:root {
+  /* 背景 */
+  --bg-base: #10201a;
+  --bg-panel: #172c24;
+  --bg-panel-2: #1f3a30;
+  --bg-raised: #27473b;
+
+  /* 文字 */
+  --text-main: #eaf5ef;
+  --text-sub: #9db8ac;
+  --text-dim: #6b8b7d;
+  --text-on-accent: #0d1a15;
+
+  /* アクセント（グラウンドの土と芝） */
+  --accent: #ffc857;
+  --accent-strong: #ffb020;
+  --field: #2f6b4f;
+  --dirt: #8a5a3b;
+
+  /* 状態 */
+  --good: #5fd39a;
+  --bad: #f2706e;
+  --line: #2c4a3e;
+
+  /* ポジション系統の色。ネームプレートの色分けに使う */
+  --pos-pitcher: #f79ac0;
+  --pos-catcher: #8fd6f0;
+  --pos-infield: #f5d76e;
+  --pos-outfield: #8fdc9a;
+  /* プレートの上に載せる文字。どの系統でも読めるよう濃い色にする */
+  --pos-text: #17251f;
+
+  /* ランク色 */
+  --rank-s: #ff5f7a;
+  --rank-a: #ff9f45;
+  --rank-b: #ffd447;
+  --rank-c: #7ed957;
+  --rank-d: #4fc3f7;
+  --rank-e: #9b8cf0;
+  --rank-f: #8fa3ad;
+  --rank-g: #6b7c85;
+
+  /* スプライトの色（ユニフォーム・帽子・道具） */
+  --uniform-a: #f2f4f7;
+  --uniform-b: #dfe6ee;
+  --uniform-c: #ffe9c4;
+  --cap-a: #2f6fd0;
+  --cap-b: #d94f4f;
+  --cap-c: #3b3f4a;
+  --cap-d: #2f9e6b;
+  /* ユニフォームの選択肢（core/team/uniforms.ts の id と対応） */
+  --team-navy-cap: #24478f;
+  --team-navy-uniform: #f2f4f7;
+  --team-crimson-cap: #a32b3c;
+  --team-crimson-uniform: #f6eee9;
+  --team-charcoal-cap: #33383f;
+  --team-charcoal-uniform: #e6e9ee;
+  --team-forest-cap: #1f6b44;
+  --team-forest-uniform: #eef4ee;
+  --team-cream-cap: #b8862b;
+  --team-cream-uniform: #ffe9c4;
+  --team-sky-cap: #2f8fd0;
+  --team-sky-uniform: #eaf3fb;
+  --bat-wood: #c98b4b;
+  --glove: #8a5a3b;
+  --skin: #f4c9a3;
+  --sprite-outline: #2a2118;
+
+  /* 背景の構造物 */
+  --building: #e6e9ee;
+  --building-shade: #c3c9d2;
+  --window: #7fa8c9;
+  --trunk: #7a5334;
+  --pole: #9aa7ad;
+  --net-line: rgba(255, 255, 255, 0.35);
+
+  /* 練習カードの色（種別ごとに2色グラデーション） */
+  --practice-batting-a: #ff8a4c;
+  --practice-batting-b: #e5453f;
+  --practice-running-a: #4fd0e7;
+  --practice-running-b: #2a7fd4;
+  --practice-fielding-a: #7ee07a;
+  --practice-fielding-b: #2f9e5a;
+  --practice-shoulder-a: #6ee7c7;
+  --practice-shoulder-b: #14907f;
+  --practice-pitching-a: #b98cf5;
+  --practice-pitching-b: #6a3fd0;
+  --practice-breaking-a: #ff8ad0;
+  --practice-breaking-b: #c33aa0;
+  --practice-stamina-a: #ffd257;
+  --practice-stamina-b: #e08a10;
+  --practice-mental-a: #8fa6ff;
+  --practice-mental-b: #3f4fc0;
+  --practice-rest-a: #ffc0cb;
+  --practice-rest-b: #d06a86;
+
+  /* 練習以外／派生のカード。練習カードより彩度を落として見分けやすくする */
+  --practice-bunt-a: #ffd8a8;
+  --practice-bunt-b: #d98e2b;
+  --practice-longtoss-a: #ffb3a0;
+  --practice-longtoss-b: #c0452a;
+  --practice-sprint-a: #a8e6ff;
+  --practice-sprint-b: #1f7fb0;
+  --practice-control-a: #c9c4ff;
+  --practice-control-b: #4a3fc0;
+  --practice-meeting-a: #bfe6d0;
+  --practice-meeting-b: #2f7a5a;
+  --practice-groundskeeping-a: #d8c9a8;
+  --practice-groundskeeping-b: #7a5a2f;
+  --practice-medical-a: #ffd0d8;
+  --practice-medical-b: #b03050;
+  --practice-study-a: #cfd8e6;
+  --practice-study-b: #46587a;
+  --practice-outing-a: #ffe0b8;
+  --practice-outing-b: #b07a2f;
+
+  /* 練習器具が要るカード。金色寄りにして「買って手に入れた練習」と分かるようにする */
+  --practice-teebatting-a: #ffe9a8;
+  --practice-teebatting-b: #c98b12;
+  --practice-weight-a: #e6d9a8;
+  --practice-weight-b: #8a6a1f;
+  --practice-agility-a: #b8f0d0;
+  --practice-agility-b: #1f8a5a;
+  --practice-machinebatting-a: #ffcfa0;
+  --practice-machinebatting-b: #b85a12;
+  --practice-bullpen-a: #d0d8ff;
+  --practice-bullpen-b: #3a4ac0;
+  --practice-videostudy-a: #e0d0f0;
+  --practice-videostudy-b: #6a3a9a;
+
+  /* 季節ごとの空と地面（月に応じて data-season で切り替える） */
+  --sky-top: #6fc3f0;
+  --sky-bottom: #d9f0ff;
+  --hill: #4f8f5a;
+  --hill-far: #7fb08a;
+  --grass: #4aa35e;
+  --dirt-scene: #c08a54;
+  --tree: #4f8f5a;
+  --blossom: #ffd0e4;
+
+  /* 余白 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+
+  /* 文字サイズ（基準幅375px） */
+  --fs-xs: 11px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+
+  --radius: 10px;
+  --radius-lg: 16px;
+
+  /* タップ領域の最小サイズ */
+  --tap-min: 44px;
+
+  /* 下部ナビの高さ。画面下の余白確保に使う */
+  --nav-height: 56px;
+}
+
+/* 季節ごとの配色。3〜5月=春、6〜8月=夏、9〜11月=秋、12〜2月=冬 */
+[data-season='spring'] {
+  --sky-top: #7fc9f2;
+  --sky-bottom: #ffe8f0;
+  --hill: #5c9b62;
+  --hill-far: #8fbf95;
+  --grass: #63b06a;
+  --dirt-scene: #c9975c;
+  --tree: #f2a9c8;
+  --blossom: #ffd3e6;
+}
+
+[data-season='summer'] {
+  --sky-top: #3aa8ee;
+  --sky-bottom: #cdeeff;
+  --hill: #3f8f4c;
+  --hill-far: #6ba876;
+  --grass: #3f9e50;
+  --dirt-scene: #cc8f4e;
+  --tree: #3f8f4c;
+  --blossom: #ffffff;
+}
+
+[data-season='autumn'] {
+  --sky-top: #64b0e0;
+  --sky-bottom: #ffe4c0;
+  --hill: #a1783a;
+  --hill-far: #c39a54;
+  --grass: #8f9a4a;
+  --dirt-scene: #bd8148;
+  --tree: #d07a2c;
+  --blossom: #ffb877;
+}
+
+[data-season='winter'] {
+  --sky-top: #8fb6d6;
+  --sky-bottom: #e8f2fa;
+  --hill: #7f8f92;
+  --hill-far: #a8b6ba;
+  --grass: #6f8a72;
+  --dirt-scene: #a8875f;
+  --tree: #5e7565;
+  --blossom: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  /* 100vh はモバイルSafariでズレるため使わない */
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  /* ダブルタップ拡大とテキスト選択を抑止して、アプリらしい操作感にする */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#root {
+  height: 100dvh;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}

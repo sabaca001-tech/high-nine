@@ -1,0 +1,87 @@
+/*
+ * 試合前のスタメン確認。
+ * 相手を上に出し、編成の下に「試合開始」を置く。
+ */
+.opponent {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, var(--dirt), var(--bg-panel) 70%);
+}
+
+.label {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.name {
+  flex: 1 1 auto;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.away {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* 主要操作は画面下部＝親指の届く範囲に置く（CLAUDE.md 3） */
+.controls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.warning {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--bad);
+  text-align: center;
+}
+
+.startButton {
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.startButton:active {
+  background: var(--accent-strong);
+}
+
+.startButton:disabled {
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+
+/*
+ * これまでの対戦。
+ * 相手の名前のすぐ下に置いて、「知っている相手か」を最初に読ませる。
+ */
+.history {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.last {
+  /* JSX は行頭の空白を落とすので、区切りは CSS で作る */
+  margin-left: var(--sp-2);
+  font-weight: 400;
+  color: var(--text-sub);
+}

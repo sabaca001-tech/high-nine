@@ -1,0 +1,26 @@
+{
+  "name": "ハイスクール・ナイン",
+  "short_name": "ハイスクール9",
+  "description": "スマホ縦画面で遊ぶ高校野球部の育成シミュレーション",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#10201a",
+  "theme_color": "#10201a",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

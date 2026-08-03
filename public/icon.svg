@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- アプリアイコン。画像を持たない方針に合わせてSVGで描く -->
+  <rect width="512" height="512" rx="96" fill="#10201a"/>
+  <circle cx="256" cy="256" r="150" fill="#f4f7f5"/>
+  <!-- 縫い目 -->
+  <path d="M150 150 q40 106 0 212" fill="none" stroke="#d9403f" stroke-width="14" stroke-linecap="round"/>
+  <path d="M362 150 q-40 106 0 212" fill="none" stroke="#d9403f" stroke-width="14" stroke-linecap="round"/>
+  <g stroke="#d9403f" stroke-width="9" stroke-linecap="round">
+    <path d="M168 186 l22 -10"/><path d="M162 222 l24 -6"/>
+    <path d="M162 290 l24 6"/><path d="M168 326 l22 10"/>
+    <path d="M344 186 l-22 -10"/><path d="M350 222 l-24 -6"/>
+    <path d="M350 290 l-24 6"/><path d="M344 326 l-22 10"/>
+  </g>
+</svg>

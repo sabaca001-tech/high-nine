@@ -1,0 +1,123 @@
+/**
+ * 能力の推移を1項目ずつ小さな折れ線で見せる（small multiples）。
+ *
+ * 6〜9項目を1枚に重ねると線が混ざって読めないので、
+ * 項目ごとに separate chart にして縦に並べる。
+ * 縦軸は全項目で 0〜100 に固定し、項目間で高さを比べられるようにしている。
+ */
+.chart {
+  position: relative;
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  margin-bottom: var(--sp-2);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: 2px;
+}
+
+.title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.current {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+}
+
+/* 増減の表示 */
+.delta {
+  font-size: var(--fs-xs);
+  margin-left: var(--sp-1);
+}
+
+.up {
+  color: var(--good);
+}
+
+.down {
+  color: var(--bad);
+}
+
+.flat {
+  color: var(--text-dim);
+}
+
+.plot {
+  display: block;
+  width: 100%;
+  height: 56px;
+  touch-action: pan-y;
+}
+
+/* 目盛りは控えめに */
+.grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.area {
+  fill: var(--accent);
+  opacity: 0.12;
+}
+
+.lastDot {
+  fill: var(--accent);
+  stroke: var(--bg-panel);
+  stroke-width: 2;
+}
+
+/* 触れた位置の読み取り */
+.cursorLine {
+  stroke: var(--text-sub);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.cursorDot {
+  fill: var(--text-main);
+  stroke: var(--bg-panel);
+  stroke-width: 2;
+}
+
+.readout {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  padding: 2px var(--sp-2);
+  border-radius: 6px;
+  background: var(--bg-base);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.axisLabel {
+  font-size: 8px;
+  fill: var(--text-dim);
+}
+
+.empty {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  text-align: center;
+  padding: var(--sp-3) 0;
+  margin: 0;
+}

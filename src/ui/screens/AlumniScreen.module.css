@@ -1,0 +1,148 @@
+.back {
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-2);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+}
+
+.filters {
+  display: flex;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+
+.filter {
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.filterActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border-left: 4px solid var(--status-color);
+}
+
+.head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.status {
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-on-accent);
+  background: var(--status-color);
+  white-space: nowrap;
+}
+
+.note {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  margin: 0;
+}
+
+/* 通算成績 */
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px var(--sp-2);
+  border-radius: 6px;
+  background: var(--bg-base);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.statValue {
+  font-weight: 700;
+}
+
+/* 年度別成績 */
+.seasonTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.seasonTable th {
+  color: var(--text-dim);
+  font-weight: 400;
+  text-align: right;
+  padding: 1px 3px;
+}
+
+.seasonTable th:first-child,
+.seasonTable td:first-child {
+  text-align: left;
+}
+
+.seasonTable td {
+  text-align: right;
+  padding: 1px 3px;
+  border-top: 1px solid var(--line);
+}
+
+.overseas {
+  color: var(--rank-d);
+}
+
+.toggle {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.empty {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  text-align: center;
+  margin: var(--sp-5) 0;
+}

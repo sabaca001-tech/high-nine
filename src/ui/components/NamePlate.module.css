@@ -1,0 +1,52 @@
+/**
+ * ポジションで色分けしたネームプレート。
+ * 左が本職の系統の色、右に他に守れる系統の色が混ざる。
+ */
+.plate {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  /* 指でつまめる高さを確保する */
+  min-height: 34px;
+  padding: 0 var(--sp-2);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  color: var(--pos-text);
+  font-size: var(--fs-sm);
+  /* ドラッグ中にスクロールへ持っていかれないようにする */
+  touch-action: none;
+  user-select: none;
+}
+
+.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* つまんでいる間は元の場所を薄くして、どこから動かしたか分かるようにする */
+.dragging {
+  opacity: 0.35;
+}
+
+.lead {
+  flex: 0 0 auto;
+  min-width: 1.6em;
+  text-align: center;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grade {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.75;
+}

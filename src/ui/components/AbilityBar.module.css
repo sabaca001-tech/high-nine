@@ -1,0 +1,49 @@
+.row {
+  display: grid;
+  grid-template-columns: 5.5em 1.6em 1fr 2.4em;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+}
+
+.label {
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+}
+
+.rank {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1;
+}
+
+.track {
+  height: 8px;
+  background: var(--bg-base);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.value {
+  font-size: var(--fs-sm);
+  color: var(--text-main);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta {
+  color: var(--good);
+  font-size: var(--fs-xs);
+  margin-left: 2px;
+}
+
+.deltaDown {
+  color: var(--bad);
+}
