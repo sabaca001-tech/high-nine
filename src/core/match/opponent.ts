@@ -47,7 +47,7 @@ export function createOpponent(rng: Rng, strength: number, fixedName?: string): 
         createPlayer(rng, {
           id: `opp${index++}`,
           grade,
-          // 各学年の1人目は必ず投手にして、投手が居ない事故を防ぐ
+          // 各学年の1人目だけ投手を確約して、投手が居ない事故を防ぐ
           isPitcher: i === 0 ? true : undefined,
           talentBonus: strength,
         }),

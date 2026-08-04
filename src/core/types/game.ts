@@ -51,8 +51,10 @@ import type { Tournament } from './tournament'
  *            GameState に scoutTraits（県ごとの選手の傾向）を追加。
  * v21 → v22: GameState に uniform を追加（学校名から色を導くのをやめた）。
  *            新年度に学校名・ユニフォーム・所在地を変えられるようにした。
+ * v22 → v23: 盤面を1マス3日・1年122マスに変更（カードの数字が1〜5に）。
+ *            大会を1回戦ずつのマスに分割。3年生は夏で引退。
  */
-export const SAVE_VERSION = 22
+export const SAVE_VERSION = 23
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
@@ -199,8 +201,8 @@ export type GameCommand =
   | { type: 'advanceYear' }
   /** スタメンを差し替える */
   | { type: 'setLineup'; lineup: Lineup }
-  /** スタメンを自動編成する */
-  | { type: 'autoLineup' }
+  /** スタメンを自動編成する。方針を選べる（省略時はバランス） */
+  | { type: 'autoLineup'; plan?: import('@/core/lineup/autoLineup').AutoLineupPlan }
   /** ベンチ入りを差し替える */
   | { type: 'setSquad'; squad: string[] }
   /** 観戦速度を変える */

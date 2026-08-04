@@ -8,16 +8,17 @@
 import { createRng, createSeed } from '@/core/rng/random'
 import type { Rng, RngState } from '@/core/rng/random'
 import {
-  addTournamentCell,
   applyRoute,
-  clearTournamentCell,
+  clearTournamentCells,
+  placeSeasonTournaments,
+  placeTournamentCells,
   createBoard,
   dayOfTournament,
   findRoute,
   forcedStopBetween,
   GOAL_INDEX,
 } from '@/core/board/boardDefs'
-import { formatDay, monthOfDay, monthsCrossed } from '@/core/calendar/days'
+import { dayOfCell, formatDay, monthOfDay, monthsCrossed } from '@/core/calendar/days'
 import { SEASON_START_MONTH } from '@/core/calendar/days'
 import { resolveCell } from '@/core/board/resolveCell'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
@@ -113,12 +114,17 @@ import type { GameEvent, LogEntry } from '@/core/types/event'
 import type { EngineResult, GameCommand, GameState, Month, PracticeBoost } from '@/core/types/game'
 import { GRADUATES_LIMIT, LOG_LIMIT, SAVE_VERSION } from '@/core/types/game'
 import type { Lineup } from '@/core/types/lineup'
-import { handSizeFor, REPUTATION_INITIAL, REPUTATION_MAX } from '@/core/types/season'
+import type { BoardCell } from '@/core/types/board'
+import { applyReputation, handSizeFor, REPUTATION_INITIAL } from '@/core/types/season'
 import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
 import { DEFAULT_UNIFORM, normalizeUniform } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
 import type { RegionId } from '@/core/types/region'
 import { isTournamentOver, roundName } from '@/core/types/tournament'
+import type { Tournament } from '@/core/types/tournament'
+import { createAlumnus } from '@/core/career/career'
+import { overallRating } from '@/core/player/rating'
+import { draftBonus } from '@/core/player/u18'
 
 export type NewGameOptions = {
   schoolName?: string
@@ -150,7 +156,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
   })
   const players = [...returning, ...recruited.newcomers]
 
-  const board = createBoard(rng)
+  const board = withSeasonTournaments(createBoard(rng), regionId)
   const hand = drawHand(rng, 0, handSizeFor(REPUTATION_INITIAL))
   const lineup = autoLineup(players)
 
@@ -211,6 +217,26 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
   }
 }
 
+/** いま立っている位置より先にある、次の大会マス */
+function nextTournamentCell(board: BoardCell[], from: number): number | null {
+  for (let index = from + 1; index < board.length; index++) {
+    if (board[index]?.kind === 'tournament') return index
+  }
+  return null
+}
+
+/**
+ * 盤面に、必ず出場する大会（夏の地区・秋季）の回戦マスを置く。
+ * 回戦数は所在地の参加校数で決まるので、盤面を作った直後に呼ぶ。
+ */
+function withSeasonTournaments(board: BoardCell[], regionId: RegionId): BoardCell[] {
+  const region = findRegion(regionId)
+  return placeSeasonTournaments(board, {
+    summerPref: createTournament('summerPref', region).totalRounds,
+    autumnPref: createTournament('autumnPref', region).totalRounds,
+  })
+}
+
 /** コマンドを適用して新しい状態を返す */
 export function applyCommand(state: GameState, command: GameCommand): EngineResult {
   switch (command.type) {
@@ -221,7 +247,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
     case 'setLineup':
       return setLineup(state, command.lineup)
     case 'autoLineup':
-      return setLineup(state, autoLineup(state.players))
+      // ベンチ入りの中から組む。ベンチ外の選手を勝手にスタメンに入れない
+      return setLineup(state, autoLineup(matchRoster(state), command.plan))
     case 'setSquad':
       return setSquad(state, command.squad)
     case 'setMatchSpeed':
@@ -679,7 +706,8 @@ function finishTournament(state: GameState): EngineResult {
   }
 
   const gain = reputationGain(tournament)
-  const reputation = clamp(state.reputation + gain, 0, REPUTATION_MAX)
+  // 評判は上に行くほど伸びにくい。そうしないと1年目で100に張り付く
+  const reputation = applyReputation(state.reputation, gain)
   const prize = tournamentPrize(tournament)
 
   // 遠征費は実際に行った試合数ぶんかかる。全国大会は補助も出る
@@ -740,45 +768,125 @@ function finishTournament(state: GameState): EngineResult {
     events.push({ type: 'message', text: '春の全国大会への出場が決まった！', tone: 'good' })
   }
 
-  const { log, serial } = appendLog(state.log, events, state.serial)
+  // 終わった大会のマスはすべて普通のマスに戻す。
+  // 戻さないと、残っている回戦のマスで同じ大会が再開してしまう
+  let board = clearTournamentCells(state.board, tournament.kind)
 
-  // 大会が終わったマスは普通のマスに戻す。
-  // こうしないと同じ日にもう一度大会が始まってしまう
-  let board = clearTournamentCell(state.board, state.boardPosition)
-
-  // 全国大会の出場権を得たら、その大会マスを盤面に足す
+  // 全国大会の出場権を得たら、その大会の回戦ぶんのマスを盤面に足す
   if (tournament.kind === 'summerPref' && tournament.champion) {
-    board = addTournamentCell(board, 'nationals', state.boardPosition)
+    board = placeTournamentCells(
+      board,
+      'nationals',
+      state.boardPosition,
+      createTournament('nationals', findRegion(state.regionId)).totalRounds,
+    )
     events.push({
       type: 'message',
-      text: `${formatDay(dayOfTournament('nationals'))}に全国大会が待っている`,
+      text: `${formatDay(dayOfTournament('nationals'))}から全国大会が始まる`,
       tone: 'good',
     })
   }
   if (tournament.kind === 'autumnPref' && tournament.champion) {
-    board = addTournamentCell(board, 'springNationals', state.boardPosition)
+    board = placeTournamentCells(
+      board,
+      'springNationals',
+      state.boardPosition,
+      createTournament('springNationals', findRegion(state.regionId)).totalRounds,
+    )
     events.push({
       type: 'message',
-      text: `${formatDay(dayOfTournament('springNationals'))}に春の全国大会が待っている`,
+      text: `${formatDay(dayOfTournament('springNationals'))}から春の全国大会が始まる`,
       tone: 'good',
     })
   }
 
+  // 夏が終われば3年生は引退する
+  const retired = retireThirdYears(state, tournament, events)
+
+  const { log: log2, serial: serial2 } = appendLog(state.log, events, state.serial)
+
   return {
     state: {
       ...state,
+      ...retired,
       tournament: null,
       board,
       nationalsBerth,
       springBerth,
       reputation,
       funds,
-      serial,
-      log,
+      serial: serial2,
+      log: log2,
       // 大会が終わったらそのままカード選択に戻る（同じ日から再開）
       phase: 'cardSelect',
     },
     events,
+  }
+}
+
+/**
+ * 夏が終わったら3年生を引退させる。
+ *
+ * 高校野球の3年生は夏の大会を最後に退く。
+ * 3月まで在籍し続けると、秋・春の大会まで同じ顔ぶれで戦えてしまい、
+ * **世代交代の重みが無くなる**。秋からは新チームで戦うことになる。
+ *
+ * 引退の時点でOB名鑑に載せる。卒業は3月だが、
+ * チームを離れる瞬間に記録を確定させるほうが分かりやすい。
+ */
+function retireThirdYears(
+  state: GameState,
+  tournament: Tournament,
+  events: GameEvent[],
+): Partial<GameState> {
+  // 地区大会で敗退したらそこまで。優勝したら全国が終わってから
+  const summerOver =
+    (tournament.kind === 'summerPref' && !tournament.champion) ||
+    tournament.kind === 'nationals'
+  if (!summerOver) return {}
+
+  const leaving = state.players.filter((player) => player.grade === 3)
+  if (leaving.length === 0) return {}
+
+  const rng = createRng(state.rngState)
+  const players = state.players.filter((player) => player.grade !== 3)
+
+  const records = leaving.map((player) =>
+    createAlumnus(
+      rng,
+      {
+        id: player.id,
+        name: player.name,
+        isPitcher: player.isPitcher,
+        position: player.position,
+        year: state.year,
+        rating: overallRating(player),
+        skills: [...player.skills],
+        highSchool: player.stats,
+        u18Bonus: draftBonus(player.u18),
+      },
+      state.reputation,
+    ),
+  )
+
+  events.push({
+    type: 'message',
+    text: `3年生${leaving.length}人が引退した。ここからは新チーム`,
+    tone: 'normal',
+  })
+
+  // 顔ぶれが大きく変わるので、スタメンとベンチ入りを組み直す
+  const lineup = autoLineup(players)
+
+  return {
+    rngState: rng.state,
+    players,
+    lineup,
+    squad: repairSquad(
+      lineup.slots.map((slot) => slot.playerId),
+      players,
+    ),
+    graduates: [...records, ...state.graduates].slice(0, GRADUATES_LIMIT),
   }
 }
 
@@ -902,8 +1010,10 @@ function finishMatch(state: GameState): EngineResult {
   })
 
   // 勝てば学校の評判が上がり、良い新入生が来やすくなる
-  const reputationDelta = won ? 2 : match.outcome === 'draw' ? 0 : -1
-  const reputation = clamp(state.reputation + reputationDelta, 0, REPUTATION_MAX)
+  // 練習試合1つで学校の評判が動きすぎないようにする。
+  // 主な変動源は大会の成績（reputationGain）
+  const reputationDelta = won ? 1 : match.outcome === 'draw' ? 0 : -1
+  const reputation = applyReputation(state.reputation, reputationDelta)
 
   // 相手がライバル校なら対戦成績を残す。「去年負けたあの学校」が分かるようになる
   const rivals = match.opponentSchoolId
@@ -939,7 +1049,7 @@ function finishMatch(state: GameState): EngineResult {
     })
   }
 
-  // 大会の試合だった場合は、勝敗を大会に反映して大会画面へ戻る
+  // 大会の試合だった場合は、勝敗を大会に反映する
   if (state.tournament) {
     const tournament = applyRoundResult(state.tournament, {
       opponentName: match.opponentName,
@@ -947,6 +1057,20 @@ function finishMatch(state: GameState): EngineResult {
       scoreAgainst: match.finalScore.opponent,
       won,
     })
+
+    // **勝っただけならまだ大会は終わらない。** 次の回戦は盤面の先のマスにあるので、
+    // いったん普通の進行に戻す。連戦にすると試合の合間に手を打つ余地が無い
+    const over = isTournamentOver(tournament)
+    if (!over) {
+      events.push({
+        type: 'message',
+        text: `次は${roundName(tournament.round, tournament.totalRounds)}。${formatDay(
+          dayOfCell(nextTournamentCell(state.board, state.boardPosition) ?? state.boardPosition),
+        )}に行われる`,
+        tone: 'good',
+      })
+    }
+
     const { log, serial } = appendLog(state.log, events, state.serial)
 
     return {
@@ -959,7 +1083,8 @@ function finishMatch(state: GameState): EngineResult {
         // 大会の評判は finishTournament でまとめて加算する
         tournament,
         serial,
-        phase: 'tournament',
+        // 終わったときだけ大会画面（結果のまとめ）へ。続くなら盤面に戻る
+        phase: over ? 'tournament' : 'cardSelect',
         log,
       },
       events,
@@ -1045,7 +1170,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   if (forced !== null && forced < wanted) {
     events.push({
       type: 'message',
-      text: `${formatDay(forced)}。ここは飛ばせない`,
+      text: `${formatDay(dayOfCell(forced))}。ここは飛ばせない`,
       tone: 'normal',
     })
   }
@@ -1123,13 +1248,15 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   } else if (outcome.fork) {
     phase = 'fork'
   } else if (cell.kind === 'tournament' && cell.tournamentKind) {
-    // 大会マスに止まった。大会を作って観戦フェーズへ送り出す
-    tournament = createTournament(cell.tournamentKind, findRegion(state.regionId))
-    events.push({
-      type: 'message',
-      text: `${tournament.name}が開幕（${tournament.entrants}校・${tournament.totalRounds}回戦制）`,
-      tone: 'normal',
-    })
+    // 大会マスに止まった。まだ始まっていなければ開幕させる
+    if (!tournament || tournament.kind !== cell.tournamentKind) {
+      tournament = createTournament(cell.tournamentKind, findRegion(state.regionId))
+      events.push({
+        type: 'message',
+        text: `${tournament.name}が開幕（${tournament.entrants}校・${tournament.totalRounds}回戦制）`,
+        tone: 'normal',
+      })
+    }
     phase = 'tournament'
   } else if (cell.kind === 'camp') {
     phase = 'camp'
@@ -1150,7 +1277,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       // 部員の増減はないが、念のため編成の整合性を保つ
       lineup: repairLineup(state.lineup, outcome.players),
       boardPosition: to,
-      month: monthOfDay(to),
+      month: monthOfDay(dayOfCell(to)),
       hand,
       serial: nextSerial,
       practiceBoost,
@@ -1163,11 +1290,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       groundLevel: monthly.groundLevel,
       equipment: monthly.equipment,
       scouting: monthly.scouting,
-      reputation: clamp(
-        monthly.reputation + (outcome.reputationDelta ?? 0),
-        0,
-        REPUTATION_MAX,
-      ),
+      reputation: applyReputation(monthly.reputation, outcome.reputationDelta ?? 0),
       phase,
       log,
     },
@@ -1269,7 +1392,8 @@ function applyMonthChanges(
   from: number,
   to: number,
 ): MonthChangeResult {
-  const crossed = monthsCrossed(from, to)
+  // from/to はマスの番号なので、日付に直してから月をまたいだか調べる
+  const crossed = monthsCrossed(dayOfCell(from), dayOfCell(to))
   const events: GameEvent[] = []
 
   let players = state.players
@@ -1522,7 +1646,7 @@ function advanceYear(state: GameState): EngineResult {
   const year = state.year + 1
 
   // 全国大会の出場権は年度をまたぐと失効する
-  const board = createBoard(rng)
+  const board = withSeasonTournaments(createBoard(rng), state.regionId)
   const handSize = handSizeFor(state.reputation)
   const hand = drawHand(rng, state.serial, handSize, unlockedKinds(state.equipment))
   let serial = state.serial + handSize

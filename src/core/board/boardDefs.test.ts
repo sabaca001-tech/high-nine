@@ -1,50 +1,52 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import { DAYS_IN_YEAR, dayOf, monthOfDay } from '@/core/calendar/days'
 import {
-  addTournamentCell,
+  CELLS_IN_YEAR,
+  cellOfDay,
+  dayOf,
+  dayOfCell,
+  DAYS_PER_CELL,
+  monthOfDay,
+} from '@/core/calendar/days'
+import {
   BOARD_LENGTH,
-  clearTournamentCell,
+  cellOfTournament,
+  clearTournamentCells,
   createBoard,
   dayOfTournament,
   forcedStopBetween,
   GOAL_INDEX,
+  placeSeasonTournaments,
+  placeTournamentCells,
+  ROUND_GAP,
 } from './boardDefs'
 
 describe('createBoard', () => {
-  it('1年ぶん（365マス）で、初日は空きマス・最終日は年度末', () => {
+  it('1年ぶんのマスがあり、初日は空きマス・最終マスは年度末', () => {
     const board = createBoard(createRng(1))
 
     expect(board).toHaveLength(BOARD_LENGTH)
-    expect(BOARD_LENGTH).toBe(DAYS_IN_YEAR)
+    expect(BOARD_LENGTH).toBe(CELLS_IN_YEAR)
     expect(board[0].kind).toBe('blank')
     expect(board[GOAL_INDEX].kind).toBe('goal')
   })
 
-  it('index が通算日と一致する', () => {
+  it('index がマスの番号と一致する', () => {
     const board = createBoard(createRng(2))
     board.forEach((cell, index) => expect(cell.index).toBe(index))
   })
 
-  it('夏の地区大会・秋季大会・冬合宿は最初から置かれている', () => {
-    const board = createBoard(createRng(3))
-
-    const summer = board[dayOfTournament('summerPref')]
-    expect(summer.kind).toBe('tournament')
-    expect(summer.tournamentKind).toBe('summerPref')
-    expect(monthOfDay(summer.index)).toBe(7)
-
-    expect(board[dayOfTournament('autumnPref')].tournamentKind).toBe('autumnPref')
-    expect(board.some((cell) => cell.kind === 'camp')).toBe(true)
+  it('1マスは3日ぶん。最後のマスでも年度内に収まる', () => {
+    expect(DAYS_PER_CELL).toBe(3)
+    expect(dayOfCell(GOAL_INDEX)).toBeLessThan(365)
+    expect(cellOfDay(dayOfCell(5))).toBe(5)
   })
 
-  it('全国大会は出場権があるときだけ置かれる', () => {
-    const without = createBoard(createRng(4))
-    const withBerth = createBoard(createRng(4), { nationals: true, spring: true })
-
-    expect(without[dayOfTournament('nationals')].kind).not.toBe('tournament')
-    expect(withBerth[dayOfTournament('nationals')].tournamentKind).toBe('nationals')
-    expect(withBerth[dayOfTournament('springNationals')].tournamentKind).toBe('springNationals')
+  it('大会マスはここでは置かない（回戦数が地区で変わるため）', () => {
+    const board = createBoard(createRng(3))
+    expect(board.some((cell) => cell.kind === 'tournament')).toBe(false)
+    // 合宿だけは日程が固定なので置かれている
+    expect(board.some((cell) => cell.kind === 'camp')).toBe(true)
   })
 
   it('同じシードなら同じ盤面になる', () => {
@@ -52,53 +54,108 @@ describe('createBoard', () => {
   })
 })
 
-describe('forcedStopBetween', () => {
-  const board = createBoard(createRng(5))
-  const summerDay = dayOfTournament('summerPref')
+describe('大会を回戦ごとのマスに置く', () => {
+  const base = createBoard(createRng(20))
 
-  it('途中に大会があれば、その手前ではなく大会の日を返す', () => {
-    expect(forcedStopBetween(board, summerDay - 5, summerDay + 5)).toBe(summerDay)
+  it('回戦の数だけマスが並ぶ', () => {
+    const board = placeTournamentCells(base, 'summerPref', -1, 5)
+    const cells = board.filter((cell) => cell.tournamentKind === 'summerPref')
+
+    expect(cells).toHaveLength(5)
+    expect(cells.map((cell) => cell.round)).toEqual([1, 2, 3, 4, 5])
   })
 
-  it('大会をまたがなければ null', () => {
-    expect(forcedStopBetween(board, 0, 10)).toBeNull()
+  it('1回戦は日程どおりの位置に立つ', () => {
+    const board = placeTournamentCells(base, 'summerPref', -1, 3)
+    const first = board.find((cell) => cell.round === 1)!
+
+    expect(first.index).toBe(cellOfTournament('summerPref'))
+    expect(monthOfDay(dayOfCell(first.index))).toBe(7)
   })
 
-  it('今いるマス自体は対象にしない（大会マスから動けなくなるのを防ぐ）', () => {
-    expect(forcedStopBetween(board, summerDay, summerDay + 3)).toBeNull()
+  it('回戦の間隔ぶんずつ後ろへ置かれる', () => {
+    const board = placeTournamentCells(base, 'summerPref', -1, 4)
+    const cells = board.filter((cell) => cell.tournamentKind === 'summerPref')
+
+    for (let i = 1; i < cells.length; i++) {
+      expect(cells[i].index - cells[i - 1].index).toBe(ROUND_GAP)
+    }
   })
 
-  it('大会がちょうど着地点でも止まる', () => {
-    expect(forcedStopBetween(board, summerDay - 3, summerDay)).toBe(summerDay)
+  it('すでに通り過ぎた位置には置かない', () => {
+    const start = cellOfTournament('summerPref')
+    const board = placeTournamentCells(base, 'summerPref', start + 1, 4)
+    const cells = board.filter((cell) => cell.tournamentKind === 'summerPref')
+
+    expect(cells.every((cell) => cell.index > start + 1)).toBe(true)
+  })
+
+  it('年度末より先には置かない（消化できない回戦を作らない）', () => {
+    const board = placeTournamentCells(base, 'springNationals', -1, 20)
+    const cells = board.filter((cell) => cell.tournamentKind === 'springNationals')
+
+    expect(cells.every((cell) => cell.index < GOAL_INDEX)).toBe(true)
+  })
+
+  it('敗退するとその大会のマスがすべて普通のマスに戻る', () => {
+    const board = placeTournamentCells(base, 'summerPref', -1, 5)
+    const cleared = clearTournamentCells(board, 'summerPref')
+
+    expect(cleared.some((cell) => cell.tournamentKind === 'summerPref')).toBe(false)
+    // 同じ位置から動き出せる
+    const start = cellOfTournament('summerPref')
+    expect(forcedStopBetween(cleared, start - 2, start + 2)).toBeNull()
+  })
+
+  it('別の大会のマスは消さない', () => {
+    let board = placeTournamentCells(base, 'summerPref', -1, 3)
+    board = placeTournamentCells(board, 'autumnPref', -1, 3)
+    const cleared = clearTournamentCells(board, 'summerPref')
+
+    expect(cleared.filter((cell) => cell.tournamentKind === 'autumnPref')).toHaveLength(3)
   })
 })
 
-describe('大会マスの出し入れ', () => {
-  it('出場権を得ると、まだ来ていない日に大会マスが立つ', () => {
-    const board = createBoard(createRng(6))
-    const day = dayOfTournament('nationals')
-    const updated = addTournamentCell(board, 'nationals', day - 30)
+describe('placeSeasonTournaments', () => {
+  it('夏の地区大会と秋季大会をまとめて置く', () => {
+    const board = placeSeasonTournaments(createBoard(createRng(21)), {
+      summerPref: 6,
+      autumnPref: 4,
+    })
 
-    expect(updated[day].kind).toBe('tournament')
-    expect(updated[day].tournamentKind).toBe('nationals')
+    expect(board.filter((cell) => cell.tournamentKind === 'summerPref')).toHaveLength(6)
+    expect(board.filter((cell) => cell.tournamentKind === 'autumnPref')).toHaveLength(4)
+    // 全国大会は出場権を得てから置かれる
+    expect(board.some((cell) => cell.tournamentKind === 'nationals')).toBe(false)
   })
 
-  it('すでに過ぎた日には立てない', () => {
-    const board = createBoard(createRng(7))
-    const day = dayOfTournament('nationals')
-    const updated = addTournamentCell(board, 'nationals', day + 1)
+  it('夏の大会が最大の回戦数でも全国大会の日程を侵さない', () => {
+    // 神奈川（178校）で8回戦。全国大会は8月12日
+    const board = placeSeasonTournaments(createBoard(createRng(22)), {
+      summerPref: 8,
+      autumnPref: 6,
+    })
+    const last = board.filter((cell) => cell.tournamentKind === 'summerPref').at(-1)!
 
-    expect(updated[day].kind).not.toBe('tournament')
+    expect(last.index).toBeLessThan(cellOfTournament('nationals'))
+  })
+})
+
+describe('forcedStopBetween', () => {
+  const board = placeTournamentCells(createBoard(createRng(5)), 'summerPref', -1, 5)
+  const start = cellOfTournament('summerPref')
+
+  it('途中に大会があれば、その位置を返す', () => {
+    expect(forcedStopBetween(board, start - 3, start + 3)).toBe(start)
   })
 
-  it('敗退するとマスが普通のマスに戻り、先へ進めるようになる', () => {
-    const board = createBoard(createRng(8))
-    const day = dayOfTournament('summerPref')
-    const cleared = clearTournamentCell(board, day)
+  it('大会をまたがなければ null', () => {
+    expect(forcedStopBetween(board, 0, 4)).toBeNull()
+  })
 
-    expect(cleared[day].kind).toBe('blank')
-    // 同じ日から動き出せる
-    expect(forcedStopBetween(cleared, day - 5, day + 5)).toBeNull()
+  it('今いるマス自体は対象にしない（大会マスから動けなくなるのを防ぐ）', () => {
+    // 次の回戦のマスで止まる
+    expect(forcedStopBetween(board, start, start + 3)).toBe(start + ROUND_GAP)
   })
 })
 
@@ -109,16 +166,20 @@ describe('大会の日程', () => {
     expect(dayOfTournament('autumnPref')).toBeLessThan(dayOfTournament('springNationals'))
   })
 
-  it('春の全国大会は年度末より前にある（消化できずに年が終わらない）', () => {
-    expect(dayOfTournament('springNationals')).toBeLessThan(GOAL_INDEX)
+  it('春の全国大会は、回戦を消化しても年度末に間に合う', () => {
+    const board = placeTournamentCells(createBoard(createRng(11)), 'springNationals', -1, 5)
+    const cells = board.filter((cell) => cell.tournamentKind === 'springNationals')
+
+    expect(cells).toHaveLength(5)
+    expect(cells.at(-1)!.index).toBeLessThan(GOAL_INDEX)
     expect(monthOfDay(dayOfTournament('springNationals'))).toBe(3)
   })
 
   it('冬合宿は12月にある', () => {
     const board = createBoard(createRng(10))
-    const camp = board.find((cell) => cell.kind === 'camp')
-    expect(camp).toBeDefined()
-    expect(monthOfDay(camp!.index)).toBe(12)
-    expect(camp!.index).toBe(dayOf(12, 26))
+    const camp = board.find((cell) => cell.kind === 'camp')!
+
+    expect(monthOfDay(dayOfCell(camp.index))).toBe(12)
+    expect(camp.index).toBe(cellOfDay(dayOf(12, 26)))
   })
 })

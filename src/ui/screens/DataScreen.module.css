@@ -206,3 +206,86 @@
   font-size: 9px;
   color: var(--text-dim);
 }
+
+/* 成長の一覧。1人1行で、伸び幅を右端に揃えて読ませる */
+.growthRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--sp-2);
+  width: 100%;
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.growthRow:last-of-type {
+  border-bottom: none;
+}
+
+.growthName {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.growthGrade {
+  margin-left: var(--sp-1);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.growthTotal {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.growthUp {
+  margin-left: var(--sp-1);
+  font-weight: 800;
+  color: var(--good);
+}
+
+.growthDown {
+  margin-left: var(--sp-1);
+  font-weight: 800;
+  color: var(--bad);
+}
+
+.growthDetail {
+  grid-column: 1 / -1;
+  font-size: 9px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 遊び方。折りたたんで、読みたい項目だけ開く */
+.helpTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--text-main);
+  text-align: left;
+}
+
+.helpMark {
+  flex: 0 0 auto;
+  margin-left: var(--sp-2);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.helpBody {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-sub);
+}

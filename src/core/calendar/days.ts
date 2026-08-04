@@ -1,9 +1,14 @@
 /**
  * 1年を日単位で扱うためのカレンダー。
  *
- * 盤面のマス＝1日にしたので、1年をまわるには365マス進む必要がある。
- * 月ごとにゴールを置くのをやめ、**盤面を1年で1本**にした。
- * 月は「何日目か」から導く。
+ * 盤面は1年で1本。**1マスは3日**で、1年は122マス。
+ * 月ごとにゴールを置くのをやめ、月は「何日目か」から導く。
+ *
+ * 1マス＝1日（365マス）にしていた時期があったが、
+ * それだとカードの数字が3〜12という大きな値になり、
+ * 「いくつ進むのか」が直感的に読めなかった。
+ * 1マス3日にすると**カードは1〜5**で済み、
+ * 1年の手数（＝練習の回数）もほぼ変わらない。
  *
  * 閏年は扱わない。1年は常に365日で、4月1日から始まる。
  */
@@ -12,6 +17,16 @@ import type { Month } from '@/core/types/game'
 
 /** 1年の日数 */
 export const DAYS_IN_YEAR = 365
+
+/**
+ * 1マスが表す日数。
+ * **ここを変えるとカードの数字と1年の手数が同時に動く。**
+ * 変えたら必ず seasonBalance.test.ts を回すこと。
+ */
+export const DAYS_PER_CELL = 3
+
+/** 盤面のマス数 */
+export const CELLS_IN_YEAR = Math.ceil(DAYS_IN_YEAR / DAYS_PER_CELL)
 
 /** 年度の開始月 */
 export const SEASON_START_MONTH: Month = 4
@@ -45,6 +60,16 @@ const MONTH_START: { month: Month; start: number; days: number }[] = (() => {
 /** 日付インデックスを 0〜364 に収める */
 function clampDay(day: number): number {
   return Math.min(DAYS_IN_YEAR - 1, Math.max(0, Math.floor(day)))
+}
+
+/** マスの番号 → 年度の何日目か */
+export function dayOfCell(cell: number): number {
+  return clampDay(Math.max(0, Math.floor(cell)) * DAYS_PER_CELL)
+}
+
+/** 年度の何日目か → マスの番号 */
+export function cellOfDay(day: number): number {
+  return Math.min(CELLS_IN_YEAR - 1, Math.floor(clampDay(day) / DAYS_PER_CELL))
 }
 
 /** 年度の何日目か → 月 */

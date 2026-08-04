@@ -158,12 +158,24 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   return outType(rng, batter, bases, outs, groundBias)
 }
 
-/** 安打の種類を決める */
+/**
+ * 安打の種類を決める。
+ *
+ * **本塁打はパワーと弾道で決まる。** 以前は素の値が0.07あり、
+ * パワーの低い打者でも安打の7%が本塁打になっていた。
+ * 「能力が低いのに柵越えする」という手触りになるので、
+ * 素の値を下げてパワーの効きを強くし、非力な打者はほぼ出ないようにした。
+ *
+ *   パワー30・弾道1 … ほぼ0（下限0.4%）
+ *   パワー50・弾道2 … 安打の4%
+ *   パワー80・弾道3 … 安打の13%
+ *   パワー95・弾道4 … 安打の19%
+ */
 function hitType(rng: Rng, batter: Player, power: number): PlayResult {
   const homerunShare = clamp(
-    0.07 + (power - 50) / 380 + (batter.batting.trajectory - 2) * 0.035,
-    0.015,
-    0.42,
+    0.03 + (power - 45) / 500 + (batter.batting.trajectory - 2) * 0.03,
+    0.004,
+    0.35,
   )
   const tripleShare = clamp(0.02 + (batter.batting.speed - 50) / 1200, 0.005, 0.06)
   const doubleShare = 0.2

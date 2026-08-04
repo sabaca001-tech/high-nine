@@ -66,14 +66,16 @@ export function isForcedStop(kind: CellKind): boolean {
   return FORCED_STOP_KINDS.includes(kind)
 }
 
-/** 盤面の1マス。index は年度の何日目か（0＝4月1日） */
+/** 盤面の1マス。index はマスの番号（0＝4月1日、1マス＝3日） */
 export type BoardCell = {
-  /** 0始まりの位置＝年度の通算日 */
+  /** 0始まりのマス番号 */
   index: number
   kind: CellKind
   /**
    * 大会マスのときだけ入る大会の種類。
-   * 勝ち進んでいる間はこのマスに留まり、敗退すると普通のマスに戻る。
+   * **回戦ごとに別のマス**が置かれ、敗退すると残りは普通のマスに戻る。
    */
   tournamentKind?: import('./tournament').TournamentKind
+  /** 大会マスのときだけ入る回戦（1始まり） */
+  round?: number
 }

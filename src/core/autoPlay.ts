@@ -99,6 +99,30 @@ export function runMatch(state: GameState): GameState {
 }
 
 /**
+ * いま進行中の大会が終わる（優勝か敗退）まで進める。
+ *
+ * **大会は1回戦ごとに別のマスに置かれる。** 勝つといったん盤面へ戻り、
+ * 次の回戦のマスまで進んでから次の試合になる。
+ * 「大会画面で次の試合を押し続ける」形ではもう回らないので、
+ * 普通の進行（`playStep`）に任せる。
+ */
+export function playOutTournament(
+  initial: GameState,
+  options: AutoPlayOptions = {},
+): GameState {
+  const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
+  let state = initial
+  let steps = 0
+
+  while (state.tournament && !isTournamentOver(state.tournament)) {
+    state = playStep(state, options)
+    if (++steps > maxSteps) throw new Error('大会が終わらない')
+  }
+
+  return state
+}
+
+/**
  * 年度末（`phase === 'yearEnd'`）になるまで進める。
  * 途中の試合・大会・合宿はすべて自動で片付ける。
  */

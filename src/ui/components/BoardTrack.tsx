@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { dateOfDay, monthOfDay } from '@/core/calendar/days'
+import { dateOfDay, dayOfCell, monthOfDay } from '@/core/calendar/days'
 import type { BoardCell } from '@/core/types/board'
 import { CELL_LABELS, CELL_MARKS } from '@/core/types/board'
 import { TOURNAMENT_LABELS } from '@/core/types/tournament'
@@ -22,7 +22,10 @@ const AHEAD = 12
 /** 大会・合宿は日付と名前を出す。飛ばせないマスなので予定として読めるようにする */
 function noteOf(cell: BoardCell): string | null {
   if (cell.kind === 'tournament') {
-    return cell.tournamentKind ? TOURNAMENT_LABELS[cell.tournamentKind] : CELL_LABELS.tournament
+    if (!cell.tournamentKind) return CELL_LABELS.tournament
+    // 回戦ごとに別のマスなので、何回戦かまで出す
+    const label = TOURNAMENT_LABELS[cell.tournamentKind]
+    return cell.round ? `${label} ${cell.round}回戦` : label
   }
   if (cell.kind === 'camp') return CELL_LABELS.camp
   if (cell.kind === 'goal') return '年度末'
@@ -53,9 +56,12 @@ export function BoardTrack({ board, position }: Props) {
         else if (cell.index < position) classNames.push(styles.passed)
 
         const note = noteOf(cell)
-        const date = dateOfDay(cell.index)
-        // 月が変わる日は月を出して、季節の流れが読めるようにする
-        const showMonth = date === 1 || cell.index === from
+        // マスは3日ぶんなので、その先頭の日付を出す
+        const day = dayOfCell(cell.index)
+        const date = dateOfDay(day)
+        // 月が変わったマスは月を出して、季節の流れが読めるようにする
+        const showMonth =
+          cell.index === from || monthOfDay(day) !== monthOfDay(dayOfCell(cell.index - 1))
 
         return (
           <div
@@ -64,7 +70,7 @@ export function BoardTrack({ board, position }: Props) {
             className={styles.cellWrap}
           >
             <span className={styles.date}>
-              {showMonth && <span className={styles.month}>{monthOfDay(cell.index)}月</span>}
+              {showMonth && <span className={styles.month}>{monthOfDay(day)}月</span>}
               {date}
             </span>
             {isCurrent && <span className={styles.pin} />}

@@ -32,10 +32,17 @@ const COLLEGES = ['青嶺大学', '東都経済大学', '西日本工科大学',
 /** 社会人チーム名 */
 const CORPORATE_TEAMS = ['大和重工', '中央銀行', '第一製鉄', '日本電機', '共栄運輸']
 
-/** 進路の判定基準（卒業時の総合） */
-const PRO_THRESHOLD = 76
-const COLLEGE_THRESHOLD = 58
-const CORPORATE_THRESHOLD = 44
+/**
+ * 進路の判定基準（卒業時の総合）。
+ *
+ * **プロ入りは滅多に出ない水準に置く。** 76にしていた頃は
+ * 3年育てれば誰でも届き、毎年のようにプロが出ていた。
+ * 総合82は無戦略プレイでは10年に一度も届かない水準で、
+ * 育て切った主軸だけが指名される。
+ */
+const PRO_THRESHOLD = 82
+const COLLEGE_THRESHOLD = 62
+const CORPORATE_THRESHOLD = 46
 
 /** 大学の在学年数 */
 const COLLEGE_LENGTH = 4
@@ -63,7 +70,8 @@ export function decidePath(
   /** U18代表の実績による上乗せ（u18.ts の draftBonus） */
   u18Bonus = 0,
 ): CareerPath {
-  const bonus = Math.round((reputation - 20) * 0.08)
+  // 評判はあくまで「目に留まりやすくなる」程度。実力を覆さない
+  const bonus = Math.round((reputation - 20) * 0.05)
   const score = rating + bonus + u18Bonus + rng.int(-4, 4)
 
   if (score >= PRO_THRESHOLD) return 'pro'

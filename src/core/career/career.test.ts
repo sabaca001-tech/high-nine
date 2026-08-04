@@ -51,11 +51,12 @@ describe('decidePath', () => {
   })
 
   it('評判が高いと進路が有利になる', () => {
+    // プロ入りの水準（82）に近い選手で比べる
     const proRate = (reputation: number): number => {
       let pro = 0
       const rng = createRng(3)
       for (let i = 0; i < 300; i++) {
-        if (decidePath(rng, 73, reputation) === 'pro') pro++
+        if (decidePath(rng, 80, reputation) === 'pro') pro++
       }
       return pro / 300
     }

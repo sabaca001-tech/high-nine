@@ -4,7 +4,8 @@ import { createInitialRoster } from '@/core/player/createPlayer'
 import { LINEUP_SIZE } from '@/core/types/lineup'
 import type { Position } from '@/core/types/player'
 import { ALL_POSITIONS, createAptitudes, defenseScore, isPlayable } from './aptitude'
-import { autoLineup, repairLineup, starterOf, validateLineup } from './autoLineup'
+import { overallRating } from '@/core/player/rating'
+import { AUTO_LINEUP_PLANS, autoLineup, repairLineup, starterOf, validateLineup } from './autoLineup'
 
 describe('createAptitudes', () => {
   it('メインポジションは必ずS', () => {
@@ -165,5 +166,46 @@ describe('ポジションの網羅', () => {
   it('ALL_POSITIONS は9個', () => {
     const expected: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
     expect([...ALL_POSITIONS].sort()).toEqual([...expected].sort())
+  })
+})
+
+describe('おまかせの方針', () => {
+  const roster = createInitialRoster(createRng(31))
+
+  it('どの方針でも成立した編成になる', () => {
+    for (const plan of AUTO_LINEUP_PLANS) {
+      expect(validateLineup(autoLineup(roster, plan.id), roster)).toEqual([])
+    }
+  })
+
+  it('能力優先は総合の高い選手が多く入る', () => {
+    const sum = (lineup: ReturnType<typeof autoLineup>) =>
+      lineup.slots.reduce((total, slot) => {
+        const player = roster.find((p) => p.id === slot.playerId)!
+        return total + overallRating(player)
+      }, 0)
+
+    expect(sum(autoLineup(roster, 'ability'))).toBeGreaterThan(
+      sum(autoLineup(roster, 'balanced')),
+    )
+  })
+
+  it('若手優先は下級生が多く入る', () => {
+    const grades = (plan: Parameters<typeof autoLineup>[1]) =>
+      autoLineup(roster, plan).slots.reduce((total, slot) => {
+        const player = roster.find((p) => p.id === slot.playerId)!
+        return total + player.grade
+      }, 0)
+
+    // 学年の合計が小さいほど下級生が多い
+    expect(grades('youth')).toBeLessThan(grades('balanced'))
+  })
+
+  it('どの方針でも投手の位置には投手が入る', () => {
+    for (const plan of AUTO_LINEUP_PLANS) {
+      const slot = autoLineup(roster, plan.id).slots.find((s) => s.position === 'P')!
+      const player = roster.find((p) => p.id === slot.playerId)!
+      expect(player.pitching).not.toBeNull()
+    }
   })
 })

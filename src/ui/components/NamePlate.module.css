@@ -13,9 +13,37 @@
   border: 2px solid transparent;
   color: var(--pos-text);
   font-size: var(--fs-sm);
-  /* ドラッグ中にスクロールへ持っていかれないようにする */
-  touch-action: none;
   user-select: none;
+}
+
+/*
+ * ドラッグ用のつまみ。
+ *
+ * **`touch-action: none` はここだけに置く。** プレート全体に置いていた頃は、
+ * 一覧のどこを触ってもスクロールできなくなっていた（見出しの隙間しか反応しなかった）。
+ * つまみから始めた指の動きだけがドラッグになり、
+ * それ以外の場所は普通にスクロールできる。
+ */
+.handle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 指で確実に掴める幅を確保する */
+  width: 22px;
+  align-self: stretch;
+  margin-left: calc(var(--sp-2) * -1);
+  touch-action: none;
+  cursor: grab;
+  color: var(--pos-text);
+  opacity: 0.55;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.handle:active {
+  opacity: 1;
+  cursor: grabbing;
 }
 
 .selected {

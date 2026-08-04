@@ -15,6 +15,9 @@ import { REPUTATION_INITIAL } from '@/core/types/season'
 /** 部員数の目安。評判が高いほど多くの入部希望者が来る */
 const BASE_ROSTER_SIZE = 24
 
+/** 部として最低限そろえる投手の数。これを切ったときだけ投手を確約する */
+const MIN_PITCHERS = 2
+
 /** 1年で入る新入生の下限・上限。強豪校ならベンチ入り争いが起きる規模になる */
 const MIN_RECRUITS = 4
 const MAX_RECRUITS = 16
@@ -84,8 +87,12 @@ export function recruitFreshmen(
       id,
       grade: 1,
       enrolledAt: { year: params.year, month: 4 },
+      // 投手が2人を切ったときだけ確約する。
+      // 3人にしていた頃は毎年投手ばかり入ってきた
       isPitcher:
-        pitchersLeft + newcomers.filter((p) => p.isPitcher).length < 3 ? true : undefined,
+        pitchersLeft + newcomers.filter((p) => p.isPitcher).length < MIN_PITCHERS
+          ? true
+          : undefined,
       talentBonus: baseTalent + rng.int(-4, 4) + (isRecommended ? 14 : 0),
       // 在校生と新入生の両方と同姓同名にならないようにする
       takenNames: [...players, ...newcomers].map((player) => player.name),
@@ -131,7 +138,10 @@ export function advanceSeason(
 ): SeasonChange {
   const { players, reputation, year, alumni = [] } = params
 
-  // 卒業生は進路（プロ・大学・社会人）まで決めて記録する
+  // 卒業生は進路（プロ・大学・社会人）まで決めて記録する。
+  // **通常は空になる。** 3年生は夏の大会が終わった時点で引退し、
+  // そこでOB名鑑に載るため（gameEngine の retireThirdYears）。
+  // ここに残るのは、引退の処理を通らなかった場合の保険
   const graduates: GraduateRecord[] = players
     .filter((player) => player.grade === 3)
     .map((player) =>

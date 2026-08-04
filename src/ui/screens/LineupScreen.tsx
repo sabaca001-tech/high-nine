@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
-import { validateLineup } from '@/core/lineup/autoLineup'
+import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import { overallRating, toRank, trajectoryStars } from '@/core/player/rating'
 import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
@@ -47,6 +47,8 @@ export function LineupEditor() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [positionFor, setPositionFor] = useState<number | null>(null)
+  /** おまかせの方針を選ぶ一覧を出しているか */
+  const [showPlans, setShowPlans] = useState(false)
 
   const handleDrop = (item: DragItem, target: DropTarget) => {
     if (!game) return
@@ -130,7 +132,9 @@ export function LineupEditor() {
 
   const plateProps = (id: string, zone: string) => ({
     'data-drop-id': id,
-    onPointerDown: (event: ReactPointerEvent) =>
+    // ドラッグは**つまみからだけ**始める。
+    // プレート全体を掴めるようにすると一覧がスクロールできなくなる
+    onHandlePointerDown: (event: ReactPointerEvent) =>
       drag.handlePointerDown({ id, from: zone }, event),
     onClick: () => setSelectedId(id),
     selected: selectedId === id,
@@ -146,11 +150,35 @@ export function LineupEditor() {
         onPointerCancel={drag.handlePointerUp}
       >
         <div className={styles.toolbar}>
-          <p className={styles.hint}>つまんで移動／タップで能力表示</p>
-          <button type="button" className={styles.autoButton} onClick={autoLineup}>
-            おまかせ
+          <p className={styles.hint}>⠿ をつまんで移動／タップで能力表示</p>
+          <button
+            type="button"
+            className={styles.autoButton}
+            onClick={() => setShowPlans((open) => !open)}
+          >
+            おまかせ ▾
           </button>
         </div>
+
+        {/* おまかせは方針を選ばせる。1種類だと納得できない結果になることがある */}
+        {showPlans && (
+          <div className={styles.plans}>
+            {AUTO_LINEUP_PLANS.map((plan) => (
+              <button
+                key={plan.id}
+                type="button"
+                className={styles.plan}
+                onClick={() => {
+                  autoLineup(plan.id)
+                  setShowPlans(false)
+                }}
+              >
+                <span className={styles.planLabel}>{plan.label}</span>
+                <span className={styles.planNote}>{plan.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {problems.length > 0 && (
           <div className={styles.warning}>

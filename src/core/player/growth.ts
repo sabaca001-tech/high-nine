@@ -65,11 +65,18 @@ function motivationMultiplierFor(player: Player): number {
   return 1 + (base - 1) * sensitivity
 }
 
-/** 能力が高いほど伸びにくくする（カンストを緩やかにする） */
+/**
+ * 能力が高いほど伸びにくくする。
+ *
+ * **総合Sは10年に1人程度**にしたいので、上に行くほど強く鈍らせる。
+ * 以前（90以上で0.3）は3年あれば誰でも90に届いてしまい、
+ * 「飛び抜けた選手」という感覚が無かった。
+ */
 function diminishingMultiplier(current: number): number {
-  if (current >= 90) return 0.3
-  if (current >= 80) return 0.5
-  if (current >= 70) return 0.75
+  if (current >= 90) return 0.08
+  if (current >= 85) return 0.16
+  if (current >= 80) return 0.28
+  if (current >= 70) return 0.5
   return 1.0
 }
 

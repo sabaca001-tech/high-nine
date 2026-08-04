@@ -51,7 +51,7 @@ type GameStore = {
   selectCard: (cardId: string) => void
   advanceYear: () => void
   setLineup: (lineup: Lineup) => void
-  autoLineup: () => void
+  autoLineup: (plan?: import('@/core/lineup/autoLineup').AutoLineupPlan) => void
   setSquad: (squad: string[]) => void
   setMatchSpeed: (speed: MatchSpeed) => void
   startMatch: () => void
@@ -135,10 +135,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     dispatch(set, game, { type: 'setSquad', squad })
   },
 
-  autoLineup: () => {
+  autoLineup: (plan) => {
     const { game } = get()
     if (!game) return
-    dispatch(set, game, { type: 'autoLineup' })
+    dispatch(set, game, { type: 'autoLineup', ...(plan ? { plan } : {}) })
   },
 
   setMatchSpeed: (speed) => {

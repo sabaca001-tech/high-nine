@@ -116,7 +116,8 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
   const playerNames: string[] = []
 
   const add = (id: string, regionId: RegionId, tradition: number) => {
-    const name = makeSchoolName(rng, names)
+    // その県らしい地名を混ぜる。どこと戦っているのか実感が湧くように
+    const name = makeSchoolName(rng, names, regionId)
     names.push(name)
     schools.push({
       id,

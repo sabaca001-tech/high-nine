@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BOARD_LENGTH, dayOfTournament, GOAL_INDEX } from '@/core/board/boardDefs'
-import { dayOf, monthOfDay } from '@/core/calendar/days'
+import {
+  BOARD_LENGTH,
+  cellOfTournament,
+  GOAL_INDEX,
+  placeTournamentCells,
+} from '@/core/board/boardDefs'
+import { cellOfDay, dayOf, monthOfDay } from '@/core/calendar/days'
 import { ALL_POSITIONS } from '@/core/lineup/aptitude'
 import { canConvert, CONVERT_STEPS } from '@/core/player/trainingFocus'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
@@ -27,6 +32,7 @@ import {
   playUntilMonth,
   playUntilNewSeason,
   playUntilPhase,
+  playOutTournament,
   playUntilYearEnd,
   playYear,
   runMatch,
@@ -228,8 +234,12 @@ describe('日単位の移動', () => {
 
   it('月をまたぐと、またいだ月の処理がその場で走る', () => {
     const base = startedGame({ seed: 402 })
-    // 4月29日から動くと必ず5月に入る
-    const state: GameState = { ...base, boardPosition: dayOf(4, 29) }
+    // 4月末のマスから動くと必ず5月に入る
+    const state: GameState = {
+      ...base,
+      boardPosition: cellOfDay(dayOf(4, 29)),
+      hand: base.hand.map((card) => ({ ...card, number: 1 as const })),
+    }
 
     const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
 
@@ -241,11 +251,11 @@ describe('日単位の移動', () => {
 
   it('2ヶ月ぶんまたいでも取りこぼさない', () => {
     const base = startedGame({ seed: 403 })
-    // 4月29日 → 6月1日以降まで一気に進める
+    // 4月下旬 → 6月以降まで一気に進める
     const state: GameState = {
       ...base,
-      boardPosition: dayOf(4, 29),
-      hand: base.hand.map((card) => ({ ...card, number: 12 as const })),
+      boardPosition: cellOfDay(dayOf(4, 29)),
+      hand: base.hand.map((card) => ({ ...card, number: 5 as const })),
       // 途中に必ず止まるマスが無いようにする
       board: base.board.map((cell) =>
         cell.kind === 'tournament' || cell.kind === 'camp'
@@ -266,17 +276,17 @@ describe('日単位の移動', () => {
 
   it('大会マスは飛び越えられない', () => {
     const base = startedGame({ seed: 404 })
-    const summerDay = dayOfTournament('summerPref')
+    const summerCell = cellOfTournament('summerPref')
     const state: GameState = {
       ...base,
-      boardPosition: summerDay - 2,
-      // 12日進めば本来は通り過ぎるはず
-      hand: base.hand.map((card) => ({ ...card, number: 12 as const })),
+      boardPosition: summerCell - 2,
+      // 5マス進めば本来は通り過ぎるはず
+      hand: base.hand.map((card) => ({ ...card, number: 5 as const })),
     }
 
     const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
 
-    expect(next.boardPosition).toBe(summerDay)
+    expect(next.boardPosition).toBe(summerCell)
     expect(next.phase).toBe('tournament')
   })
 
@@ -285,7 +295,7 @@ describe('日単位の移動', () => {
     const state: GameState = {
       ...base,
       boardPosition: GOAL_INDEX - 2,
-      hand: base.hand.map((card) => ({ ...card, number: 12 as const })),
+      hand: base.hand.map((card) => ({ ...card, number: 5 as const })),
     }
 
     const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
@@ -504,7 +514,7 @@ describe('世代交代', () => {
    */
   const playOneYear = playUntilNewSeason
 
-  it('1年経つと3年生が卒業し、新入生が加入する', () => {
+  it('1年経つと3年生が抜け、新入生が加入する', () => {
     const before = startedGame({ seed: 71 })
     const thirdYearIds = before.players.filter((p) => p.grade === 3).map((p) => p.id)
 
@@ -512,14 +522,36 @@ describe('世代交代', () => {
 
     expect(after.phase).toBe('newSeason')
     expect(after.pendingSeason).not.toBeNull()
-    expect(after.pendingSeason!.graduates).toHaveLength(thirdYearIds.length)
 
-    // 卒業した選手は在籍していない
+    // 抜けた選手は在籍していない
     for (const id of thirdYearIds) {
       expect(after.players.some((p) => p.id === id)).toBe(false)
     }
-    // OB名鑑に残っている
+    // OB名鑑に残っている（引退した時点で載る）
     expect(after.graduates.length).toBe(thirdYearIds.length)
+  })
+
+  it('3年生は夏の大会が終わった時点で引退する', () => {
+    let state = startedGame({ seed: 73 })
+    const thirdYearIds = state.players.filter((p) => p.grade === 3).map((p) => p.id)
+    expect(thirdYearIds.length).toBeGreaterThan(0)
+
+    // 夏の大会が終わるまで進める
+    let guard = 0
+    while (state.players.some((p) => p.grade === 3)) {
+      state = playStep(state)
+      if (++guard > 600) throw new Error('3年生が引退しない')
+    }
+
+    // まだ年度末ではない＝秋以降を新チームで戦う
+    expect(state.phase).not.toBe('yearEnd')
+    expect(state.month).toBeGreaterThanOrEqual(7)
+    expect(state.month).toBeLessThanOrEqual(9)
+
+    // 引退した時点でOB名鑑に載り、編成も組み直されている
+    expect(state.graduates.length).toBe(thirdYearIds.length)
+    expect(validateLineup(state.lineup, state.players)).toEqual([])
+    expect(state.squad.every((id) => state.players.some((p) => p.id === id))).toBe(true)
   })
 
   it('卒業後もスタメンが成立している', () => {
@@ -579,19 +611,6 @@ describe('大会', () => {
   /** 大会マスに止まるまで進める */
   const untilTournament = (state: GameState) => playUntilPhase(state, 'tournament')
 
-  /** 大会が終わるまで試合を消化する */
-  function playOutTournament(initial: GameState): GameState {
-    let state = initial
-    let guard = 0
-    while (!state.tournament!.eliminated && !state.tournament!.champion) {
-      state = applyCommand(state, { type: 'playTournamentMatch' }).state
-      // 試合前にスタメンを確認する画面を挟む
-      state = runMatch(state)
-      state = applyCommand(state, { type: 'finishMatch' }).state
-      if (++guard > 20) throw new Error('大会が終わらない')
-    }
-    return state
-  }
 
   it('7月の大会マスに止まると夏の大会が始まる', () => {
     const next = untilTournament(startedGame({ seed: 81 }))
@@ -634,26 +653,56 @@ describe('大会', () => {
     expect(playing.pendingMatch).not.toBeNull()
 
     const after = applyCommand(playing, { type: 'finishMatch' }).state
-    expect(after.phase).toBe('tournament')
     expect(after.tournament!.results).toHaveLength(1)
 
     const result = after.tournament!.results[0]
     expect(result.won).toBe(after.tournament!.round === 2)
     expect(result.won).toBe(!after.tournament!.eliminated)
+
+    // 勝てば盤面に戻って次の回戦のマスへ、負ければ大会の結果画面へ
+    expect(after.phase).toBe(result.won ? 'cardSelect' : 'tournament')
   })
 
-  it('勝ち進んでいる間は大会マスに留まる', () => {
-    const inTournament = untilTournament(startedGame({ seed: 87 }))
-    const day = inTournament.boardPosition
+  it('勝つと次の回戦のマスが先に待っている', () => {
+    // 1回戦に勝つまで探す
+    for (let seed = 87; seed < 120; seed++) {
+      const inTournament = untilTournament(startedGame({ seed }))
+      const cell = inTournament.boardPosition
 
-    const after = applyCommand(
-      runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state),
-      { type: 'finishMatch' },
-    ).state
+      const after = applyCommand(
+        runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state),
+        { type: 'finishMatch' },
+      ).state
+      if (after.tournament!.eliminated) continue
 
-    // 勝っても負けても、大会が終わるまではその日から動かない
-    expect(after.boardPosition).toBe(day)
-    expect(after.phase).toBe('tournament')
+      // その場から動かず、盤面の先に次の回戦のマスがある
+      expect(after.boardPosition).toBe(cell)
+      expect(after.phase).toBe('cardSelect')
+
+      const next = after.board.find(
+        (c) => c.index > cell && c.kind === 'tournament' && c.tournamentKind === 'summerPref',
+      )
+      expect(next).toBeDefined()
+      expect(next!.round).toBe(2)
+      return
+    }
+    throw new Error('1回戦に勝つ組み合わせが見つからない')
+  })
+
+  it('敗退すると残りの回戦のマスも消える', () => {
+    for (let seed = 200; seed < 240; seed++) {
+      const inTournament = untilTournament(startedGame({ seed }))
+      const after = applyCommand(
+        runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state),
+        { type: 'finishMatch' },
+      ).state
+      if (!after.tournament!.eliminated) continue
+
+      const finished = applyCommand(after, { type: 'finishTournament' }).state
+      expect(finished.board.some((c) => c.tournamentKind === 'summerPref')).toBe(false)
+      return
+    }
+    throw new Error('1回戦で負ける組み合わせが見つからない')
   })
 
   it('大会が終わるとマスが普通のマスに戻り、先へ進める', () => {
@@ -791,15 +840,10 @@ describe('春の全国大会', () => {
   it('出場権があると3月に大会マスが立ち、終われば年度末まで進める', () => {
     // 秋季大会を制した状態を直接作る（盤面にも春の全国のマスを置く）
     const base = startedGame({ seed: 97 })
-    const day = dayOfTournament('springNationals')
     const state: GameState = {
       ...base,
       springBerth: true,
-      board: base.board.map((cell) =>
-        cell.index === day
-          ? { index: day, kind: 'tournament', tournamentKind: 'springNationals' }
-          : cell,
-      ),
+      board: placeTournamentCells(base.board, 'springNationals', -1, 5),
     }
 
     const inTournament = playUntilPhase(state, 'tournament', {
@@ -810,11 +854,7 @@ describe('春の全国大会', () => {
     let current = inTournament
     let guard = 0
     while (current.tournament!.kind !== 'springNationals') {
-      while (!current.tournament!.champion && !current.tournament!.eliminated) {
-        current = applyCommand(current, { type: 'playTournamentMatch' }).state
-        current = runMatch(current)
-        current = applyCommand(current, { type: 'finishMatch' }).state
-      }
+      current = playOutTournament(current)
       current = applyCommand(current, { type: 'finishTournament' }).state
       current = playUntilPhase(current, 'tournament')
       if (++guard > 6) throw new Error('春の全国大会に到達しない')
@@ -823,11 +863,7 @@ describe('春の全国大会', () => {
     expect(current.month).toBe(3)
     expect(current.tournament!.kind).toBe('springNationals')
 
-    while (!current.tournament!.champion && !current.tournament!.eliminated) {
-      current = applyCommand(current, { type: 'playTournamentMatch' }).state
-      current = runMatch(current)
-      current = applyCommand(current, { type: 'finishMatch' }).state
-    }
+    current = playOutTournament(current)
     const after = applyCommand(current, { type: 'finishTournament' }).state
     expect(after.phase).toBe('cardSelect')
 
@@ -887,13 +923,7 @@ describe('部費とショップ', () => {
       let state = playUntilPhase(startedGame({ seed }), 'tournament')
       const beforeFunds = state.funds
 
-      let guard = 0
-      while (!state.tournament!.eliminated && !state.tournament!.champion) {
-        state = applyCommand(state, { type: 'playTournamentMatch' }).state
-        state = runMatch(state)
-        state = applyCommand(state, { type: 'finishMatch' }).state
-        if (++guard > 20) throw new Error('大会が終わらない')
-      }
+      state = playOutTournament(state)
       const wins = state.tournament!.results.filter((r) => r.won).length
       if (wins < 2) continue
 
@@ -2063,29 +2093,29 @@ describe('ライバル校', () => {
     // 夏の地区大会を優勝して全国へ出るまで進める
     let found = false
 
-    for (let seed = 8000; seed < 8040 && !found; seed++) {
-      let state = playUntilPhase(startedGame({ seed, regionId: 'tottori' }), 'tournament')
-      let guard = 0
+    // 鳥取（24校＝5回戦）でも全国に届くのは稀なので、何度も試す
+    for (let seed = 8000; seed < 8200 && !found; seed++) {
+      let state = startedGame({ seed, regionId: 'tottori' })
 
-      while (!found && guard < 40) {
-        if (state.tournament && !isTournamentOver(state.tournament)) {
-          const checking = applyCommand(state, { type: 'playTournamentMatch' }).state
+      for (let guard = 0; guard < 600 && !found; guard++) {
+        if (state.phase === 'yearEnd') break
 
-          if (state.tournament.kind === 'nationals') {
-            const setup = checking.pendingSetup!
-            const names = nationalRivals(state.rivals, state.regionId).map((s) => s.name)
-            expect(names).toContain(setup.opponentName)
-            expect(setup.opponentRegionName).toBeTruthy()
-            expect(setup.opponentRegionName).not.toBe('鳥取')
-            found = true
-            break
-          }
-          state = runMatch(checking)
-          state = applyCommand(state, { type: 'finishMatch' }).state
-        } else {
-          state = playStep(state)
+        // 全国大会の回戦マスに着いたら、そこで相手を確かめる
+        if (
+          state.phase === 'tournament' &&
+          state.tournament?.kind === 'nationals' &&
+          !isTournamentOver(state.tournament)
+        ) {
+          const setup = applyCommand(state, { type: 'playTournamentMatch' }).state
+            .pendingSetup!
+          const names = nationalRivals(state.rivals, state.regionId).map((s) => s.name)
+          expect(names).toContain(setup.opponentName)
+          expect(setup.opponentRegionName).toBeTruthy()
+          expect(setup.opponentRegionName).not.toBe('鳥取')
+          found = true
+          break
         }
-        guard++
+        state = playStep(state)
       }
     }
 

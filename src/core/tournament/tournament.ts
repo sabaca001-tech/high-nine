@@ -107,13 +107,13 @@ export function reputationGain(tournament: Tournament): number {
   const wins = tournament.results.filter((entry) => entry.won).length
 
   if (tournament.kind === 'nationals') {
-    return wins * 4 + (tournament.champion ? 30 : 0)
+    return wins * 3 + (tournament.champion ? 25 : 0)
   }
   if (tournament.kind === 'springNationals') {
-    return wins * 3 + (tournament.champion ? 20 : 0)
+    return wins * 2 + (tournament.champion ? 16 : 0)
   }
   if (tournament.kind === 'autumnPref') {
-    return wins * 1 + (tournament.champion ? 6 : 0)
+    return wins * 1 + (tournament.champion ? 5 : 0)
   }
-  return wins * 2 + (tournament.champion ? 15 : 0)
+  return wins * 2 + (tournament.champion ? 12 : 0)
 }

@@ -31,6 +31,29 @@ export type SeasonReport = {
 /** 学校の評判の上限 */
 export const REPUTATION_MAX = 100
 
+/**
+ * 評判の上がりにくさ。
+ *
+ * 素の加算をそのまま足していたら、**1年目で100に張り付いた**。
+ * そうなると新入生の質も手札の枚数も頭打ちになり、
+ * 「勝って学校を大きくする」という筋が2年目以降なくなってしまう。
+ *
+ * 上に行くほど伸びを鈍らせて、全国屈指（90以上）は
+ * 何年も勝ち続けた学校だけが届く水準にする。
+ *  評判20 → 加算の90% ／ 評判50 → 60% ／ 評判80 → 26% ／ 評判95 → 9%
+ */
+export function reputationGainAt(current: number, raw: number): number {
+  if (raw <= 0) return raw
+  const room = Math.max(0, 1 - current / REPUTATION_MAX)
+  return raw * room * room
+}
+
+/** 評判は整数で持つ（小数だと表示も比較も読みにくい） */
+export function applyReputation(current: number, raw: number): number {
+  const next = current + reputationGainAt(current, raw)
+  return Math.round(Math.min(REPUTATION_MAX, Math.max(0, next)))
+}
+
 /** 評判の初期値 */
 export const REPUTATION_INITIAL = 20
 
@@ -80,13 +103,19 @@ export const REPUTATION_GRADE_LABELS: Record<ReputationGrade, string> = {
  * 評判が上がると**選択肢が増える**という形の報酬にした。
  * 能力を直接盛るより、プレイヤーの判断の幅が広がるほうが面白い。
  */
+/**
+ * 評判ごとの手札の枚数。
+ *
+ * **下限を5枚にしてある。** 4枚だと選択肢が少なすぎて、
+ * 「引いた中から選ぶ」という手触りにならなかった。
+ */
 const HAND_SIZE_BY_GRADE: Record<ReputationGrade, number> = {
-  G: 4,
-  F: 4,
+  G: 5,
+  F: 5,
   E: 5,
-  D: 5,
+  D: 6,
   C: 6,
-  B: 6,
+  B: 7,
   A: 7,
   S: 8,
 }

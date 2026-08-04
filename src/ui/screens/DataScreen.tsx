@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { formatInnings } from '@/core/player/careerStats'
+import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
+import type { GrowthRange } from '@/core/player/growthReport'
+import { ABILITY_LABELS } from '@/core/types/player'
 import { overallRating, toRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
@@ -19,16 +22,19 @@ import { handSizeFor, reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/ty
 import { findRegion, regionStrength, roundsFor } from '@/core/types/region'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
+import { HELP_TOPICS } from './helpTopics'
 import styles from './DataScreen.module.css'
 
-type Tab = 'team' | 'facility' | 'rivals' | 'draft' | 'scout'
+type Tab = 'team' | 'growth' | 'facility' | 'rivals' | 'draft' | 'scout' | 'help'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'team', label: 'チーム' },
+  { id: 'growth', label: '成長' },
   { id: 'facility', label: '設備' },
   { id: 'rivals', label: '他校' },
   { id: 'draft', label: '進路' },
   { id: 'scout', label: 'スカウト' },
+  { id: 'help', label: '遊び方' },
 ]
 
 /**
@@ -60,10 +66,12 @@ export function DataScreen() {
       </div>
 
       {tab === 'team' && <TeamTab />}
+      {tab === 'growth' && <GrowthTab />}
       {tab === 'facility' && <FacilityTab />}
       {tab === 'rivals' && <RivalsTab />}
       {tab === 'draft' && <DraftTab />}
       {tab === 'scout' && <ScoutTab />}
+      {tab === 'help' && <HelpTab />}
     </AppLayout>
   )
 }
@@ -147,6 +155,75 @@ function TeamTab() {
         <button type="button" className={styles.link} onClick={() => setScreen('records')}>
           歴代記録（ベストナイン・通算記録） ▶
         </button>
+      </Section>
+    </>
+  )
+}
+
+/**
+ * 誰がどれだけ伸びたか。
+ *
+ * 練習も試合もその場でメッセージが流れるだけで、後から振り返れなかった。
+ * 「今年いちばん伸びたのは誰か」が分からないと、
+ * 練習の選び方が良かったのかを判断しようがない。
+ */
+function GrowthTab() {
+  const game = useGameStore((s) => s.game)!
+  const showPlayer = useGameStore((s) => s.showPlayer)
+  const [range, setRange] = useState<GrowthRange>('season')
+
+  const ranking = growthRanking(game.players, range, game.year)
+  const grown = ranking.filter((entry) => entry.delta !== 0 || entry.gains.length > 0)
+
+  return (
+    <>
+      <div className={styles.tabs}>
+        {(['month', 'season', 'enrollment'] as GrowthRange[]).map((id) => (
+          <button
+            key={id}
+            type="button"
+            className={range === id ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+            onClick={() => setRange(id)}
+          >
+            {GROWTH_RANGE_LABELS[id]}
+          </button>
+        ))}
+      </div>
+
+      <Section title={`伸びた順（${GROWTH_RANGE_LABELS[range]}）`}>
+        {grown.length === 0 ? (
+          <p className={styles.note}>
+            まだ記録がありません。月が変わると1件ずつ記録され、そこからの差を出します。
+          </p>
+        ) : (
+          grown.map((entry) => (
+            <button
+              key={entry.player.id}
+              type="button"
+              className={styles.growthRow}
+              onClick={() => showPlayer(entry.player.id)}
+            >
+              <span className={styles.growthName}>
+                {entry.player.name}
+                <span className={styles.growthGrade}>{entry.player.grade}年</span>
+              </span>
+              <span className={styles.growthTotal}>
+                {entry.from} → {entry.to}
+                <span className={entry.delta >= 0 ? styles.growthUp : styles.growthDown}>
+                  {signed(entry.delta)}
+                </span>
+              </span>
+              <span className={styles.growthDetail}>
+                {entry.gains.length === 0
+                  ? '変化なし'
+                  : entry.gains
+                      .slice(0, 5)
+                      .map((gain) => `${ABILITY_LABELS[gain.key]}${signed(gain.delta)}`)
+                      .join(' ')}
+              </span>
+            </button>
+          ))
+        )}
       </Section>
     </>
   )
@@ -408,6 +485,39 @@ function ScoutResultRow({ result }: { result: ScoutResult }) {
           : `${result.schoolName}（${result.regionName}）`}
       </span>
     </div>
+  )
+}
+
+/**
+ * 遊び方。
+ *
+ * **機能を足したら helpTopics.ts に項目を足す。**
+ * 仕組みが画面に散っていて、触っただけでは分からないものが多い。
+ */
+function HelpTab() {
+  const [open, setOpen] = useState<string | null>(HELP_TOPICS[0].id)
+
+  return (
+    <>
+      {HELP_TOPICS.map((topic) => (
+        <section key={topic.id} className={styles.section}>
+          <button
+            type="button"
+            className={styles.helpTitle}
+            onClick={() => setOpen(open === topic.id ? null : topic.id)}
+          >
+            {topic.title}
+            <span className={styles.helpMark}>{open === topic.id ? '−' : '＋'}</span>
+          </button>
+          {open === topic.id &&
+            topic.body.map((paragraph) => (
+              <p key={paragraph} className={styles.helpBody}>
+                {paragraph}
+              </p>
+            ))}
+        </section>
+      ))}
+    </>
   )
 }
 

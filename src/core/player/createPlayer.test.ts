@@ -97,10 +97,25 @@ describe('createInitialRoster', () => {
     expect(new Set(roster.map((p) => p.id)).size).toBe(roster.length)
   })
 
-  it('どのシードでも投手が最低6人いる（各学年2人）', () => {
+  it('どのシードでも投手が最低3人いる（各学年1人）', () => {
     for (let seed = 0; seed < 30; seed++) {
       const roster = createInitialRoster(createRng(seed))
-      expect(roster.filter((p) => p.isPitcher).length).toBeGreaterThanOrEqual(6)
+      expect(roster.filter((p) => p.isPitcher).length).toBeGreaterThanOrEqual(3)
     }
+  })
+
+  it('投手は部員のおよそ2割に収まる（打線を組んでも余らない）', () => {
+    let pitchers = 0
+    let total = 0
+
+    for (let seed = 0; seed < 40; seed++) {
+      const roster = createInitialRoster(createRng(seed))
+      pitchers += roster.filter((p) => p.isPitcher).length
+      total += roster.length
+    }
+
+    const rate = pitchers / total
+    expect(rate).toBeGreaterThan(0.12)
+    expect(rate).toBeLessThan(0.3)
   })
 })

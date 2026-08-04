@@ -88,6 +88,17 @@ const GRADE_BASE: Record<Grade, number> = {
 /** 能力のばらつき幅（±） */
 const ABILITY_SPREAD = 14
 
+/**
+ * 本職の投手になる割合。
+ *
+ * 0.25にしていたところ、部員10人につき2〜3人が投手になり、
+ * **打線を組むと投手が余る**状態だった。
+ * 実際の部でも投手は1割台なので、10人に2人程度に下げている。
+ * 投手不足の事故は `createInitialRoster` と `recruitFreshmen` の
+ * 「最低人数の保証」で防ぐ。
+ */
+const PITCHER_RATE = 0.18
+
 export type CreatePlayerOptions = {
   id: string
   grade: Grade
@@ -107,7 +118,7 @@ export type CreatePlayerOptions = {
 /** 選手を1人生成する */
 export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const { id, grade, talentBonus = 0 } = options
-  const isPitcher = options.isPitcher ?? rng.chance(0.25)
+  const isPitcher = options.isPitcher ?? rng.chance(PITCHER_RATE)
   const base = GRADE_BASE[grade] + talentBonus
 
   /** base を中心にばらつかせた能力値を1つ作る */
@@ -181,8 +192,9 @@ export function createInitialRoster(
         createPlayer(rng, {
           id: `p${counter}`,
           grade,
-          // 各学年の先頭2人は必ず投手にして、投手不足の事故を防ぐ
-          isPitcher: i < 2 ? true : undefined,
+          // 各学年の先頭1人だけ投手を確約する。
+          // 2人にしていた頃は投手が多くなりすぎた
+          isPitcher: i < 1 ? true : undefined,
           // 在校生は入学年が異なるので、記録の起点は加入月に揃える
           enrolledAt: { year: 1, month: 4 },
           takenNames: players.map((player) => player.name),

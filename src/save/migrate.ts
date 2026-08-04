@@ -15,11 +15,12 @@ import { SAVE_VERSION } from '@/core/types/game'
 import { snapshotOf } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { REPUTATION_INITIAL } from '@/core/types/season'
-import { DEFAULT_REGION_ID } from '@/core/types/region'
 import { monthlyFunds } from '@/core/shop/funds'
 import { rollInitialPitches } from '@/core/player/pitchDefs'
-import { createBoard } from '@/core/board/boardDefs'
-import { firstDayOfMonth } from '@/core/calendar/days'
+import { createBoard, GOAL_INDEX, placeSeasonTournaments } from '@/core/board/boardDefs'
+import { createTournament } from '@/core/tournament/tournament'
+import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
+import { cellOfDay, firstDayOfMonth } from '@/core/calendar/days'
 import { drawHand } from '@/core/card/drawCards'
 import { autoSquad } from '@/core/player/squad'
 import { handSizeFor } from '@/core/types/season'
@@ -108,6 +109,9 @@ export function migrate(raw: unknown): GameState | null {
   }
   if (version < 22) {
     data = migrateV21ToV22(data)
+  }
+  if (version < 23) {
+    data = migrateV22ToV23(data)
   }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
@@ -330,11 +334,8 @@ function migrateV12ToV13(raw: Record<string, unknown>): Record<string, unknown> 
   return {
     ...raw,
     version: 13,
-    board: createBoard(rng, {
-      nationals: raw.nationalsBerth === true,
-      spring: raw.springBerth === true,
-    }),
-    boardPosition: firstDayOfMonth(month),
+    board: createBoard(rng),
+    boardPosition: cellOfDay(firstDayOfMonth(month)),
     // 旧フェーズ monthEnd は年度末しか無くなったのでカード選択に戻す
     phase: raw.phase === 'monthEnd' ? 'cardSelect' : raw.phase,
     // 進行中の大会は盤面の対応が取れないので畳む
@@ -543,6 +544,49 @@ function migrateV21ToV22(raw: Record<string, unknown>): Record<string, unknown> 
     ...raw,
     version: 22,
     uniform: normalizeUniform(typeof raw.uniform === 'string' ? raw.uniform : undefined),
+  }
+}
+
+/**
+ * v22 → v23
+ *
+ *  - 盤面を1マス1日（365マス）から1マス3日（122マス）に変更。
+ *    マスの意味が変わったので**盤面を作り直す**。
+ *    位置は日付を保って読み替える（4月に戻したりしない）。
+ *  - 大会は1回戦ずつ別のマスに置く形になった。
+ *    進行中の大会があっても、マスの持ち方が違うのでいったん畳む。
+ */
+function migrateV22ToV23(raw: Record<string, unknown>): Record<string, unknown> {
+  const rngState = typeof raw.rngState === 'number' ? raw.rngState : 1
+  const rng = createRng(rngState)
+  const regionId = typeof raw.regionId === 'string' ? raw.regionId : DEFAULT_REGION_ID
+  const region = findRegion(regionId)
+
+  // 旧盤面の位置は「通算日」だったので、そのままマス番号に読み替える
+  const oldDay = typeof raw.boardPosition === 'number' ? raw.boardPosition : 0
+  const boardPosition = Math.min(GOAL_INDEX, cellOfDay(oldDay))
+
+  const board = placeSeasonTournaments(createBoard(rng), {
+    summerPref: createTournament('summerPref', region).totalRounds,
+    autumnPref: createTournament('autumnPref', region).totalRounds,
+  })
+
+  // カードの数字も 3〜12 から 1〜5 に変わっているので引き直す
+  const reputation = typeof raw.reputation === 'number' ? raw.reputation : REPUTATION_INITIAL
+  const serial = typeof raw.serial === 'number' ? raw.serial : 0
+  const handSize = handSizeFor(reputation)
+
+  return {
+    ...raw,
+    version: 23,
+    board,
+    boardPosition,
+    hand: drawHand(rng, serial, handSize),
+    serial: serial + handSize,
+    // 進行中の大会は畳む。回戦ぶんのマスが無いので続きを再現できない
+    tournament: null,
+    phase: raw.phase === 'tournament' ? 'cardSelect' : raw.phase,
+    rngState: rng.state,
   }
 }
 

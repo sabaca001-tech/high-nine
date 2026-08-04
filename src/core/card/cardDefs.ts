@@ -128,7 +128,7 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     gains: [],
     conditionDelta: -3,
     trustDelta: 6,
-    weight: 3,
+    weight: 2,
   },
   rest: {
     kind: 'rest',
@@ -200,7 +200,7 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     gains: [],
     conditionDelta: -12,
     trustDelta: 3,
-    weight: 3,
+    weight: 2,
     special: 'groundUp',
   },
   medical: {
@@ -220,7 +220,7 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     gains: [],
     conditionDelta: 2,
     trustDelta: 9,
-    weight: 3,
+    weight: 2,
   },
   outing: {
     kind: 'outing',
@@ -312,22 +312,18 @@ export const RARE_CARD_RATE = 0.08
 export const RARE_MULTIPLIER = 2
 
 /**
- * カードの数字（＝進む日数）の出現重み。
+ * カードの数字（＝進むマス数）の出現重み。
  *
- * 平均7日ほどにしてある。1年365日を50手前後で回る計算で、
- * 月ごとの盤面だった頃（1年で約55手）とテンポを揃えている。
- * ここを小さくすると1年の手数が増え、そのぶん練習回数が増えて
- * **成長が一気に速くなる**ので、変えるときは必ず診断を回すこと。
+ * 平均2.5マス＝約7.5日。1マス3日・1年122マスなので、1年を約49手で回る。
+ * 1マス1日だった頃（3〜12日・約49手）とテンポを揃えてある。
+ *
+ * ここを変えると1年の手数が変わり、**練習回数＝成長速度が直接動く**ので、
+ * 変えるときは必ず `seasonBalance.test.ts` を回すこと。
  */
 export const CARD_NUMBER_WEIGHTS: { value: CardNumber; weight: number }[] = [
-  { value: 3, weight: 8 },
-  { value: 4, weight: 10 },
-  { value: 5, weight: 13 },
-  { value: 6, weight: 15 },
-  { value: 7, weight: 16 },
-  { value: 8, weight: 14 },
-  { value: 9, weight: 10 },
-  { value: 10, weight: 7 },
-  { value: 11, weight: 4 },
-  { value: 12, weight: 3 },
+  { value: 1, weight: 12 },
+  { value: 2, weight: 26 },
+  { value: 3, weight: 28 },
+  { value: 4, weight: 20 },
+  { value: 5, weight: 14 },
 ]

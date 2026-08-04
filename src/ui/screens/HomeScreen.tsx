@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { overallRating } from '@/core/player/rating'
 import { reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/types/season'
 import { findRegion } from '@/core/types/region'
-import { formatDay } from '@/core/calendar/days'
+import { dayOfCell, formatDay } from '@/core/calendar/days'
 import { TOURNAMENT_LABELS } from '@/core/types/tournament'
 import type { PracticeKind } from '@/core/types/card'
 import type { GameState } from '@/core/types/game'
@@ -40,8 +40,8 @@ export function HomeScreen() {
 
   const upcoming = nextEvent
     ? nextEvent.kind === 'camp'
-      ? `${formatDay(nextEvent.index)}：冬合宿`
-      : `${formatDay(nextEvent.index)}：${
+      ? `${formatDay(dayOfCell(nextEvent.index))}：冬合宿`
+      : `${formatDay(dayOfCell(nextEvent.index))}：${
           nextEvent.tournamentKind === 'nationals' ||
           nextEvent.tournamentKind === 'springNationals'
             ? TOURNAMENT_LABELS[nextEvent.tournamentKind]

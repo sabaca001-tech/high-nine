@@ -5,6 +5,7 @@ import { LINEUP_SIZE } from '@/core/types/lineup'
 import { isAvailable } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, defenseScore, POSITION_WEIGHT } from './aptitude'
+import { overallRating } from '@/core/player/rating'
 
 /**
  * 守備位置を埋める順番。
@@ -19,12 +20,63 @@ const FILL_ORDER: Position[] = [
 ]
 
 /**
+ * おまかせ編成の方針。
+ *
+ * 1種類しか無かった頃は「守備適性だけで埋める」形だったので、
+ * **打てる選手が外れる**ことがあり、結果が納得できなかった。
+ * 何を優先したいかを選べるようにする。
+ */
+export type AutoLineupPlan = 'balanced' | 'ability' | 'youth'
+
+export const AUTO_LINEUP_PLANS: { id: AutoLineupPlan; label: string; description: string }[] = [
+  {
+    id: 'balanced',
+    label: 'バランス',
+    description: '守備適性と打力の両方を見て組む',
+  },
+  {
+    id: 'ability',
+    label: '能力優先',
+    description: '総合の高い選手から順に、守れる位置へ入れる',
+  },
+  {
+    id: 'youth',
+    label: '若手優先',
+    description: '下級生を積極的に使う。育てながら戦う',
+  },
+]
+
+/**
+ * その方針での「その位置にどれだけ向いているか」。
+ *
+ * どの方針でも守備適性は必ず見る。守れない位置に置くと
+ * 失策と被安打が増えるので（aptitude.ts）、無視すると単に弱くなる。
+ */
+function fitFor(plan: AutoLineupPlan, player: Player, position: Position): number {
+  const defense = defenseScore(player, position)
+  const hitting = player.batting.meet * 0.55 + player.batting.power * 0.45
+  const overall = overallRating(player)
+
+  switch (plan) {
+    case 'ability':
+      // 総合を主に見つつ、守れない位置は避ける
+      return overall * 1.2 + defense * 0.5
+    case 'youth':
+      // 下級生を大きく優遇する。3年生は夏で抜けるので伸ばす価値が薄い
+      return defense * 0.7 + hitting * 0.3 + (3 - player.grade) * 22
+    case 'balanced':
+    default:
+      return defense * 0.7 + hitting * 0.3
+  }
+}
+
+/**
  * スタメンを自動で組む。
  *
- * 1. 各ポジションを「守れる度合い」が高い選手から順に埋める
+ * 1. 各ポジションを、方針に合った選手から順に埋める
  * 2. 埋まった9人を打撃の特徴に応じて並べる
  */
-export function autoLineup(players: Player[]): Lineup {
+export function autoLineup(players: Player[], plan: AutoLineupPlan = 'balanced'): Lineup {
   const available = players.filter(isAvailable)
   const pool = available.length >= LINEUP_SIZE ? available : players
 
@@ -35,8 +87,14 @@ export function autoLineup(players: Player[]): Lineup {
     const candidates = pool.filter((p) => !used.has(p.id))
     if (candidates.length === 0) break
 
-    const best = candidates.reduce((a, b) =>
-      defenseScore(b, position) > defenseScore(a, position) ? b : a,
+    // 投手だけは投手能力を持つ選手に限る（誰でも投げられては困る）
+    const eligible =
+      position === 'P' && candidates.some((p) => p.pitching)
+        ? candidates.filter((p) => p.pitching)
+        : candidates
+
+    const best = eligible.reduce((a, b) =>
+      fitFor(plan, b, position) > fitFor(plan, a, position) ? b : a,
     )
     assigned.set(position, best)
     used.add(best.id)

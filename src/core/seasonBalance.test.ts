@@ -239,3 +239,54 @@ describe('控えの出番', () => {
     )
   }, 300000)
 })
+
+/**
+ * 総合Sの出現頻度の診断。
+ *
+ * 「Sは10年に1人、弱小校ではさらに稀」を狙っている。
+ * 判定はせず、10年ぶんの在籍選手から最高ランクの出方を出力する。
+ */
+describe('総合Sの希少さ', () => {
+  it('10年でSランクが何人出るかを出力する', () => {
+    const SEEDS = 6
+    const YEARS = 10
+
+    /** その年に在籍していた選手の最高総合 */
+    const best: number[] = []
+    let sCount = 0
+    let aCount = 0
+
+    for (let seed = 0; seed < SEEDS; seed++) {
+      let state = startedGame({ seed })
+      const seen = new Set<string>()
+
+      for (let year = 1; year <= YEARS; year++) {
+        state = playUntilYearEnd(state)
+
+        for (const player of state.players) {
+          const rating = overallRating(player)
+          // 同じ選手を年ごとに数えない。到達した最高ランクだけを見る
+          if (rating >= 90 && !seen.has(`S:${player.id}`)) {
+            seen.add(`S:${player.id}`)
+            sCount += 1
+          } else if (rating >= 80 && !seen.has(`A:${player.id}`)) {
+            seen.add(`A:${player.id}`)
+            aCount += 1
+          }
+        }
+        best.push(Math.max(...state.players.map(overallRating)))
+
+        state = applyCommand(state, { type: 'advanceYear' }).state
+        state = applyCommand(state, { type: 'finishSeason' }).state
+      }
+    }
+
+    console.log(
+      `10年あたり Sランク${(sCount / SEEDS).toFixed(1)}人 / Aランク${(aCount / SEEDS).toFixed(1)}人`,
+    )
+    console.log(
+      `年ごとの最高総合 平均${(best.reduce((a, b) => a + b, 0) / best.length).toFixed(1)} / ` +
+        `全体の最高${Math.max(...best)}`,
+    )
+  }, 300000)
+})
