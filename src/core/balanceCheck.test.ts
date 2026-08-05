@@ -37,7 +37,10 @@ describe('バランス確認', () => {
 
     summary(state, '開始      ')
 
-    for (let month = 0; month < 72; month++) {
+    // ループ1周が1年。以前は変数名も見出しも「月」になっていて、
+    // 12年後の数値を1年後だと読み違えるもとになっていた
+    const YEARS = 72
+    for (let year = 0; year < YEARS; year++) {
       // カードの使用枚数を数えるため、選択のたびにカウントする
       state = playUntilYearEnd(state, {
         chooseCard: (s) => {
@@ -46,10 +49,10 @@ describe('バランス確認', () => {
         },
       })
       state = applyCommand(state, { type: 'advanceYear' }).state
-      if ((month + 1) % 12 === 0) summary(state, `${(month + 1) / 12}年後`)
+      if ((year + 1) % 12 === 0) summary(state, `${year + 1}年後`)
     }
 
-    console.log(`1ヶ月あたりのカード使用枚数: ${(cardsUsed / 72).toFixed(1)}`)
+    console.log(`1年あたりのカード使用枚数: ${(cardsUsed / YEARS).toFixed(1)}`)
   })
 
   it('試合の平均スコアと成績を出力する（常に成功する診断用）', () => {

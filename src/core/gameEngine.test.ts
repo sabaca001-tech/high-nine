@@ -234,10 +234,10 @@ describe('日単位の移動', () => {
 
   it('月をまたぐと、またいだ月の処理がその場で走る', () => {
     const base = startedGame({ seed: 402 })
-    // 4月末のマスから動くと必ず5月に入る
+    // 4月30日のマスから1マス動くと必ず5月1日に入る
     const state: GameState = {
       ...base,
-      boardPosition: cellOfDay(dayOf(4, 29)),
+      boardPosition: cellOfDay(dayOf(4, 30)),
       hand: base.hand.map((card) => ({ ...card, number: 1 as const })),
     }
 
@@ -249,9 +249,9 @@ describe('日単位の移動', () => {
     expect(next.log.some((entry) => entry.text.includes('維持費'))).toBe(true)
   })
 
-  it('2ヶ月ぶんまたいでも取りこぼさない', () => {
+  it('月を連続でまたいでも取りこぼさない', () => {
     const base = startedGame({ seed: 403 })
-    // 4月下旬 → 6月以降まで一気に進める
+    // 4月下旬 → 6月まで進める。1マス1日なのでカード1枚では月をまたぎ切れない
     const state: GameState = {
       ...base,
       boardPosition: cellOfDay(dayOf(4, 29)),
@@ -264,9 +264,11 @@ describe('日単位の移動', () => {
       ),
     }
 
-    let next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
-    next = applyCommand(next, { type: 'selectCard', cardId: next.hand[0].id }).state
-    next = applyCommand(next, { type: 'selectCard', cardId: next.hand[0].id }).state
+    let next = state
+    // 4/29 から 6月に入るまで（33日ぶん）。5枚ずつなので7手あれば足りる
+    for (let i = 0; i < 8; i++) {
+      next = applyCommand(next, { type: 'selectCard', cardId: next.hand[0].id }).state
+    }
 
     expect(next.month).toBe(6)
     // 5月と6月の両方の月替わりが記録されている
@@ -742,6 +744,51 @@ describe('大会', () => {
       return
     }
     throw new Error('地区大会に優勝するシードが見つからない')
+  })
+
+  it('勝ち上がって大会を終えるとチームが伸びる', () => {
+    // 勝ち上がるまでシードを変えて探す。初戦敗退では伸びないのが正しい挙動
+    for (let seed = 300; seed < 360; seed++) {
+      const inTournament = untilTournament(startedGame({ seed, regionId: 'tottori' }))
+      const played = playOutTournament(inTournament)
+      const wins = played.tournament!.results.filter((result) => result.won).length
+      if (wins < 3) continue
+
+      const before = new Map(
+        played.players.map((player) => [player.id, overallRating(player)] as const),
+      )
+      const result = applyCommand(played, { type: 'finishTournament' })
+
+      // 大会そのものの経験でスタメンが伸びている
+      const grew = result.state.players.filter(
+        (player) => overallRating(player) > (before.get(player.id) ?? 0),
+      )
+      expect(grew.length).toBeGreaterThan(0)
+      expect(
+        result.events.some(
+          (event) => event.type === 'message' && event.text.includes('一回り大きくなった'),
+        ),
+      ).toBe(true)
+      return
+    }
+    throw new Error('3回戦以上まで勝ち上がるシードが見つからない')
+  })
+
+  it('初戦敗退では大会の経験による成長は起きない', () => {
+    for (let seed = 400; seed < 460; seed++) {
+      const inTournament = untilTournament(startedGame({ seed }))
+      const played = playOutTournament(inTournament)
+      if (played.tournament!.results.some((result) => result.won)) continue
+
+      const result = applyCommand(played, { type: 'finishTournament' })
+      expect(
+        result.events.some(
+          (event) => event.type === 'message' && event.text.includes('一回り大きくなった'),
+        ),
+      ).toBe(false)
+      return
+    }
+    throw new Error('初戦敗退するシードが見つからない')
   })
 
   it('大会の成績で評判が上がる（負けても下がらない）', () => {
@@ -1619,15 +1666,38 @@ describe('怪我と離脱', () => {
   it('月が変わると離脱期間が1つ減り、0で復帰する', () => {
     const base = startedGame({ seed: 304 })
     const injuredId = base.players[0].id
+
+    /**
+     * 月末のマスに置いて1マスだけ進める。
+     * 自動プレイで月まで進めると、途中で治療カードや青マスを踏んで
+     * 怪我が治ってしまい、離脱期間そのものを確かめられない。
+     */
+    function crossMonth(from: GameState, month: Month, date: number): GameState {
+      const at: GameState = {
+        ...from,
+        boardPosition: cellOfDay(dayOf(month, date)),
+        // 何も起きないマスと、効果を持たない打撃カードだけにする
+        board: from.board.map((cell) =>
+          cell.kind === 'goal' ? cell : { index: cell.index, kind: 'blank' as const },
+        ),
+        hand: from.hand.map((card) => ({
+          ...card,
+          number: 1 as const,
+          kind: 'batting' as PracticeKind,
+        })),
+      }
+      return applyCommand(at, { type: 'selectCard', cardId: at.hand[0].id }).state
+    }
+
     let state: GameState = {
       ...base,
       players: base.players.map((p, i) => (i === 0 ? { ...p, injuryMonths: 2 } : p)),
     }
 
-    state = playUntilMonth(state, 5)
+    state = crossMonth(state, 4, 30)
     expect(state.players.find((p) => p.id === injuredId)!.injuryMonths).toBe(1)
 
-    state = playUntilMonth(state, 6)
+    state = crossMonth(state, 5, 31)
     expect(state.players.find((p) => p.id === injuredId)!.injuryMonths).toBe(0)
     expect(state.log.some((entry) => entry.text.includes('復帰'))).toBe(true)
   })

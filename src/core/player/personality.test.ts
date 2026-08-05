@@ -109,29 +109,50 @@ describe('成長への影響', () => {
 })
 
 describe('体力消費と信頼度への影響', () => {
+  /**
+   * 1手あたりの消耗が2〜3という小さな値になったので、端数は確率で丸めている。
+   * 1回では差が出ないことがあるため、まとめて平均で比べる。
+   */
+  function average(
+    personality: Personality,
+    def: (typeof PRACTICE_DEFS)[keyof typeof PRACTICE_DEFS],
+    pick: 'condition' | 'trust',
+    startCondition = 100,
+  ): number {
+    const rng = createRng(9)
+    const trials = 500
+    let total = 0
+    for (let i = 0; i < trials; i++) {
+      const player = makePlayer({ personality, condition: startCondition })
+      total += applyCardCost(rng, [player], def)[0][pick]
+    }
+    return total / trials
+  }
+
   it('やんちゃは消耗が激しい', () => {
-    const wild = applyCardCost([makePlayer({ personality: 'やんちゃ' })], PRACTICE_DEFS.batting)
-    const cool = applyCardCost([makePlayer({ personality: 'クール' })], PRACTICE_DEFS.batting)
-    expect(wild[0].condition).toBeLessThan(cool[0].condition)
+    expect(average('やんちゃ', PRACTICE_DEFS.batting, 'condition')).toBeLessThan(
+      average('クール', PRACTICE_DEFS.batting, 'condition'),
+    )
   })
 
   it('したたかは消耗しにくい', () => {
-    const shrewd = applyCardCost([makePlayer({ personality: 'したたか' })], PRACTICE_DEFS.batting)
-    const cool = applyCardCost([makePlayer({ personality: 'クール' })], PRACTICE_DEFS.batting)
-    expect(shrewd[0].condition).toBeGreaterThan(cool[0].condition)
+    expect(average('したたか', PRACTICE_DEFS.batting, 'condition')).toBeGreaterThan(
+      average('クール', PRACTICE_DEFS.batting, 'condition'),
+    )
   })
 
   it('ムードメーカーは信頼度が上がりやすい', () => {
-    const mood = applyCardCost([makePlayer({ personality: 'ムードメーカー' })], PRACTICE_DEFS.mental)
-    const cool = applyCardCost([makePlayer({ personality: 'クール' })], PRACTICE_DEFS.mental)
-    expect(mood[0].trust).toBeGreaterThan(cool[0].trust)
+    expect(average('ムードメーカー', PRACTICE_DEFS.mental, 'trust')).toBeGreaterThan(
+      average('クール', PRACTICE_DEFS.mental, 'trust'),
+    )
   })
 
   it('体力の回復には性格の影響が出ない', () => {
-    const players = ALL.map((personality) => makePlayer({ personality, condition: 50 }))
-    const after = applyCardCost(players, PRACTICE_DEFS.rest)
-    for (const player of after) {
-      expect(player.condition).toBe(80)
+    const values = ALL.map((personality) =>
+      average(personality, PRACTICE_DEFS.rest, 'condition', 50),
+    )
+    for (const value of values) {
+      expect(value).toBeCloseTo(values[0], 1)
     }
   })
 })

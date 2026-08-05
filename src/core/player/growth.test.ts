@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { Motivation, Player } from '@/core/types/player'
-import { applyCardCost, applyPractice, getAbility, raiseAbility } from './growth'
+import { applyCardCost, applyPractice, CARD_COST_SCALE, getAbility, raiseAbility } from './growth'
 import { emptyCareerStats } from './careerStats'
 
 /** テスト用の選手を作る（乱数を使わず値を固定する） */
@@ -102,23 +102,44 @@ describe('getAbility', () => {
 })
 
 describe('applyCardCost', () => {
+  /**
+   * 1手あたりの消耗は CARD_COST_SCALE で薄めたうえ、端数を確率で丸めている。
+   * 1回だけ見ても±1ぶれるので、まとめて平均を取る。
+   */
+  function averageAfter(
+    def: (typeof PRACTICE_DEFS)[keyof typeof PRACTICE_DEFS],
+    overrides: Parameters<typeof makePlayer>[0] = {},
+  ): { condition: number; trust: number } {
+    const rng = createRng(5)
+    const trials = 400
+    let condition = 0
+    let trust = 0
+    for (let i = 0; i < trials; i++) {
+      const after = applyCardCost(rng, [makePlayer(overrides)], def)[0]
+      condition += after.condition
+      trust += after.trust
+    }
+    return { condition: condition / trials, trust: trust / trials }
+  }
+
   it('練習すると体力が減る', () => {
-    const players = applyCardCost([makePlayer()], PRACTICE_DEFS.batting)
-    expect(players[0].condition).toBe(100 + PRACTICE_DEFS.batting.conditionDelta)
+    const expected = 100 + PRACTICE_DEFS.batting.conditionDelta * CARD_COST_SCALE
+    expect(averageAfter(PRACTICE_DEFS.batting).condition).toBeCloseTo(expected, 0)
   })
 
   it('休養カードで体力が回復する', () => {
-    const players = applyCardCost([makePlayer({ condition: 50 })], PRACTICE_DEFS.rest)
-    expect(players[0].condition).toBe(80)
+    const expected = 50 + PRACTICE_DEFS.rest.conditionDelta * CARD_COST_SCALE
+    expect(averageAfter(PRACTICE_DEFS.rest, { condition: 50 }).condition).toBeCloseTo(expected, 0)
   })
 
   it('メンタル強化で信頼度が上がる', () => {
-    const players = applyCardCost([makePlayer()], PRACTICE_DEFS.mental)
-    expect(players[0].trust).toBe(50 + PRACTICE_DEFS.mental.trustDelta)
+    const expected = 50 + PRACTICE_DEFS.mental.trustDelta * CARD_COST_SCALE
+    expect(averageAfter(PRACTICE_DEFS.mental).trust).toBeCloseTo(expected, 0)
   })
 
   it('体力・信頼度は0〜100に収まる', () => {
     const players = applyCardCost(
+      createRng(1),
       [makePlayer({ trust: 100, condition: 5 })],
       PRACTICE_DEFS.stamina,
     )
@@ -129,7 +150,7 @@ describe('applyCardCost', () => {
 
   it('元の配列を変更しない', () => {
     const player = makePlayer()
-    applyCardCost([player], PRACTICE_DEFS.batting)
+    applyCardCost(createRng(1), [player], PRACTICE_DEFS.batting)
     expect(player.condition).toBe(100)
   })
 })

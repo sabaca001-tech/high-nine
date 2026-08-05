@@ -30,6 +30,7 @@ import { recruitFreshmen } from '@/core/season/graduation'
 import { applyCardCost, clamp } from '@/core/player/growth'
 import { addBatting, addPitching } from '@/core/player/careerStats'
 import { applyMatchGrowth } from '@/core/player/matchGrowth'
+import type { MatchStage } from '@/core/player/matchGrowth'
 import {
   applySubstitution,
   finalizeMatch,
@@ -106,6 +107,8 @@ import {
   opponentStrengthFor,
   reputationGain,
 } from '@/core/tournament/tournament'
+import { applyTournamentGrowth } from '@/core/tournament/tournamentGrowth'
+import { findSkill } from '@/core/skill/skillDefs'
 import { PRACTICE_LABELS } from '@/core/types/card'
 import type { PracticeKind } from '@/core/types/card'
 import { ABILITY_LABELS, HISTORY_LIMIT, isAvailable, snapshotOf } from '@/core/types/player'
@@ -800,14 +803,52 @@ function finishTournament(state: GameState): EngineResult {
     })
   }
 
-  // 夏が終われば3年生は引退する
-  const retired = retireThirdYears(state, tournament, events)
+  // 大会を戦い抜いたことによる成長。**引退処理より先に行う。**
+  // あとにすると、3年生が最後の夏で得たものがOB名鑑の記録に載らない
+  const rng = createRng(state.rngState)
+  const grown = applyTournamentGrowth(rng, state.players, {
+    tournament,
+    starters: state.lineup.slots.map((slot) => slot.playerId),
+    squad: state.squad,
+  })
+
+  if (grown.changes.length > 0) {
+    events.push({ type: 'ability', changes: grown.changes })
+    events.push({
+      type: 'message',
+      text: `${tournament.name}を戦い抜き、${
+        new Set(grown.changes.map((change) => change.playerId)).size
+      }人が一回り大きくなった`,
+      tone: 'good',
+    })
+  }
+  for (const news of grown.skills) {
+    const skill = findSkill(news.skillId)
+    if (!skill) continue
+    events.push({
+      type: 'message',
+      text:
+        news.rank === 'gold'
+          ? `${news.playerName}が大舞台で覚醒し、金の特殊能力「${skill.name}」を身につけた！`
+          : `${news.playerName}が大会での経験から特殊能力「${skill.name}」を身につけた`,
+      tone: 'good',
+    })
+  }
+
+  // 夏が終われば3年生は引退する。成長を反映した選手で判定する
+  const retired = retireThirdYears(
+    { ...state, players: grown.players, rngState: rng.state },
+    tournament,
+    events,
+  )
 
   const { log: log2, serial: serial2 } = appendLog(state.log, events, state.serial)
 
   return {
     state: {
       ...state,
+      players: grown.players,
+      rngState: rng.state,
       ...retired,
       tournament: null,
       board,
@@ -979,6 +1020,13 @@ function finishMatch(state: GameState): EngineResult {
   const rng = createRng(state.rngState)
   const growthChanges: AbilityChange[] = []
 
+  // 負ければ終わりの大会は、同じ内容でも得るものが大きい
+  const stage: MatchStage = !state.tournament
+    ? 'practice'
+    : state.tournament.kind === 'nationals' || state.tournament.kind === 'springNationals'
+      ? 'nationals'
+      : 'pref'
+
   const players = state.players.map((player) => {
     // 出場した選手ほど得るものが大きい
     const batting = battingById.get(player.id)
@@ -998,6 +1046,7 @@ function finishMatch(state: GameState): EngineResult {
       ...(pitching ? { pitching } : {}),
       won,
       mvp: player.id === match.mvpPlayerId,
+      stage,
     })
     growthChanges.push(...grown.changes)
 
@@ -1177,6 +1226,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
 
   // 止まったマスに関係なく、カードを使った時点で体力を消耗する
   let players = applyCardCost(
+    rng,
     state.players,
     PRACTICE_DEFS[card.kind],
     managerConditionCost(state.managerId),

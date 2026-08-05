@@ -1,7 +1,7 @@
 /**
  * 能力の成長計算。
  *
- * 成長量 = 基本値 × やる気補正 × 学年補正 × 体力補正 × 高能力ペナルティ × レア倍率
+ * 成長量 = 基本値 × 手数補正 × やる気補正 × 学年補正 × 体力補正 × 高能力ペナルティ × レア倍率
  * 端数は確率で切り上げる（+2.4 なら 40% の確率で +3、60% で +2）。
  */
 
@@ -16,6 +16,31 @@ import { focusMultiplier } from './trainingFocus'
 
 /** 投手能力に属するキー */
 const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
+
+/**
+ * 練習1回あたりの倍率。
+ *
+ * 盤面を1マス1日に戻したことで、1年の練習マスが約13回から約61回に増えた
+ * （手数49→146、練習マスの重みも組み直した結果）。
+ * カード定義の `amount` は「1回の練習でこれくらい」という読みやすい値のまま残し、
+ * **増えた回数ぶんをここで割り戻す**。カードの数字を全部書き換えるより、
+ * 盤面の刻みを変えたときにここ1か所を直すほうが追いやすい。
+ *
+ * 計算上は 13.4 / 61 ≒ 0.22 だが、それだと以前より伸びが鈍かったので
+ * 実測しながら 0.25 に上げてある。変えたら必ず seasonBalance.test.ts を回すこと。
+ */
+export const PRACTICE_GROWTH_SCALE = 0.25
+
+/**
+ * カード1枚あたりの体力・信頼度の倍率。
+ *
+ * こちらは「止まったマスに関係なく毎手かかる」ので、
+ * 練習マスの回数ではなく**手数そのもの**（49→146手）で割り戻す。
+ * 計算上は 1/3 ≒ 0.33 だが、それだと無戦略プレイの体力が50台に居座り、
+ * 体力補正（70未満で0.85倍）が常時かかる状態になったので 0.30 に緩めてある。
+ * 成長の倍率とは別の値になるのが正しい。
+ */
+export const CARD_COST_SCALE = 0.3
 
 /** やる気による成長倍率 */
 const MOTIVATION_MULTIPLIER: Record<Motivation, number> = {
@@ -183,6 +208,7 @@ export function applyPractice(
  * （マスに止まった時だけ消耗させると体力が常に満タンになり、休養カードが無意味になる）
  */
 export function applyCardCost(
+  rng: Rng,
   players: Player[],
   def: PracticeDef,
   /** マネージャーによる体力消費の倍率 */
@@ -196,13 +222,19 @@ export function applyCardCost(
 
     const effect = effectOf(player.personality)
     // 消耗だけ性格とマネージャーの影響を受ける（回復はそのまま）
-    const condition =
-      def.conditionDelta < 0
-        ? Math.round(def.conditionDelta * effect.conditionCost * conditionCostRate)
-        : def.conditionDelta
+    // CARD_COST_SCALE は消耗にも回復にも掛ける。片方だけ薄めると
+    // 休養カードが手数のぶんだけ強くなってしまう
+    const condition = roundRandom(
+      rng,
+      def.conditionDelta *
+        CARD_COST_SCALE *
+        (def.conditionDelta < 0 ? effect.conditionCost * conditionCostRate : 1),
+    )
 
-    const trust =
-      def.trustDelta > 0 ? Math.round(def.trustDelta * effect.trustGain) : def.trustDelta
+    const trust = roundRandom(
+      rng,
+      def.trustDelta * CARD_COST_SCALE * (def.trustDelta > 0 ? effect.trustGain : 1),
+    )
 
     return {
       ...player,
@@ -210,6 +242,19 @@ export function applyCardCost(
       trust: clamp(player.trust + trust, 0, 100),
     }
   })
+}
+
+/**
+ * 端数を確率で丸める（-2.6 なら 60% で -3、40% で -2）。
+ *
+ * **四捨五入にしてはいけない。** 1手あたりの消耗が2〜3という小さな値になったので、
+ * 四捨五入すると性格やマネージャーの2割の差が丸め込まれて消える
+ * （「やんちゃは消耗が激しい」が成立しなくなった）。
+ * 成長計算と同じやり方に揃えてある。
+ */
+function roundRandom(rng: Rng, value: number): number {
+  const floor = Math.floor(value)
+  return floor + (rng.chance(value - floor) ? 1 : 0)
 }
 
 /** その選手がこの効果の対象かどうか */
@@ -234,6 +279,7 @@ function calcGrowth(
 
   const raw =
     gain.amount *
+    PRACTICE_GROWTH_SCALE *
     motivationMultiplierFor(player) *
     GRADE_MULTIPLIER[player.grade] *
     conditionMultiplierFor(player) *

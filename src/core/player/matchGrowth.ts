@@ -41,6 +41,28 @@ const MAX_STEPS = 3
 /** 勝った試合はよく身につく */
 const WIN_BONUS = 1.2
 
+/**
+ * 大会の試合は練習試合より得るものが大きい。
+ *
+ * 負ければ終わりの一発勝負で、しかも相手が強い。
+ * 同じ4安打でも、練習試合と県大会の準決勝では意味が違う。
+ * ここを1.0のままにしていたので、**大会が「結果を見るだけ」の場面**になっていた。
+ */
+export type MatchStage = 'practice' | 'pref' | 'nationals'
+
+const STAGE_MULTIPLIER: Record<MatchStage, number> = {
+  practice: 1,
+  pref: 1.5,
+  nationals: 2,
+}
+
+/** 1試合で伸びる上限も大会では緩める */
+const STAGE_MAX_STEPS: Record<MatchStage, number> = {
+  practice: MAX_STEPS,
+  pref: 4,
+  nationals: 5,
+}
+
 export type MatchGrowthResult = {
   player: Player
   changes: AbilityChange[]
@@ -59,13 +81,17 @@ export function applyMatchGrowth(
     won: boolean
     /** 今日のヒーローに選ばれたか */
     mvp: boolean
+    /** 練習試合か、大会か。省略すると練習試合 */
+    stage?: MatchStage
   },
 ): MatchGrowthResult {
   const points = performancePoints(params.batting, params.pitching)
   if (points <= 0) return { player, changes: [] }
 
-  const scaled = points * (params.won ? WIN_BONUS : 1) * (params.mvp ? 1.3 : 1)
-  const steps = Math.min(MAX_STEPS, rollSteps(rng, scaled / POINTS_PER_STEP))
+  const stage = params.stage ?? 'practice'
+  const scaled =
+    points * (params.won ? WIN_BONUS : 1) * (params.mvp ? 1.3 : 1) * STAGE_MULTIPLIER[stage]
+  const steps = Math.min(STAGE_MAX_STEPS[stage], rollSteps(rng, scaled / POINTS_PER_STEP))
   if (steps <= 0) return { player, changes: [] }
 
   // 活躍した内容に近い能力が伸びる。投げて勝ったなら投手能力

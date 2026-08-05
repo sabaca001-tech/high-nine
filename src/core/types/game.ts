@@ -53,8 +53,10 @@ import type { Tournament } from './tournament'
  *            新年度に学校名・ユニフォーム・所在地を変えられるようにした。
  * v22 → v23: 盤面を1マス3日・1年122マスに変更（カードの数字が1〜5に）。
  *            大会を1回戦ずつのマスに分割。3年生は夏で引退。
+ * v23 → v24: 盤面を1マス1日・1年365マスに戻す（boardPosition が通算日に戻る）。
+ *            増えた手数ぶん、1手あたりの成長と消耗を薄めた。
  */
-export const SAVE_VERSION = 23
+export const SAVE_VERSION = 24
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12

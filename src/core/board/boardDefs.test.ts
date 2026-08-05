@@ -36,9 +36,9 @@ describe('createBoard', () => {
     board.forEach((cell, index) => expect(cell.index).toBe(index))
   })
 
-  it('1マスは3日ぶん。最後のマスでも年度内に収まる', () => {
-    expect(DAYS_PER_CELL).toBe(3)
-    expect(dayOfCell(GOAL_INDEX)).toBeLessThan(365)
+  it('1マスは1日ぶん。最後のマスが3月31日になる', () => {
+    expect(DAYS_PER_CELL).toBe(1)
+    expect(dayOfCell(GOAL_INDEX)).toBe(364)
     expect(cellOfDay(dayOfCell(5))).toBe(5)
   })
 

@@ -113,6 +113,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 23) {
     data = migrateV22ToV23(data)
   }
+  if (version < 24) {
+    data = migrateV23ToV24(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -584,6 +587,42 @@ function migrateV22ToV23(raw: Record<string, unknown>): Record<string, unknown> 
     hand: drawHand(rng, serial, handSize),
     serial: serial + handSize,
     // 進行中の大会は畳む。回戦ぶんのマスが無いので続きを再現できない
+    tournament: null,
+    phase: raw.phase === 'tournament' ? 'cardSelect' : raw.phase,
+    rngState: rng.state,
+  }
+}
+
+/**
+ * v23 → v24
+ *  - 盤面を1マス3日（122マス）から**1マス1日（365マス）**に戻した
+ *
+ * `boardPosition` の意味が「3日刻みのマス番号」から「通算日」に変わる。
+ * 旧マス番号 × 3 が、その日の通算日。マスの中身も密度が変わっているので、
+ * 盤面ごと作り直す（進行中の大会は畳む）。
+ */
+function migrateV23ToV24(raw: Record<string, unknown>): Record<string, unknown> {
+  const rngState = typeof raw.rngState === 'number' ? raw.rngState : 1
+  const rng = createRng(rngState)
+  const regionId = typeof raw.regionId === 'string' ? raw.regionId : DEFAULT_REGION_ID
+  const region = findRegion(regionId)
+
+  // 旧盤面は1マス3日だった。定数は現在値（1）に変わっているので直接 3 を掛ける
+  const OLD_DAYS_PER_CELL = 3
+  const oldCell = typeof raw.boardPosition === 'number' ? raw.boardPosition : 0
+  const boardPosition = Math.min(GOAL_INDEX, Math.max(0, oldCell) * OLD_DAYS_PER_CELL)
+
+  const board = placeSeasonTournaments(createBoard(rng), {
+    summerPref: createTournament('summerPref', region).totalRounds,
+    autumnPref: createTournament('autumnPref', region).totalRounds,
+  })
+
+  return {
+    ...raw,
+    version: 24,
+    board,
+    boardPosition,
+    // 進行中の大会は畳む。回戦ぶんのマスが置き直されるので続きを再現できない
     tournament: null,
     phase: raw.phase === 'tournament' ? 'cardSelect' : raw.phase,
     rngState: rng.state,

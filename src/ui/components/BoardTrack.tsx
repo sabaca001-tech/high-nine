@@ -15,9 +15,13 @@ type Props = {
  *
  * 全部を並べると読めないので、**現在地の前後だけを切り出して**表示する。
  * 前を少し残すのは「どこから来たか」が分かるようにするため。
+ *
+ * 先を3週間ぶん見せているのは、飛ばせない大会・合宿のマスに
+ * **止まる前から気づける**ようにするため。カードは最大5マスしか進まないので、
+ * 判断そのものには手前の数マスがあれば足りる。
  */
-const BEHIND = 3
-const AHEAD = 12
+const BEHIND = 4
+const AHEAD = 24
 
 /** 大会・合宿は日付と名前を出す。飛ばせないマスなので予定として読めるようにする */
 function noteOf(cell: BoardCell): string | null {
@@ -56,7 +60,7 @@ export function BoardTrack({ board, position }: Props) {
         else if (cell.index < position) classNames.push(styles.passed)
 
         const note = noteOf(cell)
-        // マスは3日ぶんなので、その先頭の日付を出す
+        // 1マス＝1日。マス番号がそのまま年度の何日目かになる
         const day = dayOfCell(cell.index)
         const date = dateOfDay(day)
         // 月が変わったマスは月を出して、季節の流れが読めるようにする

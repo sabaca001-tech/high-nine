@@ -45,9 +45,14 @@ export function attemptTraining(rng: Rng, player: Player): SkillGrantResult {
   }
 }
 
-/** マイナス能力を1つ付ける。すでに全部持っていれば何も起きない */
-export function addRedSkill(rng: Rng, player: Player): SkillGrantResult {
-  const candidates = skillsFor({ forPitcher: player.isPitcher, rank: 'red' }).filter(
+/**
+ * 指定したランクの特殊能力を1つ付ける。**成功判定はしない。**
+ *
+ * 大会での活躍のように「付けるかどうかは呼び出し側がすでに決めている」場面で使う。
+ * 特訓（`attemptTraining`）と違って、ここまで来たら必ず身につく。
+ */
+export function grantSkill(rng: Rng, player: Player, rank: SkillRank): SkillGrantResult {
+  const candidates = skillsFor({ forPitcher: player.isPitcher, rank }).filter(
     (skill) => !player.skills.includes(skill.id),
   )
   if (candidates.length === 0) return { player, granted: false, skillId: null }
@@ -58,6 +63,11 @@ export function addRedSkill(rng: Rng, player: Player): SkillGrantResult {
     granted: true,
     skillId: target.id,
   }
+}
+
+/** マイナス能力を1つ付ける。すでに全部持っていれば何も起きない */
+export function addRedSkill(rng: Rng, player: Player): SkillGrantResult {
+  return grantSkill(rng, player, 'red')
 }
 
 /** マイナス能力を1つ取り除く。青マスの特別指導などで使う */

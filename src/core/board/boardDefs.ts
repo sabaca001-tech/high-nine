@@ -1,7 +1,7 @@
 /**
  * 盤面の生成。
  *
- * **1マス＝3日、盤面は1年で1本**（122マス）。
+ * **1マス＝1日、盤面は1年で1本**（365マス）。
  * 月ごとにゴールを置くのをやめたので、4月1日から3月31日まで
  * 途切れずに1本の道が続く。大会や合宿はその日付のマスとして置かれ、
  * 通り過ぎることはできない（必ず止まる）。
@@ -28,7 +28,7 @@ export const GOAL_INDEX = BOARD_LENGTH - 1
  * 実際の高校野球の日程に寄せてある。全国大会は出場権を得たときだけ
  * 盤面に置かれるので、ここでは「置くならこの日」を決めているだけ。
  *
- * 春の全国大会だけ実際より早い（3月上旬）。回戦ぶんのマスを置くと
+ * 春の全国大会だけ実際より少し早い。8回戦ぶんのマス（中1日で15日）を置くと
  * 年度末（3月31日）を越えてしまうため。
  */
 export const EVENT_DAYS: { day: number; kind: 'tournament' | 'camp'; tournamentKind?: TournamentKind }[] = [
@@ -36,7 +36,7 @@ export const EVENT_DAYS: { day: number; kind: 'tournament' | 'camp'; tournamentK
   { day: dayOf(8, 12), kind: 'tournament', tournamentKind: 'nationals' },
   { day: dayOf(10, 15), kind: 'tournament', tournamentKind: 'autumnPref' },
   { day: dayOf(12, 26), kind: 'camp' },
-  { day: dayOf(3, 5), kind: 'tournament', tournamentKind: 'springNationals' },
+  { day: dayOf(3, 10), kind: 'tournament', tournamentKind: 'springNationals' },
 ]
 
 /** その大会の1回戦が置かれる日 */
@@ -50,31 +50,46 @@ export function cellOfTournament(kind: TournamentKind): number {
 }
 
 /**
- * 回戦と回戦の間隔（マス）。
+ * 回戦と回戦の間隔（マス＝日）。
  *
- * 1マス＝3日なので、1マス間隔で中2日。
- * 夏の地区大会は最大8回戦あり、7/15から8マス＝24日で8/8。
+ * 中1日。連日で決勝まで戦わせると、体力の回復も継投の判断も入る余地が無い。
+ * 夏の地区大会は最大8回戦あり、7/15から14日で7/29。
  * 全国大会（8/12）に間に合う。ここを広げると日程が破綻する。
  */
-export const ROUND_GAP = 1
+export const ROUND_GAP = 2
 
 /**
  * マスの出現重み。
+ *
+ * **1マス1日にしたぶん、1年の手数が約49手から約146手に増えた。**
+ * 重みをそのままにすると、練習試合も特訓も怪我も年3倍起きてしまう。
+ * 練習マス以外は「1年に何回あってほしいか」から逆算して薄め、
+ * 増えたぶんは練習マスと空きマスが受け持つ。
+ *
  * 練習マスを最頻にして成長が主軸であることを伝えつつ、
  * 特訓・OBのような「当たり」を低確率で混ぜて、どのマスに止めるかの読み合いを作る。
+ *
+ * | マス | 年あたりの回数（146手） |
+ * |---|---|
+ * | 練習 | 61 |
+ * | 何も無い | 41 |
+ * | 休養 | 7.3 |
+ * | 青・赤・白・黄 | 各 5.8 |
+ * | 練習試合 | 4.4 |
+ * | 特訓・OB・分岐 | 各 2.9 |
  */
 const CELL_WEIGHTS: { value: CellKind; weight: number }[] = [
-  { value: 'practice', weight: 30 },
-  { value: 'good', weight: 12 },
-  { value: 'bad', weight: 11 },
-  { value: 'random', weight: 10 },
-  { value: 'rest', weight: 9 },
-  { value: 'boost', weight: 8 },
-  { value: 'training', weight: 5 },
-  { value: 'alumni', weight: 4 },
-  { value: 'match', weight: 6 },
-  { value: 'fork', weight: 5 },
-  { value: 'blank', weight: 10 },
+  { value: 'practice', weight: 42 },
+  { value: 'blank', weight: 28 },
+  { value: 'rest', weight: 5 },
+  { value: 'good', weight: 4 },
+  { value: 'bad', weight: 4 },
+  { value: 'random', weight: 4 },
+  { value: 'boost', weight: 4 },
+  { value: 'match', weight: 3 },
+  { value: 'training', weight: 2 },
+  { value: 'alumni', weight: 2 },
+  { value: 'fork', weight: 2 },
 ]
 
 /**
@@ -90,18 +105,23 @@ export type Route = {
   weights: { value: CellKind; weight: number }[]
 }
 
+/**
+ * 道筋は「その1ヶ月だけ密度を上げる」もの。
+ * 基本の盤面（練習42/空き28）より特別なマスを厚くしてあり、
+ * だからこそ分岐マスに止まる価値がある。
+ */
 export const ROUTES: Route[] = [
   {
     id: 'practice',
     label: '練習の道',
     description: '練習マスが多い。堅実に伸ばす',
     weights: [
-      { value: 'practice', weight: 55 },
-      { value: 'boost', weight: 12 },
-      { value: 'rest', weight: 10 },
-      { value: 'good', weight: 8 },
-      { value: 'bad', weight: 8 },
-      { value: 'blank', weight: 7 },
+      { value: 'practice', weight: 70 },
+      { value: 'boost', weight: 10 },
+      { value: 'rest', weight: 6 },
+      { value: 'good', weight: 3 },
+      { value: 'bad', weight: 3 },
+      { value: 'blank', weight: 8 },
     ],
   },
   {
@@ -109,12 +129,13 @@ export const ROUTES: Route[] = [
     label: '挑戦の道',
     description: '特訓・OB・試合が増えるが、悪いマスも多い',
     weights: [
-      { value: 'training', weight: 16 },
-      { value: 'alumni', weight: 12 },
-      { value: 'match', weight: 14 },
-      { value: 'good', weight: 16 },
-      { value: 'bad', weight: 24 },
-      { value: 'practice', weight: 18 },
+      { value: 'training', weight: 8 },
+      { value: 'alumni', weight: 6 },
+      { value: 'match', weight: 7 },
+      { value: 'good', weight: 8 },
+      { value: 'bad', weight: 12 },
+      { value: 'practice', weight: 35 },
+      { value: 'blank', weight: 24 },
     ],
   },
   {
@@ -122,11 +143,11 @@ export const ROUTES: Route[] = [
     label: '休養の道',
     description: '体力を回復しやすく、悪いマスがほとんど無い',
     weights: [
-      { value: 'rest', weight: 34 },
-      { value: 'practice', weight: 26 },
-      { value: 'good', weight: 14 },
-      { value: 'blank', weight: 22 },
-      { value: 'bad', weight: 4 },
+      { value: 'rest', weight: 25 },
+      { value: 'practice', weight: 35 },
+      { value: 'good', weight: 10 },
+      { value: 'blank', weight: 27 },
+      { value: 'bad', weight: 3 },
     ],
   },
 ]
@@ -135,13 +156,13 @@ export function findRoute(id: string): Route | undefined {
   return ROUTES.find((route) => route.id === id)
 }
 
-/** ルート分岐で作り直す範囲（マス）。この先1ヶ月ぶんだけ変える */
-export const ROUTE_RANGE_CELLS = 10
+/** ルート分岐で作り直す範囲（マス＝日）。この先1ヶ月ぶんだけ変える */
+export const ROUTE_RANGE_CELLS = 30
 
 /**
  * 分岐マスから先を、選んだ道筋で作り直す。
  *
- * 盤面が1年ぶんになったので、**この先10マス（約30日）だけ**を対象にする。
+ * 盤面が1年ぶんになったので、**この先30マス（＝30日）だけ**を対象にする。
  * 1年まるごと書き換えると、1回の選択が効きすぎて他の判断が意味を失う。
  * 大会・合宿・年度末と、すでに通過したマスは動かさない。
  */
