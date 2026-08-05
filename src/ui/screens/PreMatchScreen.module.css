@@ -32,6 +32,17 @@
   white-space: nowrap;
 }
 
+/* 力の差。勝ったとき・負けたときの評判の動きがここで読める */
+.matchup {
+  flex: 0 0 auto;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 /* 主要操作は画面下部＝親指の届く範囲に置く（CLAUDE.md 3） */
 .controls {
   flex: 0 0 auto;

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyReputation,
   handSizeFor,
   HAND_SIZE_MAX,
   REPUTATION_GRADE_LABELS,
   REPUTATION_INITIAL,
   REPUTATION_MAX,
   reputationGrade,
+  reputationGainAt,
 } from './season'
 import type { ReputationGrade } from './season'
 
@@ -58,5 +60,42 @@ describe('handSizeFor', () => {
 
   it('最低でも選べる程度の枚数はある', () => {
     expect(handSizeFor(0)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('reputationGainAt', () => {
+  it('上に行くほど上がりにくい', () => {
+    expect(reputationGainAt(20, 10)).toBeGreaterThan(reputationGainAt(50, 10))
+    expect(reputationGainAt(50, 10)).toBeGreaterThan(reputationGainAt(90, 10))
+  })
+
+  it('下に行くほど下がりにくい', () => {
+    // 負けが込んだ学校が0まで削られると立て直せない
+    expect(reputationGainAt(20, -10)).toBeGreaterThan(reputationGainAt(80, -10))
+  })
+
+  it('低いところでも下げ幅が0にはならない', () => {
+    expect(reputationGainAt(5, -10)).toBeLessThan(0)
+  })
+})
+
+describe('applyReputation', () => {
+  it('0〜100に収まる', () => {
+    expect(applyReputation(0, -50)).toBeGreaterThanOrEqual(0)
+    expect(applyReputation(99, 999)).toBeLessThanOrEqual(REPUTATION_MAX)
+  })
+
+  it('整数で返る', () => {
+    expect(Number.isInteger(applyReputation(37, 1.7))).toBe(true)
+    expect(Number.isInteger(applyReputation(37, -1.7))).toBe(true)
+  })
+
+  it('負けが込んでも底を打つ（立て直せなくならない）', () => {
+    let reputation = REPUTATION_INITIAL
+    // 3試合に1勝という弱いチームを想定して長く回す
+    for (let i = 0; i < 300; i++) {
+      reputation = applyReputation(reputation, i % 3 === 0 ? 1 : -0.4)
+    }
+    expect(reputation).toBeGreaterThan(5)
   })
 })

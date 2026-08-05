@@ -2,6 +2,7 @@ import { overallRating } from '@/core/player/rating'
 import { firstSquadSet } from '@/core/player/squad'
 import type { Player } from '@/core/types/player'
 import type { UniformId } from '@/core/team/uniforms'
+import { isInHallOfFame } from '@/core/types/career'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerCard } from '@/ui/components/PlayerCard'
@@ -24,7 +25,7 @@ export function PlayerListScreen() {
     <AppLayout title="部員一覧" subtitle={`${game.players.length}人`} scrollable>
       <div className={styles.links}>
         <button type="button" className={styles.alumniLink} onClick={() => setScreen('alumni')}>
-          OB名鑑（{game.graduates.length}人） ▶
+          OB名鑑（プロ入り {game.graduates.filter(isInHallOfFame).length}人） ▶
         </button>
         <button type="button" className={styles.alumniLink} onClick={() => setScreen('records')}>
           歴代記録 ▶

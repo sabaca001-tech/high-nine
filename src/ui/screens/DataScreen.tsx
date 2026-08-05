@@ -16,7 +16,7 @@ import { findManager, groundName, GROUND_LEVEL_MAX } from '@/core/shop/facility'
 import { formatFunds, monthlyFunds } from '@/core/shop/funds'
 import { monthlyUpkeep } from '@/core/shop/upkeep'
 import { uniformName } from '@/core/team/uniforms'
-import { CAREER_PATH_LABELS } from '@/core/types/career'
+import { CAREER_PATH_LABELS, isCareerPending, isInHallOfFame } from '@/core/types/career'
 import type { GraduateRecord } from '@/core/types/season'
 import { handSizeFor, reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/types/season'
 import { findRegion, regionStrength, roundsFor } from '@/core/types/region'
@@ -360,17 +360,25 @@ function RivalRow({ school, showRegion }: { school: RivalSchool; showRegion?: bo
   )
 }
 
-/** 卒業後の進路。ドラフト（プロ入り）を上に出す */
+/**
+ * 卒業後の進路。
+ *
+ * OB名鑑はプロに届いた選手だけなので、**そこに載る前の選手をここで追う**。
+ * 大学生は在学中ここに居て、指名されるとOB名鑑へ移る。
+ */
 function DraftTab() {
   const game = useGameStore((s) => s.game)!
   const setScreen = useGameStore((s) => s.setScreen)
 
-  const drafted = game.graduates.filter((graduate) => graduate.path === 'pro')
-  const others = game.graduates.filter((graduate) => graduate.path !== 'pro')
+  const drafted = game.graduates.filter(isInHallOfFame)
+  const pending = game.graduates.filter(isCareerPending)
+  const finished = game.graduates.filter(
+    (graduate) => !isInHallOfFame(graduate) && !isCareerPending(graduate),
+  )
 
   return (
     <>
-      <Section title={`ドラフト指名（${drafted.length}人）`}>
+      <Section title={`プロ入り（${drafted.length}人）`}>
         {drafted.length === 0 ? (
           <p className={styles.note}>まだプロ入りした選手はいません。</p>
         ) : (
@@ -378,16 +386,27 @@ function DraftTab() {
         )}
       </Section>
 
-      <Section title={`その他の進路（${others.length}人）`}>
-        {others.length === 0 ? (
-          <p className={styles.note}>まだ卒業生がいません。</p>
+      <Section title={`プロを目指している（${pending.length}人）`}>
+        {pending.length === 0 ? (
+          <p className={styles.note}>大学・社会人で現役の卒業生はいません。</p>
         ) : (
-          others.map((graduate) => <GraduateRow key={graduate.id} graduate={graduate} />)
+          pending.map((graduate) => <GraduateRow key={graduate.id} graduate={graduate} />)
+        )}
+        <p className={styles.note}>
+          大学に進んだ選手は4年後に進路が決まります。指名されればOB名鑑に載ります。
+        </p>
+      </Section>
+
+      <Section title={`競技を終えた（${finished.length}人）`}>
+        {finished.length === 0 ? (
+          <p className={styles.note}>まだ該当する卒業生はいません。</p>
+        ) : (
+          finished.map((graduate) => <GraduateRow key={graduate.id} graduate={graduate} />)
         )}
       </Section>
 
       <button type="button" className={styles.link} onClick={() => setScreen('alumni')}>
-        OB名鑑（その後の成績） ▶
+        OB名鑑（プロでの成績） ▶
       </button>
     </>
   )

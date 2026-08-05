@@ -45,6 +45,12 @@ export type MatchState = {
   decisive: boolean
   /** 相手がライバル校ならその id。対戦成績を残すのに使う */
   opponentSchoolId: string | null
+  /**
+   * 相手の強さ。0が互角、+20なら格上。
+   * 試合が終わったあとに**格上に勝ったのか格下に負けたのか**を判定するため、
+   * 結果まで持ち回る（評判の増減がここで決まる）。
+   */
+  opponentStrength: number
   /** 自校（後攻） */
   home: MatchTeam
   /** 相手（先攻） */
@@ -70,6 +76,7 @@ export function startMatchState(rng: Rng, setup: MatchSetup): MatchState {
     kind: setup.kind,
     decisive: setup.decisive === true,
     opponentSchoolId: setup.opponentSchoolId ?? null,
+    opponentStrength: setup.opponentStrength,
     // プレイヤーは常に後攻。サヨナラ勝ちが起きるようにする
     away: createTeam({
       name: opponent.name,
@@ -213,6 +220,7 @@ export function finalizeMatch(rng: Rng, state: MatchState): MatchResult {
     kind: state.kind,
     opponentName: state.away.name,
     opponentSchoolId: state.opponentSchoolId,
+    opponentStrength: state.opponentStrength,
     innings: state.innings,
     finalScore: { player: state.home.runs, opponent: state.away.runs },
     outcome,

@@ -58,6 +58,21 @@ const MOUTHS = [
   'M -7 16 q 7 7 14 0',
 ]
 
+/** 顔の輪郭の始点（頭のてっぺんは ここから faceLength ぶん上） */
+const FACE_TOP_Y = -8
+
+/** 帽子のつばの高さ */
+const CAP_BRIM_Y = -14
+
+/** 帽子が頭を覆う余白。0にすると輪郭線が重なって見える */
+const CAP_MARGIN = 3
+
+/**
+ * 描画範囲。帽子は顔より上に出るので、上を広めに取って丸みが切れないようにする。
+ * 正方形を保つこと（縦横で潰れる）。
+ */
+const VIEW_BOX = '-52 -60 104 104'
+
 /** 文字列から安定した数値を作る */
 function hash(value: string): number {
   let total = 2166136261
@@ -114,8 +129,21 @@ export function PlayerPortrait({
    * 以前は右の頬から顎へ下りたあと、左の頬に戻らずに始点へ直線で閉じていたため、
    * 顔の左半分が塗られず透明に見えていた。
    */
+  /**
+   * 帽子。**必ず頭の輪郭から導くこと。**
+   *
+   * 以前は帽子の丸みを `jawWidth` だけで決めていたので、
+   * 顔の縦幅（`faceLength`）が大きい選手では**頭のてっぺんが帽子から飛び出していた**。
+   * 顔と帽子で別々の乱数を使っているのが原因で、条件が揃った選手だけ崩れる。
+   *
+   * 頭のてっぺんは `FACE_TOP_Y - faceLength`。
+   * 帽子の高さをそこから逆算して、必ず `CAP_MARGIN` ぶん上を覆うようにする。
+   */
+  const capWidth = jawWidth + 2
+  const capHeight = CAP_BRIM_Y - FACE_TOP_Y + faceLength + CAP_MARGIN
+
   const facePath =
-    `M ${-jawWidth} -8` +
+    `M ${-jawWidth} ${FACE_TOP_Y}` +
     ` a ${jawWidth} ${faceLength} 0 0 1 ${jawWidth * 2} 0` +
     ` q 0 ${faceLength * 0.5} ${-jawWidth * 0.5} ${faceLength * 0.68}` +
     ` q ${-jawWidth * 0.5} ${faceLength * 0.26} ${-jawWidth} 0` +
@@ -126,7 +154,7 @@ export function PlayerPortrait({
     <svg
       width={size}
       height={size}
-      viewBox="-50 -56 100 100"
+      viewBox={VIEW_BOX}
       className={className}
       style={style}
       role="presentation"
@@ -229,15 +257,21 @@ export function PlayerPortrait({
       {cap && (
         <>
           <path
-            d={`M -${jawWidth + 2} -14 a ${jawWidth + 2} ${jawWidth + 2} 0 0 1 ${(jawWidth + 2) * 2} 0 z`}
+            d={`M ${-capWidth} ${CAP_BRIM_Y} a ${capWidth} ${capHeight} 0 0 1 ${capWidth * 2} 0 z`}
             fill={capColor}
           />
           <path
-            d={`M -${jawWidth + 2} -14 h ${(jawWidth + 2) * 2} q 6 0 6 5 h -${(jawWidth + 2) * 2 + 6} z`}
+            d={`M ${-capWidth} ${CAP_BRIM_Y} h ${capWidth * 2} q 6 0 6 5 h ${-(capWidth * 2 + 6)} z`}
             fill={capColor}
             opacity="0.85"
           />
-          <ellipse cx="0" cy="-30" rx="6" ry="4" fill="rgba(255,255,255,0.25)" />
+          <ellipse
+            cx="0"
+            cy={CAP_BRIM_Y - capHeight * 0.55}
+            rx="6"
+            ry="4"
+            fill="rgba(255,255,255,0.25)"
+          />
         </>
       )}
     </svg>

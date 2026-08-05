@@ -116,6 +116,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 24) {
     data = migrateV23ToV24(data)
   }
+  if (version < 25) {
+    data = migrateV24ToV25(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -627,6 +630,33 @@ function migrateV23ToV24(raw: Record<string, unknown>): Record<string, unknown> 
     phase: raw.phase === 'tournament' ? 'cardSelect' : raw.phase,
     rngState: rng.state,
   }
+}
+
+/**
+ * v24 → v25
+ *  - ProSeason に ability（そのシーズンの実力）を追加
+ *
+ * 過去のシーズンの実力は記録されていないので、現在値で埋める。
+ * グラフは平らな線から始まるが、そこから先は正しく動く。
+ */
+function migrateV24ToV25(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.graduates)) return { ...raw, version: 25 }
+
+  const graduates = raw.graduates.map((value) => {
+    if (!isRecord(value)) return value
+    const ability = typeof value.ability === 'number' ? value.ability : 50
+    const seasons = Array.isArray(value.proSeasons) ? value.proSeasons : []
+    return {
+      ...value,
+      proSeasons: seasons.map((season) =>
+        isRecord(season) && typeof season.ability !== 'number'
+          ? { ...season, ability }
+          : season,
+      ),
+    }
+  })
+
+  return { ...raw, version: 25, graduates }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

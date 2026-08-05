@@ -3,6 +3,7 @@ import { createRng } from '@/core/rng/random'
 import { ABILITY_MAX, ABILITY_MIN } from '@/core/types/player'
 import type { Grade } from '@/core/types/player'
 import { createInitialRoster, createPlayer } from './createPlayer'
+import { overallRating } from './rating'
 
 describe('createPlayer', () => {
   it('同じシードなら同じ選手ができる', () => {
@@ -117,5 +118,52 @@ describe('createInitialRoster', () => {
     const rate = pitchers / total
     expect(rate).toBeGreaterThan(0.12)
     expect(rate).toBeLessThan(0.3)
+  })
+})
+
+
+describe('性格の出現率', () => {
+  it('天才肌はレア（2%前後）', () => {
+    const rng = createRng(77)
+    const trials = 3000
+    let genius = 0
+    for (let i = 0; i < trials; i++) {
+      if (createPlayer(rng, { id: `p${i}`, grade: 1 }).personality === '天才肌') genius += 1
+    }
+    const rate = genius / trials
+    expect(rate).toBeGreaterThan(0.005)
+    expect(rate).toBeLessThan(0.05)
+  })
+
+  it('他の性格はどれも出る', () => {
+    const rng = createRng(78)
+    const seen = new Set<string>()
+    for (let i = 0; i < 600; i++) {
+      seen.add(createPlayer(rng, { id: `p${i}`, grade: 2 }).personality)
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(5)
+  })
+
+  it('天才肌は入学時の能力も高い', () => {
+    const rng = createRng(79)
+    let geniusTotal = 0
+    let geniusCount = 0
+    let otherTotal = 0
+    let otherCount = 0
+
+    for (let i = 0; i < 6000; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: false })
+      const rating = overallRating(player)
+      if (player.personality === '天才肌') {
+        geniusTotal += rating
+        geniusCount += 1
+      } else {
+        otherTotal += rating
+        otherCount += 1
+      }
+    }
+
+    expect(geniusCount).toBeGreaterThan(20)
+    expect(geniusTotal / geniusCount).toBeGreaterThan(otherTotal / otherCount)
   })
 })

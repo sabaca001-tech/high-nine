@@ -68,9 +68,25 @@ export function pickName(rng: Rng, taken: readonly string[]): string {
   return name
 }
 
-const PERSONALITIES: Personality[] = [
-  'ど根性', 'クール', 'ムードメーカー', 'したたか', '天才肌', 'やんちゃ',
+/**
+ * 性格の出現率。
+ *
+ * **「天才肌」だけはレアにしてある。** 6分の1で出ていた頃は
+ * どの学年にも数人いて、いちばん伸びる性格が当たり前に手に入っていた。
+ * 引き当てたときに「当たりだ」と思える頻度まで下げ、
+ * 代わりに入学時点の能力も高くしてある（`GENIUS_TALENT_BONUS`）。
+ */
+const PERSONALITY_WEIGHTS: { value: Personality; weight: number }[] = [
+  { value: 'ど根性', weight: 20 },
+  { value: 'クール', weight: 20 },
+  { value: 'ムードメーカー', weight: 20 },
+  { value: 'したたか', weight: 19 },
+  { value: 'やんちゃ', weight: 19 },
+  { value: '天才肌', weight: 2 },
 ]
+
+/** 天才肌の入学時の上乗せ。素質そのものが違う */
+export const GENIUS_TALENT_BONUS = 8
 
 /** 野手のポジション（投手を除く） */
 const FIELDER_POSITIONS: Position[] = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -119,7 +135,12 @@ export type CreatePlayerOptions = {
 export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const { id, grade, talentBonus = 0 } = options
   const isPitcher = options.isPitcher ?? rng.chance(PITCHER_RATE)
-  const base = GRADE_BASE[grade] + talentBonus
+
+  // 性格は能力より先に決める。天才肌は素質そのものが違うので、
+  // 決まった性格が入学時の能力にも効く
+  const personality = rng.weighted(PERSONALITY_WEIGHTS)
+  const genius = personality === '天才肌'
+  const base = GRADE_BASE[grade] + talentBonus + (genius ? GENIUS_TALENT_BONUS : 0)
 
   /** base を中心にばらつかせた能力値を1つ作る */
   const ability = (): number =>
@@ -158,7 +179,7 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     trust: 20 + rng.int(0, 20),
     condition: 70 + rng.int(0, 30),
     injuryMonths: 0,
-    personality: rng.pick(PERSONALITIES),
+    personality,
     aptitudes: createAptitudes(rng, position),
     skills: [],
     history: [],

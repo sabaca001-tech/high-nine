@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import type { Alumnus } from '@/core/types/career'
-import { careerTotals, isCareerActive } from '@/core/types/career'
+import {
+  careerTotals,
+  isCareerActive,
+  isCareerPending,
+  isInHallOfFame,
+} from '@/core/types/career'
 import { emptyCareerStats } from '@/core/player/careerStats'
-import { advanceCareer, createAlumnus, decidePath, simulateProSeason } from './career'
+import {
+  advanceCareer,
+  createAlumnus,
+  decidePath,
+  simulateProSeason,
+  toProAbility,
+  trimGraduates,
+} from './career'
 
 function base(rating: number, isPitcher = false) {
   return {
@@ -242,6 +254,7 @@ describe('careerTotals', () => {
           year: 4,
           team: 'X',
           overseas: false,
+          ability: 40,
           games: 100,
           batting: { atBats: 400, hits: 120, homeruns: 20, rbi: 70, average: 0.3 },
           pitching: null,
@@ -250,6 +263,7 @@ describe('careerTotals', () => {
           year: 5,
           team: 'X',
           overseas: false,
+          ability: 42,
           games: 120,
           batting: { atBats: 500, hits: 130, homeruns: 25, rbi: 80, average: 0.26 },
           pitching: null,
@@ -279,5 +293,166 @@ describe('careerTotals', () => {
     expect(totals.years).toBe(0)
     expect(totals.average).toBe(0)
     expect(totals.era).toBe(0)
+  })
+})
+
+
+describe('toProAbility', () => {
+  it('ほとんどの選手は半分になる', () => {
+    const rng = createRng(11)
+    let halved = 0
+    const trials = 400
+    for (let i = 0; i < trials; i++) {
+      if (toProAbility(rng, 90).ability === 45) halved += 1
+    }
+    expect(halved / trials).toBeGreaterThan(0.8)
+  })
+
+  it('稀に落ち幅が小さい選手がいる', () => {
+    const rng = createRng(12)
+    let adapted = 0
+    const trials = 400
+    for (let i = 0; i < trials; i++) {
+      if (toProAbility(rng, 90).adapted) adapted += 1
+    }
+    expect(adapted).toBeGreaterThan(0)
+    expect(adapted / trials).toBeLessThan(0.3)
+  })
+
+  it('高校の総合より必ず低くなる', () => {
+    const rng = createRng(13)
+    for (let i = 0; i < 200; i++) {
+      expect(toProAbility(rng, 85).ability).toBeLessThan(85)
+    }
+  })
+})
+
+describe('プロ入り後の物差し', () => {
+  it('高校からプロへ行くと能力が置き換わる', () => {
+    // 82以上でプロになるまで引き直す
+    for (let seed = 1; seed < 80; seed++) {
+      const alumnus = createAlumnus(createRng(seed), base(95), 60)
+      if (alumnus.path !== 'pro') continue
+      expect(alumnus.ability).toBeLessThan(alumnus.rating)
+      return
+    }
+    throw new Error('プロ入りするシードが見つからない')
+  })
+
+  it('大学経由でも入団時に置き換わる', () => {
+    for (let seed = 1; seed < 120; seed++) {
+      const alumnus = createAlumnus(createRng(seed), base(70), 40)
+      if (alumnus.path !== 'college') continue
+
+      const rng = createRng(seed + 500)
+      let current = alumnus
+      for (let year = 0; year < 6 && current.status === 'college'; year++) {
+        current = advanceCareer(rng, current, 4 + year).alumnus
+      }
+      if (current.status !== 'pro') continue
+
+      expect(current.ability).toBeLessThan(current.rating)
+      return
+    }
+    // 大学から必ずプロへ行くとは限らないので、届かなくても失敗にはしない
+  })
+
+  it('プロで年ごとの実力が記録される', () => {
+    for (let seed = 1; seed < 80; seed++) {
+      const alumnus = createAlumnus(createRng(seed), base(95), 60)
+      if (alumnus.path !== 'pro') continue
+
+      const played = runCareer(seed + 90, alumnus, 5)
+      expect(played.proSeasons.length).toBeGreaterThan(0)
+      for (const season of played.proSeasons) {
+        expect(typeof season.ability).toBe('number')
+        expect(season.ability).toBeGreaterThan(0)
+      }
+      return
+    }
+    throw new Error('プロ入りするシードが見つからない')
+  })
+})
+
+describe('OB名鑑の対象', () => {
+  const pro = (): Alumnus => ({
+    ...base(90),
+    path: 'pro',
+    status: 'pro',
+    ability: 45,
+    team: 'X',
+    collegeYears: 0,
+    proSeasons: [],
+    note: null,
+  })
+  const college = (): Alumnus => ({
+    ...base(70),
+    id: 'c1',
+    path: 'college',
+    status: 'college',
+    ability: 70,
+    team: '青嶺大学',
+    collegeYears: 2,
+    proSeasons: [],
+    note: null,
+  })
+  const done = (): Alumnus => ({
+    ...base(40),
+    id: 'n1',
+    path: 'none',
+    status: 'retired',
+    ability: 40,
+    team: null,
+    collegeYears: 0,
+    proSeasons: [],
+    note: null,
+  })
+
+  it('プロだけが名鑑に載る', () => {
+    expect(isInHallOfFame(pro())).toBe(true)
+    expect(isInHallOfFame(college())).toBe(false)
+    expect(isInHallOfFame(done())).toBe(false)
+  })
+
+  it('引退したプロも載り続ける', () => {
+    const retired: Alumnus = {
+      ...pro(),
+      status: 'retired',
+      proSeasons: [
+        {
+          year: 5,
+          team: 'X',
+          overseas: false,
+          ability: 40,
+          games: 100,
+          batting: { atBats: 300, hits: 80, homeruns: 10, rbi: 40, average: 0.267 },
+          pitching: null,
+        },
+      ],
+    }
+    expect(isInHallOfFame(retired)).toBe(true)
+  })
+
+  it('大学在学中は「プロを目指している」側に入る', () => {
+    expect(isCareerPending(college())).toBe(true)
+    expect(isCareerPending(pro())).toBe(false)
+    expect(isCareerPending(done())).toBe(false)
+  })
+
+  it('上限で切ってもプロは落とさない', () => {
+    const list: Alumnus[] = [
+      ...Array.from({ length: 8 }, (_, i) => ({ ...done(), id: `n${i}` })),
+      { ...pro(), id: 'p1' },
+      ...Array.from({ length: 8 }, (_, i) => ({ ...done(), id: `m${i}` })),
+    ]
+    const trimmed = trimGraduates(list, 5)
+
+    expect(trimmed).toHaveLength(5)
+    expect(trimmed.some((alumnus) => alumnus.id === 'p1')).toBe(true)
+  })
+
+  it('上限を超えていなければそのまま返す', () => {
+    const list = [pro(), college()]
+    expect(trimGraduates(list, 10)).toBe(list)
   })
 })

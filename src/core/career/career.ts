@@ -7,7 +7,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import type { Alumnus, CareerPath, ProSeason } from '@/core/types/career'
-import { isCareerActive } from '@/core/types/career'
+import { isCareerActive, isInHallOfFame } from '@/core/types/career'
 
 /** プロ球団名（実在球団を想起させない独自の名称） */
 const PRO_TEAMS = [
@@ -50,11 +50,32 @@ const COLLEGE_LENGTH = 4
 /** 1シーズンの試合数 */
 const SEASON_GAMES = 143
 
+/**
+ * プロ入りで能力がどれだけ落ちるか。
+ *
+ * 高校の総合はあくまで**高校生の中での物差し**。
+ * そのままプロへ持ち込むと、卒業した年から一線級の成績を残してしまい、
+ * 「プロで通用するか」という段階が消えていた。
+ * プロの物差しに置き換えるので、**ほとんどの選手は半分になる**。
+ *
+ * 稀に適応する選手がいる。ここが全員一律だと、
+ * 誰を送り出しても同じ結末になってしまう。
+ */
+const PRO_SCALE = 0.5
+const PRO_ADAPT_CHANCE = 0.12
+const PRO_ADAPT_SCALE = 0.7
+const PRO_PRODIGY_CHANCE = 0.03
+const PRO_PRODIGY_SCALE = 0.85
+
+/**
+ * プロ入り後の能力は**高校とは別の物差し**（おおむね20〜60）。
+ * 高校の基準（プロ入りが82以上）と混ぜて読まないこと。
+ */
 /** プロで戦力外になる実力の下限 */
-const RELEASE_THRESHOLD = 45
+const RELEASE_THRESHOLD = 22
 
 /** 渡米を検討し始める実力 */
-const OVERSEAS_THRESHOLD = 88
+const OVERSEAS_THRESHOLD = 62
 
 /**
  * 卒業時の進路を決める。
@@ -80,6 +101,30 @@ export function decidePath(
   return 'none'
 }
 
+/**
+ * プロ入りしたときに能力をプロの物差しへ置き換える。
+ *
+ * 戻り値の `adapted` は「思ったより落ちなかった」かどうか。
+ * 世代交代の報告に出して、稀な当たりが分かるようにする。
+ */
+export function toProAbility(
+  rng: Rng,
+  ability: number,
+): { ability: number; adapted: boolean } {
+  const roll = rng.float()
+  const scale =
+    roll < PRO_PRODIGY_CHANCE
+      ? PRO_PRODIGY_SCALE
+      : roll < PRO_PRODIGY_CHANCE + PRO_ADAPT_CHANCE
+        ? PRO_ADAPT_SCALE
+        : PRO_SCALE
+
+  return {
+    ability: clamp(ability * scale),
+    adapted: scale > PRO_SCALE,
+  }
+}
+
 /** 卒業直後の記録を作る */
 export function createAlumnus(
   rng: Rng,
@@ -100,6 +145,9 @@ export function createAlumnus(
   const { u18Bonus = 0, ...record } = base
   const path = decidePath(rng, base.rating, reputation, u18Bonus)
 
+  // 高校からそのままプロへ行く選手は、この時点でプロの物差しに置き換わる
+  const ability = path === 'pro' ? toProAbility(rng, base.rating).ability : base.rating
+
   return {
     ...record,
     path,
@@ -111,7 +159,7 @@ export function createAlumnus(
           : path === 'corporate'
             ? 'corporate'
             : 'retired',
-    ability: base.rating,
+    ability,
     team:
       path === 'pro'
         ? rng.pick(PRO_TEAMS)
@@ -124,6 +172,28 @@ export function createAlumnus(
     proSeasons: [],
     note: path === 'none' ? '高校で競技を終えた' : null,
   }
+}
+
+/**
+ * 卒業生の記録を上限まで切り詰める。
+ *
+ * **プロに届いた選手は絶対に落とさない。** 単純に新しい順で切ると、
+ * 何年も経ったあとに古いプロOBが押し出されて名鑑から消える。
+ * 落とすのは高校で終えた選手など、記録として残す価値が薄いものから。
+ *
+ * 落とした選手の高校成績も歴代記録から消える点は承知のうえ
+ * （セーブの大きさに上限が要るため）。
+ */
+export function trimGraduates(graduates: Alumnus[], limit: number): Alumnus[] {
+  if (graduates.length <= limit) return graduates
+
+  const kept = graduates.filter(isInHallOfFame)
+  if (kept.length >= limit) return kept.slice(0, limit)
+
+  const rest = graduates.filter((alumnus) => !isInHallOfFame(alumnus))
+  // 元の並び（新しい順）を保つため、id ではなく元配列の順で拾い直す
+  const survivors = new Set([...kept, ...rest.slice(0, limit - kept.length)])
+  return graduates.filter((alumnus) => survivors.has(alumnus))
 }
 
 /** 1年ぶん進めた結果。ニュースは世代交代画面に出す */
@@ -163,9 +233,19 @@ function advanceCollege(rng: Rng, alumnus: Alumnus): CareerUpdate {
   // 卒業。大学での到達点で進路が決まる
   if (ability >= PRO_THRESHOLD - 4) {
     const team = rng.pick(PRO_TEAMS)
+    // 大学経由でも、プロに入る時点で物差しが変わるのは同じ
+    const pro = toProAbility(rng, ability)
     return {
-      alumnus: { ...alumnus, ability, collegeYears: COLLEGE_LENGTH, status: 'pro', team },
-      news: `${alumnus.name}が大学を経て${team}に入団した`,
+      alumnus: {
+        ...alumnus,
+        ability: pro.ability,
+        collegeYears: COLLEGE_LENGTH,
+        status: 'pro',
+        team,
+      },
+      news: `${alumnus.name}が大学を経て${team}に入団した${
+        pro.adapted ? '。プロの水にすぐ慣れそうだ' : ''
+      }`,
     }
   }
   if (ability >= CORPORATE_THRESHOLD) {
@@ -199,9 +279,10 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
   const season = simulateProSeason(rng, alumnus, year)
   const proSeasons = [...alumnus.proSeasons, season]
 
-  // 年齢による変化。5年目までは伸び、その後は下がっていく
+  // 年齢による変化。5年目までは伸び、その後は下がっていく。
+  // プロの物差し（20〜60）は高校より幅が狭いので、振れ幅も小さくする
   const years = proSeasons.length
-  const drift = years <= 5 ? rng.int(-2, 6) : rng.int(-9, 2)
+  const drift = years <= 5 ? rng.int(-1, 4) : rng.int(-6, 1)
   const ability = clamp(alumnus.ability + drift)
 
   const updated: Alumnus = { ...alumnus, proSeasons, ability }
@@ -289,8 +370,9 @@ function advanceCorporate(rng: Rng, alumnus: Alumnus): CareerUpdate {
 export function simulateProSeason(rng: Rng, alumnus: Alumnus, year: number): ProSeason {
   const overseas = alumnus.status === 'mlb'
   const ability = alumnus.ability
-  // 実力が低いと一軍に定着できない
-  const playRate = clamp01((ability - 35) / 55)
+  // 実力が低いと一軍に定着できない。
+  // プロの物差し（20〜60）に合わせた範囲で、20なら0・65で1になる
+  const playRate = clamp01((ability - 20) / 45)
 
   if (alumnus.isPitcher) {
     const games = clampRange(Math.round((12 + playRate * 20) * (0.8 + rng.float() * 0.4)), 1, 70)
@@ -303,6 +385,7 @@ export function simulateProSeason(rng: Rng, alumnus: Alumnus, year: number): Pro
       year,
       team: alumnus.team ?? '無所属',
       overseas,
+      ability,
       games,
       batting: null,
       pitching: { wins, losses, strikeouts, era },
@@ -324,6 +407,7 @@ export function simulateProSeason(rng: Rng, alumnus: Alumnus, year: number): Pro
     year,
     team: alumnus.team ?? '無所属',
     overseas,
+    ability,
     games,
     batting: { atBats, hits, homeruns, rbi, average: round3(average) },
     pitching: null,

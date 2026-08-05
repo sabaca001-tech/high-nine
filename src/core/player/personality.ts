@@ -75,15 +75,18 @@ export const PERSONALITY_EFFECTS: Record<Personality, PersonalityEffect> = {
     summary: '四球を選びやすく、消耗しにくい',
   },
   天才肌: {
-    // 伸びは速いが、気分の影響も大きい
-    growth: 1.18,
+    // 50人に1人しか出ない当たり性格（createPlayer の PERSONALITY_WEIGHTS）。
+    // 入学時の能力も高く、そこからの伸びも別格にしてある。
+    // 引き当てた学年が特別に感じられないと、レアにした意味が無い
+    growth: 1.4,
     conditionResilience: 1.0,
+    // その代わり気分の影響が大きい。やる気を保つ手を打つ理由になる
     motivationSensitivity: 1.5,
     conditionCost: 1.0,
     trustGain: 0.8,
     eye: 0,
     clutch: 0,
-    summary: 'よく伸びるが、やる気に大きく左右される',
+    summary: '素質が違う。飛び抜けて伸びるが、やる気に大きく左右される',
   },
   やんちゃ: {
     growth: 1.12,

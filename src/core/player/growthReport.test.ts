@@ -8,6 +8,16 @@ import type { Player } from '@/core/types/player'
 
 const roster = createInitialRoster(createRng(3))
 
+/**
+ * 打撃を伸ばして総合が動く選手＝野手を選ぶ。
+ * 添字で決め打ちすると、選手生成の乱数の使い方が変わったときに
+ * たまたま投手を引いて「meet を伸ばしても総合が動かない」で落ちる。
+ */
+function fielderAt(index: number): Player {
+  const fielders = roster.filter((player) => !player.isPitcher)
+  return fielders[index % fielders.length]
+}
+
 /** 能力を底上げした選手を作る（記録は入学時のまま） */
 function grown(player: Player, amount: number): Player {
   return {
@@ -22,7 +32,7 @@ function grown(player: Player, amount: number): Player {
 
 describe('growthOf', () => {
   it('入学からの伸びを出せる', () => {
-    const player = grown(roster[10], 10)
+    const player = grown(fielderAt(10), 10)
     const entry = growthOf(player, 'enrollment', 1)!
 
     expect(entry.to).toBe(overallRating(player))
@@ -32,13 +42,13 @@ describe('growthOf', () => {
   })
 
   it('伸びていなければ差は0', () => {
-    const entry = growthOf(roster[10], 'enrollment', 1)!
+    const entry = growthOf(fielderAt(10), 'enrollment', 1)!
     expect(entry.delta).toBe(0)
     expect(entry.gains).toEqual([])
   })
 
   it('下がった能力もそのまま出す', () => {
-    const player = grown(roster[11], -6)
+    const player = grown(fielderAt(11), -6)
     const entry = growthOf(player, 'enrollment', 1)!
 
     expect(entry.delta).toBeLessThan(0)
@@ -46,7 +56,7 @@ describe('growthOf', () => {
   })
 
   it('伸びの大きい能力から並ぶ', () => {
-    const base = roster[12]
+    const base = fielderAt(12)
     const player: Player = {
       ...base,
       batting: { ...base.batting, meet: base.batting.meet + 2, power: base.batting.power + 9 },
@@ -61,7 +71,7 @@ describe('growthOf', () => {
   })
 
   it('直近1ヶ月は末尾の記録と比べる', () => {
-    const base = roster[13]
+    const base = fielderAt(13)
     // 2ヶ月ぶんの記録を足してから伸ばす
     const withHistory: Player = {
       ...base,
@@ -73,7 +83,7 @@ describe('growthOf', () => {
   })
 
   it('今年度の起点が無ければ入学時と比べる', () => {
-    const player = grown(roster[14], 5)
+    const player = grown(fielderAt(14), 5)
     // history は1年目の記録しか無い。3年目を指定しても落ちない
     expect(growthOf(player, 'season', 3)!.delta).toBeGreaterThan(0)
   })
@@ -81,14 +91,14 @@ describe('growthOf', () => {
 
 describe('growthRanking', () => {
   it('伸びた順に並ぶ', () => {
-    const players = [grown(roster[0], 2), grown(roster[1], 12), grown(roster[2], 7)]
+    const players = [grown(fielderAt(0), 2), grown(fielderAt(1), 12), grown(fielderAt(2), 7)]
     const ranking = growthRanking(players, 'enrollment', 1)
 
     expect(ranking).toHaveLength(3)
     for (let i = 1; i < ranking.length; i++) {
       expect(ranking[i].delta).toBeLessThanOrEqual(ranking[i - 1].delta)
     }
-    expect(ranking[0].player.id).toBe(roster[1].id)
+    expect(ranking[0].player.id).toBe(fielderAt(1).id)
   })
 
   it('記録の無い選手は除く', () => {

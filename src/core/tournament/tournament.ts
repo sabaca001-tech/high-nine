@@ -104,16 +104,21 @@ export function applyRoundResult(
  * （大会に挑むこと自体が罰にならないようにする）。
  */
 export function reputationGain(tournament: Tournament): number {
-  const wins = tournament.results.filter((entry) => entry.won).length
+  if (!tournament.champion) return 0
+  return CHAMPION_REPUTATION[tournament.kind]
+}
 
-  if (tournament.kind === 'nationals') {
-    return wins * 3 + (tournament.champion ? 25 : 0)
-  }
-  if (tournament.kind === 'springNationals') {
-    return wins * 2 + (tournament.champion ? 16 : 0)
-  }
-  if (tournament.kind === 'autumnPref') {
-    return wins * 1 + (tournament.champion ? 5 : 0)
-  }
-  return wins * 2 + (tournament.champion ? 12 : 0)
+/**
+ * 優勝したことへの評価。
+ *
+ * **1勝ごとの評判はもう試合のたびに動いている**（`matchReputationDelta`）。
+ * ここで勝ち数ぶんを足すと二重になるうえ、
+ * 「1回戦で格上を倒した」と「1回戦で格下に勝った」が同じ重みになってしまう。
+ * ここは「大会を制した」という一点だけを評価する。
+ */
+const CHAMPION_REPUTATION: Record<TournamentKind, number> = {
+  summerPref: 12,
+  nationals: 25,
+  autumnPref: 5,
+  springNationals: 16,
 }

@@ -68,14 +68,31 @@ export type TraitMap = Record<RegionId, ScoutTrait>
 
 const ALL_TRAITS: ScoutTrait[] = ['power', 'contact', 'speed', 'defense', 'pitching', 'raw']
 
-/**
- * 県ごとの傾向を決める。**新規ゲームで一度だけ**。
- * 途中で変わると「あの県は投手王国だった」という覚え方ができなくなる。
- */
+/** 県ごとの傾向を決める */
 export function createTraits(rng: Rng): TraitMap {
   const map = {} as TraitMap
   for (const region of REGIONS) {
     map[region.id] = rng.pick(ALL_TRAITS)
+  }
+  return map
+}
+
+/**
+ * 年度が変わったときに傾向を引き直す。
+ *
+ * 固定にしていた頃は、一度「投手王国」を見つけたら**毎年そこへ行くだけ**になり、
+ * 行き先を選ぶ判断が1年目で終わっていた。
+ * その学年にどんな中学生が育ったかは年ごとに違うので、毎年引き直す。
+ *
+ * **必ず前年と違う傾向にする。** 同じ値を引き直すと「変わらなかった」のか
+ * 「更新されていない」のか区別が付かず、変えた意味が伝わらない。
+ */
+export function shiftTraits(rng: Rng, previous: TraitMap): TraitMap {
+  const map = {} as TraitMap
+  for (const region of REGIONS) {
+    const before = previous[region.id]
+    const candidates = before ? ALL_TRAITS.filter((trait) => trait !== before) : ALL_TRAITS
+    map[region.id] = rng.pick(candidates)
   }
   return map
 }

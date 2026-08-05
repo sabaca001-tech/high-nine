@@ -179,6 +179,8 @@ export type MatchResult = {
   opponentName: string
   /** 相手がライバル校ならその id。無ければ null */
   opponentSchoolId: string | null
+  /** 相手の強さ。0が互角、+20なら格上。評判の増減に使う */
+  opponentStrength: number
   /** イニングごとの得点（0番目が1回） */
   innings: { player: number; opponent: number }[]
   finalScore: { player: number; opponent: number }

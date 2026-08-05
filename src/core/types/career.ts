@@ -47,6 +47,11 @@ export type ProSeason = {
   team: string
   /** 海外リーグでの成績か */
   overseas: boolean
+  /**
+   * そのシーズンを迎えた時点の実力（プロの物差し）。
+   * 年ごとに残しておかないと、**現在値しか見えず推移が描けない**。
+   */
+  ability: number
   games: number
   /** 野手成績。投手なら null */
   batting: {
@@ -152,6 +157,29 @@ export function careerTotals(alumnus: Alumnus): {
     strikeouts,
     era: eraCount > 0 ? Math.round((eraSum / eraCount) * 100) / 100 : 0,
   }
+}
+
+/**
+ * OB名鑑に載るか。
+ *
+ * **プロに届いた選手だけを載せる。** 卒業生を全員並べていた頃は、
+ * 高校で競技を終えた選手や社会人へ進んだ選手で埋まってしまい、
+ * 「うちからプロが出た」という出来事が名鑑の中に埋もれていた。
+ *
+ * 大学経由でプロに入った選手もここに現れる。
+ * 在学中はまだ載らず、**指名された年に名前が出る**。
+ */
+export function isInHallOfFame(alumnus: Alumnus): boolean {
+  return alumnus.status === 'pro' || alumnus.status === 'mlb' || alumnus.proSeasons.length > 0
+}
+
+/**
+ * まだプロを目指している途中か（大学在学中・社会人で現役）。
+ * OB名鑑には出ないが、いずれ載るかもしれない選手たち。
+ */
+export function isCareerPending(alumnus: Alumnus): boolean {
+  if (isInHallOfFame(alumnus)) return false
+  return alumnus.status === 'college' || alumnus.status === 'corporate'
 }
 
 /** まだ進路が動く状態か */

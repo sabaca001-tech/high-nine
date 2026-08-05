@@ -30,6 +30,7 @@ import { recruitFreshmen } from '@/core/season/graduation'
 import { applyCardCost, clamp } from '@/core/player/growth'
 import { addBatting, addPitching } from '@/core/player/careerStats'
 import { applyMatchGrowth } from '@/core/player/matchGrowth'
+import { matchReputationDelta, matchupLabel, teamRating } from '@/core/season/matchReputation'
 import type { MatchStage } from '@/core/player/matchGrowth'
 import {
   applySubstitution,
@@ -62,7 +63,7 @@ import {
   successChance,
 } from '@/core/scout/scouting'
 import type { ScoutRegion, ScoutResult } from '@/core/scout/scouting'
-import { createTraits } from '@/core/scout/scoutTraits'
+import { createTraits, shiftTraits } from '@/core/scout/scoutTraits'
 import { playU18, selectU18, U18_SQUAD_SIZE } from '@/core/player/u18'
 import { applyCamp, findCampPlan, CAMP_AFTERGLOW } from '@/core/camp/campDefs'
 import { advanceSeason } from '@/core/season/graduation'
@@ -125,7 +126,7 @@ import type { UniformId } from '@/core/team/uniforms'
 import type { RegionId } from '@/core/types/region'
 import { isTournamentOver, roundName } from '@/core/types/tournament'
 import type { Tournament } from '@/core/types/tournament'
-import { createAlumnus } from '@/core/career/career'
+import { createAlumnus, trimGraduates } from '@/core/career/career'
 import { overallRating } from '@/core/player/rating'
 import { draftBonus } from '@/core/player/u18'
 
@@ -1040,12 +1041,10 @@ function finishMatch(state: GameState): EngineResult {
     if (batting) stats = addBatting(stats, batting)
     if (pitching) stats = addPitching(stats, pitching)
 
-    // 活躍した選手はその場で伸びる。試合に出す判断に育成上の意味を持たせる
+    // 成績が良ければ伸び、悪ければ落ちる。チームの勝敗は混ぜない
     const grown = applyMatchGrowth(rng, player, {
       ...(batting ? { batting } : {}),
       ...(pitching ? { pitching } : {}),
-      won,
-      mvp: player.id === match.mvpPlayerId,
       stage,
     })
     growthChanges.push(...grown.changes)
@@ -1058,10 +1057,14 @@ function finishMatch(state: GameState): EngineResult {
     }
   })
 
-  // 勝てば学校の評判が上がり、良い新入生が来やすくなる
-  // 練習試合1つで学校の評判が動きすぎないようにする。
-  // 主な変動源は大会の成績（reputationGain）
-  const reputationDelta = won ? 1 : match.outcome === 'draw' ? 0 : -1
+  // 誰と戦ったかで評判の振れ幅が変わる。格上を倒せば名前が売れ、
+  // 格下に落とせば一気に評判を落とす。大会の試合でもここで動かす
+  const ourRating = teamRating(state.players, state.lineup)
+  const reputationDelta = matchReputationDelta({
+    outcome: match.outcome,
+    ourRating,
+    opponentStrength: match.opponentStrength,
+  })
   const reputation = applyReputation(state.reputation, reputationDelta)
 
   // 相手がライバル校なら対戦成績を残す。「去年負けたあの学校」が分かるようになる
@@ -1091,10 +1094,31 @@ function finishMatch(state: GameState): EngineResult {
 
   if (growthChanges.length > 0) {
     events.push({ type: 'ability', changes: growthChanges })
+    const gained = new Set(
+      growthChanges.filter((c) => c.after > c.before).map((c) => c.playerId),
+    ).size
+    const lost = new Set(growthChanges.filter((c) => c.after < c.before).map((c) => c.playerId)).size
+    if (gained > 0) {
+      events.push({ type: 'message', text: `試合での活躍で${gained}人が成長した`, tone: 'good' })
+    }
+    if (lost > 0) {
+      events.push({ type: 'message', text: `${lost}人が打てず、感覚を落とした`, tone: 'bad' })
+    }
+  }
+
+  // 相手の格に対して勝ちすぎ・負けすぎなら、その意味を書き添える
+  const matchup = matchupLabel(ourRating, match.opponentStrength)
+  if (reputationDelta >= 2) {
     events.push({
       type: 'message',
-      text: `試合での活躍で${new Set(growthChanges.map((c) => c.playerId)).size}人が成長した`,
+      text: `${matchup}の${match.opponentName}を破り、学校の評判が大きく上がった`,
       tone: 'good',
+    })
+  } else if (reputationDelta <= -2) {
+    events.push({
+      type: 'message',
+      text: `${matchup}の${match.opponentName}に敗れ、学校の評判が大きく下がった`,
+      tone: 'bad',
     })
   }
 
@@ -1129,7 +1153,10 @@ function finishMatch(state: GameState): EngineResult {
         players,
         rivals,
         pendingMatch: null,
-        // 大会の評判は finishTournament でまとめて加算する
+        // 1試合ごとの評判はここで動かす。強い相手を倒すほど大きく上がるので、
+        // 決勝で勝つことと1回戦で勝つことが同じ重みにならない。
+        // 大会をやり切ったこと自体の評価は finishTournament で足す
+        reputation,
         tournament,
         serial,
         // 終わったときだけ大会画面（結果のまとめ）へ。続くなら盤面に戻る
@@ -1730,8 +1757,12 @@ function advanceYear(state: GameState): EngineResult {
     rivals.push(update.school)
     if (update.news) rivalNews.push(update.news)
   }
-  // 新しい卒業生を先頭に、既存OBは進路が1年ぶん進んだものに差し替える
-  const graduates = [...change.graduates, ...change.updatedAlumni].slice(0, GRADUATES_LIMIT)
+  // 新しい卒業生を先頭に、既存OBは進路が1年ぶん進んだものに差し替える。
+  // 上限で切るときも、プロに届いた選手は落とさない
+  const graduates = trimGraduates(
+    [...change.graduates, ...change.updatedAlumni],
+    GRADUATES_LIMIT,
+  )
 
   const pendingSeason = {
     year,
@@ -1806,6 +1837,9 @@ function advanceYear(state: GameState): EngineResult {
       rivals,
       // 訪問の記録と候補は使い切り。次の秋にまた視察して回る
       scouting: { regions: [], visiting: null, results: scouted.results },
+      // 県の傾向も毎年引き直す。固定だと一度良い県を見つけたら
+      // 毎年そこへ行くだけになり、行き先を選ぶ判断が1年目で終わってしまう
+      scoutTraits: shiftTraits(rng, state.scoutTraits),
       tournament: null,
       board,
       boardPosition: 0,

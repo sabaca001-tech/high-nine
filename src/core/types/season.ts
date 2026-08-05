@@ -43,10 +43,22 @@ export const REPUTATION_MAX = 100
  *  評判20 → 加算の90% ／ 評判50 → 60% ／ 評判80 → 26% ／ 評判95 → 9%
  */
 export function reputationGainAt(current: number, raw: number): number {
-  if (raw <= 0) return raw
-  const room = Math.max(0, 1 - current / REPUTATION_MAX)
-  return raw * room * room
+  if (raw > 0) {
+    const room = Math.max(0, 1 - current / REPUTATION_MAX)
+    return raw * room * room
+  }
+  // 下がるほうも同じ考えで鈍らせる。**下限で止まらないと詰む。**
+  // 負けるたびに削られる仕組みを入れたら、勝てないチームの評判が
+  // 一桁まで落ちて新入生も部費も枯れ、立て直しようが無くなった（実測で60年後に6）。
+  // 落ちるところまで落ちた学校は、もう失うものが無い
+  return raw * Math.max(REPUTATION_LOSS_FLOOR, current / REPUTATION_MAX)
 }
+
+/**
+ * 評判が低いときに下げ幅へかかる下限の倍率。
+ * 評判20なら下げ幅の25%しか通らないので、無戦略でも20前後で底を打つ。
+ */
+const REPUTATION_LOSS_FLOOR = 0.25
 
 /** 評判は整数で持つ（小数だと表示も比較も読みにくい） */
 export function applyReputation(current: number, raw: number): number {

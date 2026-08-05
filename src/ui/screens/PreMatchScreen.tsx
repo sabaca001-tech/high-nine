@@ -1,5 +1,6 @@
 import { validateLineup } from '@/core/lineup/autoLineup'
 import { formatRecord, hasMet } from '@/core/rival/rivals'
+import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { LineupEditor } from './LineupScreen'
@@ -41,6 +42,13 @@ export function PreMatchScreen() {
         {setup.opponentRegionName && (
           <span className={styles.away}>{setup.opponentRegionName}代表</span>
         )}
+        {/*
+          力の差を言葉で出す。勝てば評判がどれだけ動くかがここで読めるので、
+          「格上に挑む」ことに意味が生まれる。
+        */}
+        <span className={styles.matchup}>
+          {matchupLabel(teamRating(game.players, game.lineup), setup.opponentStrength)}
+        </span>
       </div>
 
       {/*

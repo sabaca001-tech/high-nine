@@ -195,17 +195,21 @@ describe('roundName', () => {
 })
 
 describe('reputationGain', () => {
-  it('勝ち進むほど評判が上がる', () => {
+  /**
+   * 1勝ごとの評判は試合のたびに動く（matchReputation）ので、ここは優勝だけを見る。
+   * 両方で勝ち数を数えると二重に加算される。
+   */
+  it('優勝するまでは0で、優勝した瞬間に入る', () => {
     let t = createTournament('summerPref', TOTTORI)
-    const gains: number[] = []
 
-    for (let i = 0; i < t.totalRounds; i++) {
+    for (let i = 0; i < t.totalRounds - 1; i++) {
       t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
-      gains.push(reputationGain(t))
+      expect(reputationGain(t)).toBe(0)
     }
-    for (let i = 1; i < gains.length; i++) {
-      expect(gains[i]).toBeGreaterThan(gains[i - 1])
-    }
+
+    t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
+    expect(t.champion).toBe(true)
+    expect(reputationGain(t)).toBeGreaterThan(0)
   })
 
   it('負けても評判は減らない', () => {

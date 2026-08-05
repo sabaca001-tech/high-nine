@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Alumnus, CareerStatus } from '@/core/types/career'
-import { CAREER_STATUS_LABELS, careerTotals } from '@/core/types/career'
+import { CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
+import { AbilityChart } from '@/ui/components/AbilityChart'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
@@ -19,11 +20,15 @@ const STATUS_COLOR: Record<CareerStatus, string> = {
   retired: 'var(--text-dim)',
 }
 
-type Filter = 'all' | 'active' | 'pro'
+type Filter = 'all' | 'active'
 
 /**
  * OB名鑑。
- * 卒業生のその後（プロ・大学・社会人）を追える。
+ *
+ * **プロに届いた選手だけを載せる。** 卒業生を全員並べていた頃は、
+ * 高校で競技を終えた選手で埋まって「うちからプロが出た」が埋もれていた。
+ * 大学経由の選手は、在学中はここに出ず、指名された年に現れる。
+ * 進路の途中経過は「データ → 進路」で追える。
  */
 export function AlumniScreen() {
   const game = useGameStore((s) => s.game)
@@ -34,16 +39,13 @@ export function AlumniScreen() {
 
   if (!game) return null
 
-  const visible = game.graduates.filter((alumnus) => {
-    if (filter === 'pro') return alumnus.proSeasons.length > 0
-    if (filter === 'active') {
-      return alumnus.status !== 'retired' && alumnus.status !== 'released'
-    }
-    return true
-  })
+  const pros = game.graduates.filter(isInHallOfFame)
+  const visible = pros.filter((alumnus) =>
+    filter === 'active' ? alumnus.status === 'pro' || alumnus.status === 'mlb' : true,
+  )
 
   return (
-    <AppLayout title="OB名鑑" subtitle={`${game.graduates.length}人`} scrollable>
+    <AppLayout title="OB名鑑" subtitle={`プロ入り ${pros.length}人`} scrollable>
       <button type="button" className={styles.back} onClick={() => setScreen('players')}>
         ← 部員一覧へ
       </button>
@@ -53,7 +55,6 @@ export function AlumniScreen() {
           [
             ['all', 'すべて'],
             ['active', '現役'],
-            ['pro', 'プロ経験'],
           ] as [Filter, string][]
         ).map(([value, label]) => (
           <button
@@ -68,7 +69,11 @@ export function AlumniScreen() {
       </div>
 
       {visible.length === 0 ? (
-        <p className={styles.empty}>該当する卒業生はいません</p>
+        <p className={styles.empty}>
+          {pros.length === 0
+            ? 'まだプロ入りしたOBはいません。ここに載るのはプロへ進んだ選手だけです（大学経由の指名も含みます）'
+            : '該当するOBはいません'}
+        </p>
       ) : (
         visible.map((alumnus) => <AlumnusCard capColor={capColor} key={alumnus.id} alumnus={alumnus} />)
       )}
@@ -91,7 +96,8 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
         <span>
           <span className={styles.name}>{alumnus.name}</span>
           <span className={styles.sub}>
-            {alumnus.year}年目卒 / {alumnus.position} / 卒業時 総合{alumnus.rating}
+            {alumnus.year}年目卒 / {alumnus.position} / 高校時 {alumnus.rating} → プロ{' '}
+            {alumnus.ability}
             {alumnus.team && ` / ${alumnus.team}`}
           </span>
         </span>
@@ -125,12 +131,31 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
             {open ? '年度別成績を閉じる' : '年度別成績を見る'}
           </button>
 
-          {open && <SeasonTable alumnus={alumnus} />}
+          {open && (
+            <>
+              <AbilityChart
+                title="実力の推移（プロ基準）"
+                points={alumnus.proSeasons.map((season) => ({
+                  label: `${season.year}年目`,
+                  value: season.ability,
+                }))}
+                max={PRO_ABILITY_MAX}
+              />
+              <SeasonTable alumnus={alumnus} />
+            </>
+          )}
         </>
       )}
     </div>
   )
 }
+
+/**
+ * 能力グラフの縦軸。
+ * プロ入りで能力は高校基準からおよそ半分に置き換わるので、
+ * 100 のままだと折れ線が下半分に張り付いて読めない。
+ */
+const PRO_ABILITY_MAX = 70
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
