@@ -403,7 +403,7 @@ npx vitest run src/core/seasonBalance.test.ts --disable-console-intercept
 - 型を破壊的に変更したら `src/save/migrate.ts` に移行処理を追加する。
 - 保存キーは **1枠目が `hs-baseball-sim:save:v1` 固定**（キーは変えず、中の `version` で管理する）。
   2枠目以降は `:2` `:3` を足す。**1枠目のキーを変えてはいけない**（既存のセーブが読めなくなる）。
-- 現在の `SAVE_VERSION` は 26。v1→v26 の移行が `migrate.ts` にある。
+- 現在の `SAVE_VERSION` は 27。v1→v27 の移行が `migrate.ts` にある。
   **盤面の刻み（`DAYS_PER_CELL`）を変えたら移行が必須。** `boardPosition` の意味が
   変わるので、`cellOfDay()` で読み替えて盤面を作り直す（v22→v23 がその例）。
 - `Player.history`（能力の推移）のように**毎月増える配列**を足すときは、必ず上限を決めて

@@ -54,8 +54,10 @@ import {
 import type { RivalSchool } from '@/core/rival/rivals'
 import {
   allProspects,
+  createNationalTeam,
   createProspects,
   emptyScouting,
+  findNationalProspect,
   findScoutRegion,
   MAX_APPROACHES,
   prospectSkillName,
@@ -194,7 +196,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     pendingSetup: null,
     regionId,
     rivals: createRivals(rng, regionId),
-    scouting: emptyScouting(),
+    scouting: { ...emptyScouting(), nationalTeam: createNationalTeam(rng, 1) },
     scoutTraits: createTraits(rng),
     tournament: null,
     nationalsBerth: false,
@@ -295,6 +297,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return visitScoutRegion(state, command.regionId)
     case 'approachProspect':
       return approachProspect(state, command.prospectId)
+    case 'approachNationalProspect':
+      return approachNationalProspect(state, command.prospectId)
     case 'chooseRoute':
       return chooseRoute(state, command.routeId)
   }
@@ -1835,8 +1839,14 @@ function advanceYear(state: GameState): EngineResult {
       graduates,
       pendingSeason,
       rivals,
-      // 訪問の記録と候補は使い切り。次の秋にまた視察して回る
-      scouting: { regions: [], visiting: null, results: scouted.results },
+      // 訪問の記録と候補は使い切り。次の秋にまた視察して回る。
+      // U15代表もその学年の顔ぶれなので、毎年選び直す
+      scouting: {
+        nationalTeam: createNationalTeam(rng, year),
+        regions: [],
+        visiting: null,
+        results: scouted.results,
+      },
       // 県の傾向も毎年引き直す。固定だと一度良い県を見つけたら
       // 毎年そこへ行くだけになり、行き先を選ぶ判断が1年目で終わってしまう
       scoutTraits: shiftTraits(rng, state.scoutTraits),
@@ -1878,6 +1888,9 @@ function resolveScouting(
   // 「あのとき通っていれば」が後から分かる
   for (const prospect of allProspects(state.scouting)) {
     const approached = prospect.approaches > 0
+    // U15代表は30人いるので、会いに行っていない選手まで報告に並べると
+    // 読めなくなる。**行き先だけは決める**（強豪校の注目選手になる）
+    const reportable = approached || !prospect.national
 
     if (approached && rng.chance(successChance(prospect, state.reputation))) {
       const player = createPlayer(rng, {
@@ -1925,15 +1938,17 @@ function resolveScouting(
       )
     }
 
-    results.push({
-      name: prospect.name,
-      rating: prospect.rating,
-      regionName: findRegion(prospect.regionId).name,
-      approached,
-      joined: false,
-      skillName: prospectSkillName(prospect),
-      schoolName: school?.name ?? '地元の高校',
-    })
+    if (reportable) {
+      results.push({
+        name: prospect.name,
+        rating: prospect.rating,
+        regionName: findRegion(prospect.regionId).name,
+        approached,
+        joined: false,
+        skillName: prospectSkillName(prospect),
+        schoolName: school?.name ?? '地元の高校',
+      })
+    }
   }
 
   return { joined, results, rivals, serial }
@@ -2056,6 +2071,51 @@ function approachProspect(state: GameState, prospectId: string): EngineResult {
                   p.id === prospectId ? { ...p, approaches: p.approaches + 1 } : p,
                 ),
               },
+        ),
+      },
+      serial,
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * U15日本代表の1人に会いに行く。
+ *
+ * 県の候補と違い、**視察して顔ぶれを見る手順が要らない**（最初から見えている）。
+ * その代わり出身県までの出張費をここで払う。
+ * 遠くの代表を口説き続けるには、それだけ部費が要る。
+ */
+function approachNationalProspect(state: GameState, prospectId: string): EngineResult {
+  if (state.month < SCOUT_OPEN_MONTH && state.month > 3) return { state, events: [] }
+  // 県への出張中は動けない。まずそちらで誰かに会う
+  if (state.scouting.visiting !== null) return { state, events: [] }
+
+  const prospect = findNationalProspect(state.scouting, prospectId)
+  if (!prospect) return { state, events: [] }
+  if (prospect.approaches >= MAX_APPROACHES) return { state, events: [] }
+
+  const cost = scoutTripCost(findRegion(state.regionId), findRegion(prospect.regionId))
+  if (state.funds < cost) return { state, events: [] }
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `U15代表の${prospect.name}に会いに${findRegion(prospect.regionId).name}へ出た（${formatFunds(cost)}）`,
+      tone: 'normal',
+    },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      funds: state.funds - cost,
+      scouting: {
+        ...state.scouting,
+        nationalTeam: state.scouting.nationalTeam.map((entry) =>
+          entry.id === prospectId ? { ...entry, approaches: entry.approaches + 1 } : entry,
         ),
       },
       serial,

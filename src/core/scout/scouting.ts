@@ -21,7 +21,7 @@ import type { Rng } from '@/core/rng/random'
 import { pickName } from '@/core/player/createPlayer'
 import type { Position } from '@/core/types/player'
 import type { RegionId } from '@/core/types/region'
-import { findRegion } from '@/core/types/region'
+import { findRegion, REGIONS } from '@/core/types/region'
 import { REPUTATION_INITIAL } from '@/core/types/season'
 import { findSkill, skillsFor } from '@/core/skill/skillDefs'
 import type { SkillId } from '@/core/types/skill'
@@ -67,6 +67,13 @@ export type Prospect = {
   skillId: SkillId | null
   /** 中学での成績 */
   junior: JuniorStats
+  /**
+   * U15日本代表に選ばれているか。
+   *
+   * 代表はある程度の実力が担保されている代わりに、
+   * **全国のスカウトが殺到している**ので獲得が難しい（`successChance`）。
+   */
+  national?: boolean
 }
 
 /** 訪問した県と、そこで挙がった候補 */
@@ -94,6 +101,12 @@ export type ScoutResult = {
 }
 
 export type ScoutingState = {
+  /**
+   * U15日本代表の30人。**年度ごとに作り直す。**
+   * 県を選ぶ前から見えていて、視察していない県の選手も載る。
+   * 実力は担保されているが、会いに行くには出身県までの出張費がかかる。
+   */
+  nationalTeam: Prospect[]
   /** 訪問した県。年度が替わるまで残る */
   regions: ScoutRegion[]
   /**
@@ -106,7 +119,7 @@ export type ScoutingState = {
 }
 
 export function emptyScouting(): ScoutingState {
-  return { regions: [], visiting: null, results: [] }
+  return { nationalTeam: [], regions: [], visiting: null, results: [] }
 }
 
 /** スカウトを始められる月。冬を挟んで通う時間を作る */
@@ -117,6 +130,9 @@ export const MAX_APPROACHES = 4
 
 /** 1つの県で挙がる候補の人数 */
 export const PROSPECTS_PER_REGION = 10
+
+/** U15日本代表の人数。全国から選ばれる */
+export const NATIONAL_TEAM_SIZE = 30
 
 /**
  * 獲得できる見込み。
@@ -129,9 +145,19 @@ export function successChance(prospect: Prospect, reputation: number): number {
   const fromReputation = (reputation - REPUTATION_INITIAL) / 180
   const fromApproaches = prospect.approaches * 0.12
   const difficulty = (prospect.rating - 50) / 150
+  // 代表は全国のスカウトが殺到している。通っても弱小校では2割前後
+  const national = prospect.national ? NATIONAL_PENALTY : 0
 
-  return clamp(0.05 + fromReputation + fromApproaches - difficulty, 0.02, 0.9)
+  return clamp(0.05 + fromReputation + fromApproaches - difficulty - national, 0.01, 0.9)
 }
+
+/**
+ * U15代表であることによる獲得率の下げ幅。
+ *
+ * 通い切った（4回）ときの見込みで、評判20なら約20%、評判95なら約58%。
+ * **評判がそのまま効く**ので、代表を獲れるかどうかが強豪校の証になる。
+ */
+const NATIONAL_PENALTY = 0.3
 
 const FIELDER_POSITIONS: Position[] = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
 
@@ -225,6 +251,51 @@ export function createProspects(
   return prospects.sort((a, b) => b.rating - a.rating)
 }
 
+/**
+ * U15日本代表の30人を作る。**年度の初めに一度だけ。**
+ *
+ * 県ごとの候補と違って、**視察しなくても顔ぶれが見えている**。
+ * 全国から選ばれた30人なので実力は担保されているが、
+ * その代わり全国のスカウトが殺到していて獲得は難しい。
+ *
+ * 素質に学校の評判は効かせない。代表は全国から選ばれるもので、
+ * こちらの評判とは関係が無い。**評判が効くのは獲得率のほう**。
+ */
+export function createNationalTeam(rng: Rng, year: number): Prospect[] {
+  const prospects: Prospect[] = []
+  const names: string[] = []
+
+  for (let i = 0; i < NATIONAL_TEAM_SIZE; i++) {
+    const isPitcher = rng.chance(0.3)
+    const name = pickName(rng, names)
+    names.push(name)
+
+    const rating = clampRating(NATIONAL_BASE + rng.int(-8, 12))
+    const regionId = rng.pick(REGIONS).id
+
+    prospects.push({
+      id: `u15-${year}-${i}`,
+      name,
+      position: isPitcher ? 'P' : rng.pick(FIELDER_POSITIONS),
+      isPitcher,
+      rating,
+      regionId,
+      approaches: 0,
+      skillId: rollSkill(rng, isPitcher, rating),
+      junior: rollJuniorStats(rng, isPitcher, rating),
+      national: true,
+    })
+  }
+
+  return prospects.sort((a, b) => b.rating - a.rating)
+}
+
+/**
+ * 代表選手の素質の中心。
+ * 県ごとの候補（評判20で中心34）より一段上に置く。
+ */
+const NATIONAL_BASE = 50
+
 /** 中学の成績を作る。素質と噛み合った数字にする */
 function rollJuniorStats(rng: Rng, isPitcher: boolean, rating: number): JuniorStats {
   const team = `${rng.pick(JUNIOR_PREFIX)}${rng.pick(JUNIOR_SUFFIX)}`
@@ -275,9 +346,20 @@ export function findScoutRegion(
   return state.regions.find((region) => region.regionId === regionId)
 }
 
-/** 訪問した県すべての候補 */
+/**
+ * 進路が決まる候補すべて。
+ * **U15代表も含める。** 含めないと、代表の選手だけ結末が出ない。
+ */
 export function allProspects(state: ScoutingState): Prospect[] {
-  return state.regions.flatMap((region) => region.prospects)
+  return [...state.regions.flatMap((region) => region.prospects), ...(state.nationalTeam ?? [])]
+}
+
+/** U15代表から1人探す */
+export function findNationalProspect(
+  state: ScoutingState,
+  prospectId: string,
+): Prospect | undefined {
+  return (state.nationalTeam ?? []).find((prospect) => prospect.id === prospectId)
 }
 
 /** 会いに行ったことのある候補だけ */

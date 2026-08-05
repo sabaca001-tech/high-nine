@@ -150,6 +150,57 @@
  * 県の一覧。
  * 出張費と傾向の2つで行き先を決めるので、その2つを大きく出す。
  */
+/*
+ * U15日本代表。県の一覧より上に置き、既定では畳んでおく。
+ * 30人ぶんを開いたまま出すと、県を選ぶという本来の入口が埋もれる。
+ */
+.national {
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--accent);
+}
+
+.nationalHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0;
+  color: var(--text-main);
+  text-align: left;
+}
+
+.nationalTitle {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.nationalCount {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.nationalMark {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.nationalNote {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+
 .region {
   margin-bottom: var(--sp-2);
   padding: var(--sp-2);

@@ -59,8 +59,9 @@ import type { Tournament } from './tournament'
  *            プロ入りで能力がプロの物差しへ置き換わるようになった。
  * v25 → v26: Player に growthAptitude（能力ごとの伸びやすさ）を追加。
  *            練習の結果が選手ごとに変わるようになった。
+ * v26 → v27: scouting に nationalTeam（U15日本代表の30人）を追加。
  */
-export const SAVE_VERSION = 26
+export const SAVE_VERSION = 27
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
@@ -249,6 +250,8 @@ export type GameCommand =
   | { type: 'buyEquipment'; equipmentId: string }
   /** スカウトで県を視察する。出張費を払い、候補が挙がる */
   | { type: 'visitScoutRegion'; regionId: RegionId }
+  /** U15代表の1人に会いに行く。出身県までの出張費がかかる */
+  | { type: 'approachNationalProspect'; prospectId: string }
   /** 視察中の県で候補1人に会いに行く（出張を1回使う） */
   | { type: 'approachProspect'; prospectId: string }
   /** ルート分岐で道筋を選ぶ */

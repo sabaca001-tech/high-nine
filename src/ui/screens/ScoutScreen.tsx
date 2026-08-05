@@ -68,6 +68,15 @@ export function ScoutScreen() {
         )}
       </p>
 
+      <NationalTeamSection
+        prospects={scouting.nationalTeam}
+        homeRegionId={game.regionId}
+        reputation={game.reputation}
+        funds={game.funds}
+        open={open}
+        busy={scouting.visiting !== null}
+      />
+
       <RegionList
         homeRegionId={game.regionId}
         traits={game.scoutTraits}
@@ -78,6 +87,90 @@ export function ScoutScreen() {
         onOpen={setOpenRegion}
       />
     </AppLayout>
+  )
+}
+
+/**
+ * U15日本代表。**県の一覧より上に、折りたたんで置く。**
+ *
+ * 30人が全国から選ばれている。視察しなくても顔ぶれが見えているので、
+ * 「どの県へ行くか」を決める前の材料になる。
+ * 代表に入っていない有望株もいるが、**代表は実力が担保されている**。
+ * その代わり全国のスカウトが殺到していて獲得は難しい（`successChance`）。
+ */
+function NationalTeamSection({
+  prospects,
+  homeRegionId,
+  reputation,
+  funds,
+  open,
+  busy,
+}: {
+  prospects: Prospect[]
+  homeRegionId: RegionId
+  reputation: number
+  funds: number
+  open: boolean
+  busy: boolean
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const approachNationalProspect = useGameStore((s) => s.approachNationalProspect)
+  const home = findRegion(homeRegionId)
+
+  if (prospects.length === 0) return null
+
+  const met = prospects.filter((prospect) => prospect.approaches > 0).length
+
+  return (
+    <section className={styles.national}>
+      <button
+        type="button"
+        className={styles.nationalHead}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className={styles.nationalTitle}>U15日本代表</span>
+        <span className={styles.nationalCount}>
+          {prospects.length}人{met > 0 && ` / 訪問${met}人`}
+        </span>
+        <span className={styles.nationalMark}>{expanded ? '−' : '＋'}</span>
+      </button>
+
+      {expanded && (
+        <>
+          <p className={styles.nationalNote}>
+            全国から選ばれた30人。<strong>実力は担保されています</strong>が、
+            全国のスカウトが殺到しているので獲得は難しくなります。
+            会いに行くには出身県までの出張費がかかります。
+            見込みは学校の評判で大きく変わります。
+          </p>
+
+          {prospects.map((prospect) => {
+            const cost = scoutTripCost(home, findRegion(prospect.regionId))
+            const poor = funds < cost
+
+            return (
+              <ProspectCard
+                key={prospect.id}
+                prospect={prospect}
+                reputation={reputation}
+                note={`${findRegion(prospect.regionId).name} / 出張費 ${formatFunds(cost)}`}
+                action={{
+                  label: !open
+                    ? `${SCOUT_OPEN_MONTH}月に解禁されます`
+                    : busy
+                      ? '出張中'
+                      : poor
+                        ? `部費が足りない ${formatFunds(cost)}`
+                        : `会いに行く ${formatFunds(cost)}`,
+                  disabled: !open || busy || poor,
+                  onClick: () => approachNationalProspect(prospect.id),
+                }}
+              />
+            )
+          })}
+        </>
+      )}
+    </section>
   )
 }
 
@@ -191,7 +284,7 @@ function ProspectList({
       </p>
 
       {region.prospects.map((prospect) => (
-        <ProspectCard
+        <RegionProspectCard
           key={prospect.id}
           prospect={prospect}
           reputation={reputation}
@@ -202,7 +295,8 @@ function ProspectList({
   )
 }
 
-function ProspectCard({
+/** 県の候補1人ぶん。会えるのは出張中だけ */
+function RegionProspectCard({
   prospect,
   reputation,
   visiting,
@@ -213,6 +307,37 @@ function ProspectCard({
 }) {
   const approachProspect = useGameStore((s) => s.approachProspect)
 
+  return (
+    <ProspectCard
+      prospect={prospect}
+      reputation={reputation}
+      action={{
+        label: visiting ? 'この選手に会いに行く' : '視察に出ると会えます',
+        disabled: !visiting,
+        onClick: () => approachProspect(prospect.id),
+      }}
+    />
+  )
+}
+
+type CardAction = {
+  label: string
+  disabled: boolean
+  onClick: () => void
+}
+
+function ProspectCard({
+  prospect,
+  reputation,
+  action,
+  note,
+}: {
+  prospect: Prospect
+  reputation: number
+  action: CardAction
+  /** 出身県や出張費など、そのカードだけの補足 */
+  note?: string
+}) {
   const chance = successChance(prospect, reputation)
   const rank = toRank(prospect.rating)
   const maxed = prospect.approaches >= MAX_APPROACHES
@@ -227,6 +352,7 @@ function ProspectCard({
           <span className={styles.name}>{prospect.name}</span>
           <span className={styles.meta}>
             {junior.team} / {POSITION_LABELS[prospect.position]}
+            {note && ` / ${note}`}
           </span>
         </span>
       </header>
@@ -285,10 +411,10 @@ function ProspectCard({
       <button
         type="button"
         className={styles.button}
-        disabled={!visiting || maxed}
-        onClick={() => approachProspect(prospect.id)}
+        disabled={action.disabled || maxed}
+        onClick={action.onClick}
       >
-        {maxed ? '通いつめた' : visiting ? 'この選手に会いに行く' : '視察に出ると会えます'}
+        {maxed ? '通いつめた' : action.label}
       </button>
     </section>
   )

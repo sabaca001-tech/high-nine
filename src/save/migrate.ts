@@ -27,7 +27,7 @@ import { autoSquad } from '@/core/player/squad'
 import { handSizeFor } from '@/core/types/season'
 import { emptyCareerStats } from '@/core/player/careerStats'
 import { createRivals, emptyRivalRecord } from '@/core/rival/rivals'
-import { emptyScouting } from '@/core/scout/scouting'
+import { createNationalTeam, emptyScouting } from '@/core/scout/scouting'
 import { createTraits } from '@/core/scout/scoutTraits'
 import { normalizeUniform } from '@/core/team/uniforms'
 import type { Month } from '@/core/types/game'
@@ -122,6 +122,9 @@ export function migrate(raw: unknown): GameState | null {
   }
   if (version < 26) {
     data = migrateV25ToV26(data)
+  }
+  if (version < 27) {
+    data = migrateV26ToV27(data)
   }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
@@ -681,6 +684,26 @@ function migrateV25ToV26(raw: Record<string, unknown>): Record<string, unknown> 
   })
 
   return { ...raw, version: 26, players }
+}
+
+/**
+ * v26 → v27
+ *  - scouting に nationalTeam（U15日本代表の30人）を追加
+ *
+ * 空配列で足すと今年度は代表が出ないままになるので、その場で選んでおく。
+ */
+function migrateV26ToV27(raw: Record<string, unknown>): Record<string, unknown> {
+  const scouting = isRecord(raw.scouting) ? raw.scouting : emptyScouting()
+  if (Array.isArray(scouting.nationalTeam)) return { ...raw, version: 27 }
+
+  const rng = createRng(typeof raw.rngState === 'number' ? raw.rngState : 1)
+  const year = typeof raw.year === 'number' ? raw.year : 1
+
+  return {
+    ...raw,
+    version: 27,
+    scouting: { ...scouting, nationalTeam: createNationalTeam(rng, year) },
+  }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

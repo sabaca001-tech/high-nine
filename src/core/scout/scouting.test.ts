@@ -5,8 +5,12 @@ import { findRegion } from '@/core/types/region'
 import { REPUTATION_INITIAL } from '@/core/types/season'
 import { scoutTripCost } from '@/core/shop/travel'
 import {
+  allProspects,
+  createNationalTeam,
   createProspects,
+  emptyScouting,
   MAX_APPROACHES,
+  NATIONAL_TEAM_SIZE,
   PROSPECTS_PER_REGION,
   prospectSkillName,
   successChance,
@@ -260,5 +264,104 @@ describe('触れ込みの特殊能力', () => {
     const withSkill = generate(42, 90).find((p) => p.skillId !== null)
     if (withSkill) expect(prospectSkillName(withSkill)).toBeTruthy()
     expect(prospectSkillName(make())).toBeNull()
+  })
+})
+
+
+describe('U15日本代表', () => {
+  const team = createNationalTeam(createRng(11), 3)
+
+  it('30人が選ばれる', () => {
+    expect(team).toHaveLength(NATIONAL_TEAM_SIZE)
+  })
+
+  it('全員に代表の印が付く', () => {
+    expect(team.every((prospect) => prospect.national === true)).toBe(true)
+  })
+
+  it('全国から集まる（1県に偏らない）', () => {
+    const regions = new Set(team.map((prospect) => prospect.regionId))
+    expect(regions.size).toBeGreaterThan(10)
+  })
+
+  it('県の候補より実力が担保されている', () => {
+    const local = createProspects(createRng(12), {
+      reputation: REPUTATION_INITIAL,
+      regionId: 'kanagawa',
+      trait: 'contact',
+      year: 3,
+      serial: 0,
+    })
+    const average = (list: { rating: number }[]) =>
+      list.reduce((sum, entry) => sum + entry.rating, 0) / list.length
+
+    expect(average(team)).toBeGreaterThan(average(local))
+    // 下限も高い。誰を選んでも一定以上
+    expect(Math.min(...team.map((p) => p.rating))).toBeGreaterThan(
+      Math.min(...local.map((p) => p.rating)),
+    )
+  })
+
+  it('素質の高い順に並ぶ', () => {
+    for (let i = 1; i < team.length; i++) {
+      expect(team[i].rating).toBeLessThanOrEqual(team[i - 1].rating)
+    }
+  })
+
+  it('年が違えば別の顔ぶれになる', () => {
+    const other = createNationalTeam(createRng(13), 4)
+    expect(other.map((p) => p.id)).not.toEqual(team.map((p) => p.id))
+  })
+})
+
+describe('代表の獲得率', () => {
+  const base = {
+    id: 'x',
+    name: 'テスト 一郎',
+    position: 'CF' as const,
+    isPitcher: false,
+    rating: 55,
+    regionId: 'kanagawa' as const,
+    approaches: 4,
+    skillId: null,
+    junior: {
+      team: 'A中学校',
+      best: '全国大会出場',
+      batting: { games: 20, average: 0.4, homeruns: 5 },
+      pitching: null,
+    },
+  }
+
+  it('同じ素質でも代表のほうが獲りにくい', () => {
+    const normal = successChance(base, 60)
+    const national = successChance({ ...base, national: true }, 60)
+    expect(national).toBeLessThan(normal)
+  })
+
+  it('評判が高いほど代表を獲れる', () => {
+    const weak = successChance({ ...base, national: true }, REPUTATION_INITIAL)
+    const strong = successChance({ ...base, national: true }, 95)
+    expect(strong).toBeGreaterThan(weak * 2)
+  })
+
+  it('弱小校でも通えばゼロにはならない', () => {
+    const chance = successChance({ ...base, national: true }, REPUTATION_INITIAL)
+    expect(chance).toBeGreaterThan(0.1)
+    expect(chance).toBeLessThan(0.3)
+  })
+
+  it('会いに行かなければ、ほぼ望みが無い', () => {
+    const chance = successChance({ ...base, national: true, approaches: 0 }, REPUTATION_INITIAL)
+    expect(chance).toBeLessThan(0.05)
+  })
+})
+
+describe('allProspects', () => {
+  it('代表も進路が決まる対象に含まれる', () => {
+    const state = {
+      ...emptyScouting(),
+      nationalTeam: createNationalTeam(createRng(21), 2),
+    }
+    expect(allProspects(state)).toHaveLength(NATIONAL_TEAM_SIZE)
   })
 })

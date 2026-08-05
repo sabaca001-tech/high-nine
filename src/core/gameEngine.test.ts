@@ -45,6 +45,7 @@ import { overallRating } from './player/rating'
 import {
   findScoutRegion,
   MAX_APPROACHES,
+  NATIONAL_TEAM_SIZE,
   PROSPECTS_PER_REGION,
   SCOUT_OPEN_MONTH,
   successChance,
@@ -2103,6 +2104,83 @@ describe('スカウト', () => {
       expect(result.schoolName).toBeTruthy()
       expect(result.regionName).toBeTruthy()
     }
+  })
+
+  it('U15代表は最初から30人見えている', () => {
+    const state = startedGame({ seed: 5100 })
+    expect(state.scouting.nationalTeam).toHaveLength(NATIONAL_TEAM_SIZE)
+    // 視察しなくても顔ぶれが分かる
+    expect(state.scouting.regions).toHaveLength(0)
+  })
+
+  it('代表に会いに行くと出張費がかかり、訪問回数が増える', () => {
+    const base = startedGame({ seed: 5101 })
+    const state: GameState = { ...base, month: SCOUT_OPEN_MONTH, funds: 200000 }
+    const target = state.scouting.nationalTeam[0]
+
+    const next = applyCommand(state, {
+      type: 'approachNationalProspect',
+      prospectId: target.id,
+    }).state
+
+    expect(next.funds).toBeLessThan(state.funds)
+    expect(next.scouting.nationalTeam[0].approaches).toBe(1)
+  })
+
+  it('部費が足りなければ代表には会えない', () => {
+    const base = startedGame({ seed: 5102 })
+    const state: GameState = { ...base, month: SCOUT_OPEN_MONTH, funds: 0 }
+    const target = state.scouting.nationalTeam[0]
+
+    const next = applyCommand(state, {
+      type: 'approachNationalProspect',
+      prospectId: target.id,
+    }).state
+    expect(next.scouting.nationalTeam[0].approaches).toBe(0)
+  })
+
+  it('解禁前は代表にも会えない', () => {
+    const base = startedGame({ seed: 5103 })
+    const state: GameState = { ...base, month: 6, funds: 200000 }
+    const target = state.scouting.nationalTeam[0]
+
+    const next = applyCommand(state, {
+      type: 'approachNationalProspect',
+      prospectId: target.id,
+    }).state
+    expect(next.scouting.nationalTeam[0].approaches).toBe(0)
+    expect(next.funds).toBe(state.funds)
+  })
+
+  it('会いに行っていない代表は報告に並ばない（30人ぶん流れない）', () => {
+    const state = startedGame({ seed: 5104 })
+    const next = playYear(state)
+    expect(next.pendingSeason!.scoutResults).toHaveLength(0)
+  })
+
+  it('会いに行った代表は報告に載る', () => {
+    const base = startedGame({ seed: 5105 })
+    let state: GameState = { ...base, month: SCOUT_OPEN_MONTH, funds: 400000 }
+    const target = state.scouting.nationalTeam[0]
+
+    state = applyCommand(state, {
+      type: 'approachNationalProspect',
+      prospectId: target.id,
+    }).state
+
+    const next = playYear(state)
+    const results = next.pendingSeason!.scoutResults
+    expect(results).toHaveLength(1)
+    expect(results[0].name).toBe(target.name)
+  })
+
+  it('年度が替わると代表も選び直される', () => {
+    const state = startedGame({ seed: 5106 })
+    const before = state.scouting.nationalTeam.map((p) => p.id)
+
+    const next = applyCommand(playYear(state), { type: 'advanceYear' }).state
+    expect(next.scouting.nationalTeam).toHaveLength(NATIONAL_TEAM_SIZE)
+    expect(next.scouting.nationalTeam.map((p) => p.id)).not.toEqual(before)
   })
 
   it('年度が替わると訪問の記録は消える', () => {
