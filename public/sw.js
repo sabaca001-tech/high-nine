@@ -9,20 +9,23 @@
  * `https://例.github.io/リポジトリ名/` というサブパスで配信されても、
  * この SW 自身の場所を基準に解決されるので壊れない。
  */
-const CACHE = 'hs-baseball-sim-v2'
+const CACHE = 'hs-baseball-sim-v3'
 /** オフラインでも起動できるよう、最低限これだけは先に入れておく */
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg']
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png']
 
 /** 配信されている場所（サブパス配信でも正しく解決するために使う） */
 const INDEX_URL = new URL('./index.html', self.location.href).href
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(SHELL))
-      .then(() => self.skipWaiting()),
-  )
+  // **待機したまま止まる。** ここで skipWaiting すると、
+  // 画面に古い JS が載ったまま新しい SW が配信を始めてしまう。
+  // 差し替えるのはページ側が「更新する」を選んだとき（SKIP_WAITING）
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)))
+})
+
+/** ページから「いま切り替えてよい」と言われたら差し替える */
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {

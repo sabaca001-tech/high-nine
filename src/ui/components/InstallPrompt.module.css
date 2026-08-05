@@ -1,0 +1,53 @@
+/*
+ * ホーム画面への追加の案内。
+ * タイトル画面の上部に出す。**セーブ枠の操作を邪魔しない高さ**に収める。
+ */
+.panel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--bg-panel);
+}
+
+.text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.steps {
+  font-size: 10px;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+
+.install {
+  flex: 0 0 auto;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.close {
+  flex: 0 0 auto;
+  width: var(--tap-min);
+  min-height: var(--tap-min);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}

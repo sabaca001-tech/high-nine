@@ -16,9 +16,23 @@ import { ShopScreen } from '@/ui/screens/ShopScreen'
 import { TournamentScreen } from '@/ui/screens/TournamentScreen'
 import { PlayerListScreen } from '@/ui/screens/PlayerListScreen'
 import { TitleScreen } from '@/ui/screens/TitleScreen'
+import { UpdateBanner } from '@/ui/components/UpdateBanner'
 
-/** 画面の出し分けだけを行う。ゲームロジックは書かない */
+/**
+ * 画面の出し分けだけを行う。ゲームロジックは書かない。
+ *
+ * 更新の案内だけは**どの画面でも出す**必要があるので、外側に重ねる。
+ */
 export default function App() {
+  return (
+    <>
+      <UpdateBanner />
+      <Screen />
+    </>
+  )
+}
+
+function Screen() {
   const screen = useGameStore((s) => s.screen)
   const game = useGameStore((s) => s.game)
 

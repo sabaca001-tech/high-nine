@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { InstallPrompt } from '@/ui/components/InstallPrompt'
 import { REPUTATION_GRADE_LABELS, reputationGrade } from '@/core/types/season'
 import type { GameState } from '@/core/types/game'
 import { useGameStore } from '@/state/useGameStore'
@@ -30,6 +31,9 @@ export function TitleScreen() {
       <span className={styles.logo}>⚾️</span>
       <h1 className={styles.title}>ハイスクール・ナイン</h1>
       <p className={styles.tagline}>3年間で、最高のチームをつくれ。</p>
+
+      {/* ホーム画面に追加できることは、案内しないと気づかれない */}
+      <InstallPrompt />
 
       <div className={styles.slots}>
         {slots.map(({ slot, state }) => (
