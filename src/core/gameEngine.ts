@@ -30,6 +30,7 @@ import { recruitFreshmen } from '@/core/season/graduation'
 import { applyCardCost, clamp } from '@/core/player/growth'
 import { addBatting, addPitching } from '@/core/player/careerStats'
 import { applyMatchGrowth } from '@/core/player/matchGrowth'
+import { fatigueAfterOuts, fatigueOf, recoveredFatigue } from '@/core/player/fatigue'
 import { matchReputationDelta, matchupLabel, teamRating } from '@/core/season/matchReputation'
 import type { MatchStage } from '@/core/player/matchGrowth'
 import {
@@ -1058,6 +1059,10 @@ function finishMatch(state: GameState): EngineResult {
       stats,
       trust: clamp(player.trust + trustGain, 0, 100),
       condition: clamp(player.condition - conditionCost, 0, 100),
+      // 投げたぶんだけ疲労が溜まる。抜けるのは日数（selectCard）
+      ...(pitching
+        ? { fatigue: fatigueAfterOuts(fatigueOf(player), pitching.outs) }
+        : {}),
     }
   })
 
@@ -1262,6 +1267,10 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     PRACTICE_DEFS[card.kind],
     managerConditionCost(state.managerId),
   )
+
+  // 投手の疲労は**進んだ日数**で抜ける。
+  // 月ごとに戻す体力と違い、大会の中1日でどれだけ回復するかが効くので日単位で扱う
+  players = recoverPitcherFatigue(players, to - from)
 
   // 自主練としてのコンバートは、どのマスに止まっても進む
   const converted = applyConvertTraining(players)
@@ -1812,7 +1821,11 @@ function advanceYear(state: GameState): EngineResult {
   )
   events.push(...april.events)
 
-  const nextLineup = repairLineup(state.lineup, april.players)
+  // 年度をまたげば腕は完全に戻る。前年の連投を翌年まで引きずらせない
+  const rested = april.players.map((player) =>
+    fatigueOf(player) === 0 ? player : { ...player, fatigue: 0 },
+  )
+  const nextLineup = repairLineup(state.lineup, rested)
   const { log, serial: nextSerial } = appendLog(state.log, events, serial)
 
   return {
@@ -1825,7 +1838,7 @@ function advanceYear(state: GameState): EngineResult {
       nationalsBerth: false,
       springBerth: false,
       phase: 'newSeason',
-      players: april.players,
+      players: rested,
       funds: april.funds,
       groundLevel: april.groundLevel,
       equipment: april.equipment,
@@ -1834,7 +1847,7 @@ function advanceYear(state: GameState): EngineResult {
       // スタメンを先に入れてから埋める（スタメンがベンチ外、という状態を作らない）
       squad: repairSquad(
         [...nextLineup.slots.map((slot) => slot.playerId), ...state.squad],
-        april.players,
+        rested,
       ),
       graduates,
       pendingSeason,
@@ -2126,6 +2139,22 @@ function approachNationalProspect(state: GameState, prospectId: string): EngineR
     },
     events,
   }
+}
+
+/**
+ * 進んだ日数ぶん、投手の疲労を抜く。
+ * 野手は疲労を持たないので触らない。
+ */
+function recoverPitcherFatigue(players: Player[], days: number): Player[] {
+  if (days <= 0) return players
+
+  return players.map((player) => {
+    const current = fatigueOf(player)
+    if (current === 0) return player
+
+    const next = recoveredFatigue(current, days)
+    return next === current ? player : { ...player, fatigue: next }
+  })
 }
 
 /**

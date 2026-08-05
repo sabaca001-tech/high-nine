@@ -126,6 +126,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 27) {
     data = migrateV26ToV27(data)
   }
+  if (version < 28) {
+    data = migrateV27ToV28(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -704,6 +707,22 @@ function migrateV26ToV27(raw: Record<string, unknown>): Record<string, unknown> 
     version: 27,
     scouting: { ...scouting, nationalTeam: createNationalTeam(rng, year) },
   }
+}
+
+/**
+ * v27 → v28
+ *  - Player に fatigue（投手の疲労）を追加
+ *
+ * 過去の登板ぶんは記録されていないので、全員0（万全）から始める。
+ */
+function migrateV27ToV28(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.players)) return { ...raw, version: 28 }
+
+  const players = raw.players.map((value) =>
+    isRecord(value) && typeof value.fatigue !== 'number' ? { ...value, fatigue: 0 } : value,
+  )
+
+  return { ...raw, version: 28, players }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

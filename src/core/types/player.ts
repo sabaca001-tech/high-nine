@@ -175,6 +175,12 @@ export type Player = {
   condition: number
   /** 残り離脱月数。0なら健康（MVPでは常に0） */
   injuryMonths: number
+  /**
+   * 投手の疲労 0〜100。**体力（condition）とは別物。**
+   * 投げたぶんだけ溜まり、日数で抜ける。連戦連投を咎めるための値で、
+   * 野手には溜まらない（`core/player/fatigue.ts`）。
+   */
+  fatigue?: number
   personality: Personality
   /**
    * 能力ごとの伸びやすさ。1.0が標準で、書かれていない能力は1.0。

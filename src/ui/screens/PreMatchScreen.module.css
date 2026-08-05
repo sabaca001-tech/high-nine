@@ -43,6 +43,19 @@
   white-space: nowrap;
 }
 
+/* 連投で疲れた先発への注意。ここで気づけないと、投げさせてから崩れる */
+.fatigue {
+  flex: 0 0 auto;
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--bad);
+  background: var(--bg-panel);
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+
 /* 主要操作は画面下部＝親指の届く範囲に置く（CLAUDE.md 3） */
 .controls {
   flex: 0 0 auto;

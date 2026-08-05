@@ -284,7 +284,10 @@ describe('特殊能力の影響', () => {
   })
 
   it('広角打法を持つと得点が増える', () => {
-    expect(averageRuns('power-hitter', 100)).toBeGreaterThan(averageRuns(null, 100))
+    // 1試合の得点は振れ幅が大きい。100試合では
+    // **先発が1人変わっただけで乱数の並びがずれて**逆転することがあるので、
+    // 差が安定して見える試合数まで増やす
+    expect(averageRuns('power-hitter', 400)).toBeGreaterThan(averageRuns(null, 400))
   })
 })
 
@@ -368,5 +371,55 @@ describe('大差の試合での交代', () => {
       if (Math.abs(result.finalScore.player - result.finalScore.opponent) > 1) continue
       expect(result.events.some((event) => event.text.includes('経験を積ませる'))).toBe(false)
     }
+  })
+})
+
+
+describe('大差の試合', () => {
+  /** こちらが大きく格上。序盤で試合が壊れる組み合わせ */
+  const LOPSIDED = -28
+
+  it('大差がつくと投手が交代する（先発が完投しない）', () => {
+    let blowouts = 0
+    let changed = 0
+
+    for (let seed = 1; seed < 80; seed++) {
+      const result = play(seed, LOPSIDED)
+      if (result.finalScore.player - result.finalScore.opponent < 7) continue
+
+      blowouts += 1
+      if (result.pitchingLines.length > 1) changed += 1
+    }
+
+    expect(blowouts).toBeGreaterThan(3)
+    // 大差の試合の多くで2人以上が投げている
+    expect(changed / blowouts).toBeGreaterThan(0.5)
+  })
+
+  it('大差では下級生の投手に経験が回る', () => {
+    let youthAppeared = false
+
+    for (let seed = 1; seed < 80 && !youthAppeared; seed++) {
+      const result = play(seed, LOPSIDED)
+      if (result.finalScore.player - result.finalScore.opponent < 7) continue
+      youthAppeared = result.events.some((event) => event.text.includes('経験を積ませる'))
+    }
+
+    expect(youthAppeared).toBe(true)
+  })
+
+  it('互角の相手との試合では、大差の交代がめったに起きない', () => {
+    // **最終スコアだけでは判定できない。** 途中で7点差がついてから
+    // 追い上げた試合もあるので、「起きない」ではなく「めったに起きない」を見る
+    let games = 0
+    let rested = 0
+
+    for (let seed = 1; seed < 80; seed++) {
+      const result = play(seed, 0)
+      games += 1
+      if (result.events.some((e) => e.text.includes('経験を積ませる'))) rested += 1
+    }
+
+    expect(rested / games).toBeLessThan(0.25)
   })
 })

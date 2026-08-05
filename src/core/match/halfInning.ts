@@ -12,6 +12,12 @@ import { isAvailable } from '@/core/types/player'
 import type { Half, MatchEventLog, PlayLog, PlayResult } from '@/core/types/match'
 import { isHit, outsOf, PLAY_RESULT_LABELS } from '@/core/types/match'
 import { misplacementPenalty } from '@/core/lineup/aptitude'
+import {
+  effectiveStamina,
+  FATIGUE_AVOID,
+  fatigueOf,
+  fatiguePenalty,
+} from '@/core/player/fatigue'
 import { simulateAtBat } from './simulateAtBat'
 import type { MatchTeam } from './teamState'
 import {
@@ -308,23 +314,49 @@ export function staminaCapacity(stamina: number): number {
 /**
  * 投手の消耗による能力倍率。
  * スタミナが切れてからも投げ続けられるが、そのぶん打たれる。
+ *
+ * **疲労（`fatigue`）は「スタミナの目減り」として効く。**
+ * 連投した投手は同じスタミナでも早く崩れ、さらに1人目の打者から少し球威が落ちる。
  */
 export function staminaFactor(pitcher: Player, faced: number): number {
-  const stamina = pitcher.pitching?.stamina ?? 20
+  const stamina = pitcher.pitching ? effectiveStamina(pitcher) : 20
   const over = Math.max(0, faced - staminaCapacity(stamina))
   // 鉄腕はバテにくい
   const rate = pitcher.skills.includes('ace-heart') ? 0.018 : 0.03
   // 下限0.5。球威も制球も半減するので、続投すれば確実に失点が増える
-  return Math.max(0.5, 1 - Math.min(0.5, over * rate))
+  const worn = Math.max(0.5, 1 - Math.min(0.5, over * rate))
+  return worn * fatiguePenalty(pitcher)
 }
 
 /** スタミナが切れた投手を降ろす目安 */
 const PITCHER_PULL_FACTOR = 0.96
 
-/** 消耗しきったら控え投手に交代する */
+/**
+ * 投手交代の判断。
+ *
+ * 1. 消耗しきったら代える（従来どおり）
+ * 2. **大差がついていたら、無事なうちに降ろして控えに投げさせる**
+ *
+ * 2を入れる前は、大量リードでもエースが最後まで投げ切っていた。
+ * 勝敗が決した試合で主戦を消耗させる理由は無く、
+ * 2番手以降に経験を積ませる機会も失われていた。
+ */
 function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
   const current = findPlayer(team, team.pitcherId)
   if (!current) return
+
+  if (isGarbageTime(team, ctx)) {
+    // 大差では**若い投手**を優先する。経験を積ませるのが目的なので、
+    // いちばん良い2番手ではなく下級生から出す
+    const youngster = availableRelievers(team, 'youth').find(
+      (player) => player.grade < current.grade,
+    )
+    if (youngster && !rng.chance(0.4)) {
+      changePitcher(team, youngster, ctx, '経験を積ませる')
+      return
+    }
+  }
+
   if (staminaFactor(current, team.faced) > PITCHER_PULL_FACTOR) return
 
   const reliever = availableRelievers(team)[0]
@@ -337,24 +369,42 @@ function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
   changePitcher(team, reliever, ctx)
 }
 
-/** まだ登板していない控え投手を、良い順に返す */
-export function availableRelievers(team: MatchTeam): Player[] {
+/**
+ * まだ登板していない控え投手を返す。
+ *
+ * 既定は「良い順」。`youth` を渡すと**下級生から**返す（大差の試合用）。
+ * どちらの並びでも、**疲れている投手は後ろに回す**。
+ * 連投で消耗した腕を真っ先に出すと、疲労を持たせた意味が無くなる。
+ */
+export function availableRelievers(team: MatchTeam, order: 'best' | 'youth' = 'best'): Player[] {
   const onField = new Set(team.lineup.slots.map((slot) => slot.playerId))
-  return team.players
-    .filter(
-      (p) =>
-        p.isPitcher &&
-        p.pitching &&
-        !team.usedPitchers.includes(p.id) &&
-        !team.retiredIds.includes(p.id) &&
-        !onField.has(p.id) &&
-        isAvailable(p),
+  const list = team.players.filter(
+    (p) =>
+      p.isPitcher &&
+      p.pitching &&
+      !team.usedPitchers.includes(p.id) &&
+      !team.retiredIds.includes(p.id) &&
+      !onField.has(p.id) &&
+      isAvailable(p),
+  )
+
+  const tired = (player: Player) => (fatigueOf(player) >= FATIGUE_AVOID ? 1 : 0)
+
+  if (order === 'youth') {
+    return list.sort(
+      (a, b) => tired(a) - tired(b) || a.grade - b.grade || pitcherValue(b) - pitcherValue(a),
     )
-    .sort((a, b) => pitcherValue(b) - pitcherValue(a))
+  }
+  return list.sort((a, b) => tired(a) - tired(b) || pitcherValue(b) - pitcherValue(a))
 }
 
 /** 投手を代える。降板した投手は退く */
-export function changePitcher(team: MatchTeam, reliever: Player, ctx: HalfContext): void {
+export function changePitcher(
+  team: MatchTeam,
+  reliever: Player,
+  ctx: HalfContext,
+  reason?: string,
+): void {
   const current = findPlayer(team, team.pitcherId)
   const slotIndex = team.lineup.slots.findIndex((slot) => slot.position === 'P')
   if (slotIndex < 0) return
@@ -370,7 +420,9 @@ export function changePitcher(team: MatchTeam, reliever: Player, ctx: HalfContex
     order,
     inning: ctx.inning,
     half: ctx.half,
-    text: `${team.isPlayer ? '' : `${team.name} `}投手交代 ${current?.name ?? ''} → ${reliever.name}`,
+    text: `${team.isPlayer ? '' : `${team.name} `}投手交代 ${current?.name ?? ''} → ${reliever.name}${
+      reason ? `（${reason}）` : ''
+    }`,
   })
 }
 
@@ -447,6 +499,19 @@ const GARBAGE_DIFF = 7
 const GARBAGE_MISPLACEMENT_MAX = 1.0
 
 /**
+ * 勝敗がほぼ決した場面か。
+ * 野手の入れ替えと投手交代で**同じ基準**を使う。
+ * 片方だけ緩いと「打線は控えなのにエースが投げ続けている」ことになる。
+ */
+export function isGarbageTime(team: MatchTeam, ctx: HalfContext): boolean {
+  const diff = team.runs - ctx.defenseTeam.runs
+  if (Math.abs(diff) < GARBAGE_DIFF) return false
+
+  const from = diff > 0 ? GARBAGE_FROM_INNING_AHEAD : GARBAGE_FROM_INNING_BEHIND
+  return ctx.inning >= from
+}
+
+/**
  * 大差がついた試合で、控えの下級生を出す。
  *
  * 代打の判断は「競った場面で打力の高い控えを出す」なので、
@@ -457,11 +522,7 @@ const GARBAGE_MISPLACEMENT_MAX = 1.0
  * ベンチ入りを決める判断に「誰を育てたいか」が乗るようになる。
  */
 function maybeRestStarter(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
-  const diff = team.runs - ctx.defenseTeam.runs
-  if (Math.abs(diff) < GARBAGE_DIFF) return
-
-  const from = diff > 0 ? GARBAGE_FROM_INNING_AHEAD : GARBAGE_FROM_INNING_BEHIND
-  if (ctx.inning < from) return
+  if (!isGarbageTime(team, ctx)) return
 
   const slotIndex = team.battingIndex
   const slot = team.lineup.slots[slotIndex]

@@ -1,6 +1,7 @@
 import { validateLineup } from '@/core/lineup/autoLineup'
 import { formatRecord, hasMet } from '@/core/rival/rivals'
 import { matchupLabel, teamRating } from '@/core/season/matchReputation'
+import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { LineupEditor } from './LineupScreen'
@@ -24,6 +25,10 @@ export function PreMatchScreen() {
   const school = setup.opponentSchoolId
     ? (game.rivals.find((rival) => rival.id === setup.opponentSchoolId) ?? null)
     : null
+
+  // スタメンの投手枠に入っている選手＝この試合の先発
+  const starterId = game.lineup.slots.find((slot) => slot.position === 'P')?.playerId
+  const starter = game.players.find((player) => player.id === starterId) ?? null
 
   const problems = validateLineup(game.lineup, game.players)
   const ready = problems.length === 0
@@ -68,6 +73,17 @@ export function PreMatchScreen() {
                   : '引き分け'}
             </span>
           )}
+        </p>
+      )}
+
+      {/*
+        先発予定の投手が疲れていないか。連戦の最中は、
+        **ここで気づいて代えられる**ようにしておく必要がある
+      */}
+      {starter && fatigueOf(starter) >= 15 && (
+        <p className={styles.fatigue}>
+          先発 {starter.name} は{FATIGUE_LABELS[fatigueLevel(starter)]}（{fatigueOf(starter)}）。
+          このまま投げると早く崩れます
         </p>
       )}
 

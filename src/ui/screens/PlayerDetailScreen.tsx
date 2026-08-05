@@ -11,6 +11,7 @@ import {
 } from '@/core/player/trainingFocus'
 import type { TrainingFocus } from '@/core/player/trainingFocus'
 import { effectOf } from '@/core/player/personality'
+import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
 import { overallRating, toRank, trajectoryStars } from '@/core/player/rating'
 import { findSkill } from '@/core/skill/skillDefs'
@@ -195,6 +196,18 @@ function AbilityTab({ player }: { player: Player }) {
             <span className={styles.statusLabel}>状態</span>
             <span className={styles.injured}>
               怪我で離脱中（あと{player.injuryMonths}ヶ月）
+            </span>
+          </div>
+        )}
+        {/*
+          投手の疲労は体力とは別物。連投すると同じスタミナでも早く崩れるので、
+          次に投げさせるかどうかの判断材料としてここに出す
+        */}
+        {player.isPitcher && (
+          <div className={styles.statusRow}>
+            <span className={styles.statusLabel}>肩の状態</span>
+            <span className={fatigueOf(player) >= 40 ? styles.injured : undefined}>
+              {FATIGUE_LABELS[fatigueLevel(player)]}（{fatigueOf(player)}）
             </span>
           </div>
         )}

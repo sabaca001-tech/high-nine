@@ -1710,6 +1710,85 @@ describe('怪我と離脱', () => {
   })
 })
 
+describe('投手の疲労', () => {
+  /** 練習試合を1つ消化した状態を作る */
+  function afterMatch(seed: number): GameState {
+    const base = startedGame({ seed })
+    const state: GameState = {
+      ...base,
+      board: base.board.map((cell, index) =>
+        index === 3 ? { index, kind: 'match' as const } : cell,
+      ),
+      hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
+      boardPosition: 0,
+    }
+    const stopped = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    return applyCommand(runMatch(stopped), { type: 'finishMatch' }).state
+  }
+
+  it('投げた投手に疲労が溜まる', () => {
+    const next = afterMatch(6001)
+    const tired = next.players.filter((player) => (player.fatigue ?? 0) > 0)
+
+    expect(tired.length).toBeGreaterThan(0)
+    expect(tired.every((player) => player.isPitcher)).toBe(true)
+  })
+
+  it('野手には疲労が溜まらない', () => {
+    const next = afterMatch(6002)
+    expect(next.players.filter((p) => !p.isPitcher).every((p) => (p.fatigue ?? 0) === 0)).toBe(true)
+  })
+
+  it('日が進むと抜ける', () => {
+    const after = afterMatch(6003)
+    const before = after.players.map((p) => p.fatigue ?? 0)
+    expect(Math.max(...before)).toBeGreaterThan(0)
+
+    // 何も起きないマスだけにして、5日ぶん進める
+    const state: GameState = {
+      ...after,
+      phase: 'cardSelect',
+      board: after.board.map((cell) =>
+        cell.kind === 'goal' ? cell : { index: cell.index, kind: 'blank' as const },
+      ),
+      hand: after.hand.map((card) => ({ ...card, number: 5 as const })),
+    }
+    const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+
+    const total = (s: GameState) => s.players.reduce((sum, p) => sum + (p.fatigue ?? 0), 0)
+    expect(total(next)).toBeLessThan(total(after))
+  })
+
+  it('年度をまたぐと完全に戻る', () => {
+    const after = afterMatch(6004)
+    const withTired = {
+      ...after,
+      players: after.players.map((p) => (p.isPitcher ? { ...p, fatigue: 90 } : p)),
+    }
+    const next = applyCommand(playYear(withTired), { type: 'advanceYear' }).state
+    expect(next.players.every((p) => (p.fatigue ?? 0) === 0)).toBe(true)
+  })
+
+  it('おまかせ編成は疲れた投手を先発から外す', () => {
+    const base = startedGame({ seed: 6005 })
+    const pitchers = base.players.filter((p) => p.isPitcher)
+    expect(pitchers.length).toBeGreaterThan(1)
+
+    // いちばん良い投手だけ消耗させる
+    const ace = [...pitchers].sort(
+      (a, b) => (b.pitching?.stamina ?? 0) - (a.pitching?.stamina ?? 0),
+    )[0]
+    const state: GameState = {
+      ...base,
+      players: base.players.map((p) => (p.id === ace.id ? { ...p, fatigue: 80 } : p)),
+    }
+
+    const next = applyCommand(state, { type: 'autoLineup' }).state
+    const starterId = next.lineup.slots.find((slot) => slot.position === 'P')?.playerId
+    expect(starterId).not.toBe(ace.id)
+  })
+})
+
 describe('ルート分岐', () => {
   /** 分岐マスに止まった状態を作る */
   function reachFork(seed: number): GameState {

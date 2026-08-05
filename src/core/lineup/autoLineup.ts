@@ -6,6 +6,8 @@ import { isAvailable } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, defenseScore, POSITION_WEIGHT } from './aptitude'
 import { overallRating } from '@/core/player/rating'
+import { FATIGUE_AVOID, FATIGUE_MAX, fatigueOf } from '@/core/player/fatigue'
+import { pitcherValue } from '@/core/match/teamState'
 
 /**
  * 守備位置を埋める順番。
@@ -57,18 +59,35 @@ function fitFor(plan: AutoLineupPlan, player: Player, position: Position): numbe
   const hitting = player.batting.meet * 0.55 + player.batting.power * 0.45
   const overall = overallRating(player)
 
+  const youth = plan === 'youth' ? (3 - player.grade) * 22 : 0
+
+  // **投手枠は投球能力で決める。**
+  // 守備適性と打力で選んでいたので、球威も制球も見ずに
+  // 「打てる投手」が先発になっていた。
+  // さらに疲労を織り込む。連投明けのエースより、休んでいる2番手のほうが計算が立つ
+  if (position === 'P') {
+    const rest = 1 - (fatigueOf(player) / FATIGUE_MAX) * FATIGUE_PICK_WEIGHT
+    return pitcherValue(player) * rest + youth
+  }
+
   switch (plan) {
     case 'ability':
       // 総合を主に見つつ、守れない位置は避ける
       return overall * 1.2 + defense * 0.5
     case 'youth':
       // 下級生を大きく優遇する。3年生は夏で抜けるので伸ばす価値が薄い
-      return defense * 0.7 + hitting * 0.3 + (3 - player.grade) * 22
+      return defense * 0.7 + hitting * 0.3 + youth
     case 'balanced':
     default:
       return defense * 0.7 + hitting * 0.3
   }
 }
+
+/**
+ * 先発を選ぶときに疲労をどれだけ嫌うか。
+ * 疲労50でおよそ3割引き。エースを休ませて2番手を立てる判断が自然に出る強さ。
+ */
+const FATIGUE_PICK_WEIGHT = 0.6
 
 /**
  * スタメンを自動で組む。
@@ -88,10 +107,17 @@ export function autoLineup(players: Player[], plan: AutoLineupPlan = 'balanced')
     if (candidates.length === 0) break
 
     // 投手だけは投手能力を持つ選手に限る（誰でも投げられては困る）
-    const eligible =
+    let eligible =
       position === 'P' && candidates.some((p) => p.pitching)
         ? candidates.filter((p) => p.pitching)
         : candidates
+
+    // 連投で消耗した投手は先発から外す。**投げられる者が他に居るときだけ。**
+    // 全員疲れている日もあるので、絞り切って0人にはしない
+    if (position === 'P') {
+      const fresh = eligible.filter((p) => fatigueOf(p) < FATIGUE_AVOID)
+      if (fresh.length > 0) eligible = fresh
+    }
 
     const best = eligible.reduce((a, b) =>
       fitFor(plan, b, position) > fitFor(plan, a, position) ? b : a,

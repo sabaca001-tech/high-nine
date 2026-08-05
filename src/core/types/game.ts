@@ -60,8 +60,9 @@ import type { Tournament } from './tournament'
  * v25 → v26: Player に growthAptitude（能力ごとの伸びやすさ）を追加。
  *            練習の結果が選手ごとに変わるようになった。
  * v26 → v27: scouting に nationalTeam（U15日本代表の30人）を追加。
+ * v27 → v28: Player に fatigue（投手の疲労）を追加。連投でパフォーマンスが落ちる。
  */
-export const SAVE_VERSION = 27
+export const SAVE_VERSION = 28
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
