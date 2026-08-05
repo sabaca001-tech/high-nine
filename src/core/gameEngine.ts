@@ -25,7 +25,7 @@ import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { PracticeSpecial } from '@/core/card/cardDefs'
 import { drawHand, replaceBrokenCards, replaceCard } from '@/core/card/drawCards'
 import { autoLineup, repairLineup, validateLineup } from '@/core/lineup/autoLineup'
-import { createInitialRoster, createPlayer } from '@/core/player/createPlayer'
+import { createInitialRoster, createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
 import { recruitFreshmen } from '@/core/season/graduation'
 import { applyCardCost, clamp } from '@/core/player/growth'
 import { addBatting, addPitching } from '@/core/player/careerStats'
@@ -1898,8 +1898,11 @@ function resolveScouting(
         grade: 1,
         enrolledAt: { year, month: SEASON_START_MONTH },
         isPitcher: prospect.isPitcher,
-        // スカウトした選手は素質どおりの能力で入学する
-        talentBonus: prospect.rating - 34,
+        // スカウトした選手は**素質どおりの能力**で入学する。
+        // 34を引いていた頃は、素質34と書いてあった選手が
+        // 総合22（＝ごく普通の新入生）で入ってきていた。
+        // カードに出す数字と実際が食い違うと、通う判断そのものが成り立たない
+        talentBonus: prospect.rating - GRADE_BASE[1],
         takenNames: state.players.map((p) => p.name),
       })
       // 触れ込みの特殊能力を持って入学してくる。ここがスカウトの意味
@@ -1958,7 +1961,7 @@ function resolveScouting(
  * 他校の注目選手として残す素質の下限。
  * 全員を抱えさせるとセーブが膨らむので、覚えておく価値のある選手だけにする。
  */
-const RIVAL_STAR_MIN_RATING = 50
+const RIVAL_STAR_MIN_RATING = 56
 
 /**
  * スカウトで県を訪問する。

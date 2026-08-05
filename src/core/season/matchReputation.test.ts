@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { autoLineup } from '@/core/lineup/autoLineup'
-import { createInitialRoster } from '@/core/player/createPlayer'
+import { createInitialRoster, GRADE_BASE } from '@/core/player/createPlayer'
 import {
   matchReputationDelta,
   matchupLabel,
+  OPPONENT_BASE_RATING,
   opponentRating,
   teamRating,
 } from './matchReputation'
@@ -25,7 +26,18 @@ describe('teamRating', () => {
 })
 
 describe('matchReputationDelta', () => {
-  const our = 40
+  /**
+   * 自校の評価を「互角の相手」に合わせておく。
+   * 数字を直に書くと、`OPPONENT_BASE_RATING`（＝互角の基準）を動かしたときに
+   * 意図しない格差が入り込んで落ちる（実際に落ちた）。
+   */
+  const our = OPPONENT_BASE_RATING
+
+  it('互角の基準が createPlayer の GRADE_BASE と揃っている', () => {
+    // 相手は各学年5人ずつ。その平均が「強さ0」の相手の総合になる
+    const average = (GRADE_BASE[1] + GRADE_BASE[2] + GRADE_BASE[3]) / 3
+    expect(OPPONENT_BASE_RATING).toBe(Math.round(average))
+  })
 
   it('引き分けは動かない', () => {
     expect(
@@ -70,7 +82,7 @@ describe('matchReputationDelta', () => {
 
   it('格上に負けても致命的ではない', () => {
     const toGiant = matchReputationDelta({ outcome: 'lose', ourRating: our, opponentStrength: 40 })
-    const toEqual = matchReputationDelta({ outcome: 'lose', ourRating: our, opponentStrength: 3 })
+    const toEqual = matchReputationDelta({ outcome: 'lose', ourRating: our, opponentStrength: 0 })
 
     expect(toGiant).toBeGreaterThan(toEqual)
   })

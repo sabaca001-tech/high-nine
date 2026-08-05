@@ -26,10 +26,12 @@ const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
  * **増えた回数ぶんをここで割り戻す**。カードの数字を全部書き換えるより、
  * 盤面の刻みを変えたときにここ1か所を直すほうが追いやすい。
  *
- * 計算上は 13.4 / 61 ≒ 0.22 だが、それだと以前より伸びが鈍かったので
- * 実測しながら 0.25 に上げてある。変えたら必ず seasonBalance.test.ts を回すこと。
+ * 計算上は 13.4 / 61 ≒ 0.22。そこから実測で調整している。
+ * **入学時の能力（`GRADE_BASE`）を上げたぶん、ここを下げてある。**
+ * 「低いところから大きく伸ばす」より「良い素材を採って仕上げる」ゲームにしたい。
+ * 変えたら必ず seasonBalance.test.ts を回すこと。
  */
-export const PRACTICE_GROWTH_SCALE = 0.25
+export const PRACTICE_GROWTH_SCALE = 0.19
 
 /**
  * カード1枚あたりの体力・信頼度の倍率。

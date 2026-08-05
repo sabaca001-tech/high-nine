@@ -16,12 +16,12 @@ import { overallRating } from '@/core/player/rating'
 /**
  * 相手チームの平均総合。
  *
- * 相手は `createOpponent` が各学年5人ずつ、`GRADE_BASE`（22/38/52）に
- * `opponentStrength` を足して作る。その平均が (22+38+52)/3 ＝ 37 なので、
- * **37 + 強さ** が相手の総合評価になる。
+ * 相手は `createOpponent` が各学年5人ずつ、`GRADE_BASE`（28/43/55）に
+ * `opponentStrength` を足して作る。その平均が (28+43+55)/3 ＝ 42 なので、
+ * **42 + 強さ** が相手の総合評価になる。
  * ここが `createPlayer` の `GRADE_BASE` と食い違うと格付けがずれる。
  */
-export const OPPONENT_BASE_RATING = 37
+export const OPPONENT_BASE_RATING = 42
 
 export function opponentRating(opponentStrength: number): number {
   return OPPONENT_BASE_RATING + opponentStrength

@@ -161,8 +161,11 @@ const NATIONAL_PENALTY = 0.3
 
 const FIELDER_POSITIONS: Position[] = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
 
-/** 金特の触れ込みが付く素質の下限。飛び抜けた選手だけ */
-const GOLD_SKILL_MIN_RATING = 58
+/**
+ * 金特の触れ込みが付く素質の下限。飛び抜けた選手だけ。
+ * 素質の水準を上げたので、ここも上げないと代表がほぼ全員金特持ちになる。
+ */
+const GOLD_SKILL_MIN_RATING = 64
 
 /** 金特が付く確率（上の条件を満たしたとき） */
 const GOLD_SKILL_CHANCE = 0.25
@@ -230,7 +233,7 @@ export function createProspects(
     names.push(name)
 
     // 評判が高いほど上澄みが来る。素材型の県はさらに素質だけ高い
-    const base = 34 + Math.round((params.reputation - REPUTATION_INITIAL) * 0.18)
+    const base = LOCAL_BASE + Math.round((params.reputation - REPUTATION_INITIAL) * 0.18)
     const raw = params.trait === 'raw' ? RAW_RATING_BONUS : 0
     const rating = clampRating(base + rng.int(-10, 14) + raw)
 
@@ -250,6 +253,13 @@ export function createProspects(
   // 良い選手から並べる。10人を素のまま出すと読むのがつらい
   return prospects.sort((a, b) => b.rating - a.rating)
 }
+
+/**
+ * 県の候補の素質の中心（評判20のとき）。
+ * 通常の新入生（`GRADE_BASE[1]` ＝ 28）より上に置く。
+ * ここが同じだと、出張費を払って通う意味が無い。
+ */
+const LOCAL_BASE = 38
 
 /**
  * U15日本代表の30人を作る。**年度の初めに一度だけ。**
@@ -292,9 +302,12 @@ export function createNationalTeam(rng: Rng, year: number): Prospect[] {
 
 /**
  * 代表選手の素質の中心。
- * 県ごとの候補（評判20で中心34）より一段上に置く。
+ *
+ * 県ごとの候補（評判20で中心38）より**はっきり上**に置く。
+ * 近づけると「代表を狙う理由」が獲得率の低さに見合わなくなる。
+ * 1年生でいきなり3年生（`GRADE_BASE[3]` ＝ 55）を上回る素材。
  */
-const NATIONAL_BASE = 50
+const NATIONAL_BASE = 60
 
 /** 中学の成績を作る。素質と噛み合った数字にする */
 function rollJuniorStats(rng: Rng, isPitcher: boolean, rating: number): JuniorStats {
