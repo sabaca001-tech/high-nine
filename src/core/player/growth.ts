@@ -9,13 +9,40 @@ import type { Rng } from '@/core/rng/random'
 import type { PracticeDef, PracticeGain } from '@/core/card/cardDefs'
 import { RARE_MULTIPLIER } from '@/core/card/cardDefs'
 import type { AbilityChange, GrowableKey, Grade, Motivation, Player } from '@/core/types/player'
-import { ABILITY_MAX, ABILITY_MIN, isAvailable } from '@/core/types/player'
+import {
+  ABILITY_MAX,
+  ABILITY_MIN,
+  isAvailable,
+  VELOCITY_MAX,
+  VELOCITY_MIN,
+  velocityScore,
+} from '@/core/types/player'
 import { effectOf } from './personality'
 import { improvePitches } from './pitchDefs'
 import { focusMultiplier } from './trainingFocus'
 
-/** 投手能力に属するキー */
+/** 投手能力に属するキー（球速は尺度が違うので別扱い） */
 const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
+
+/**
+ * 投手の肩力は球速に比例させる。
+ *
+ * 速い球を投げる腕が、送球だけ弱いということは無い。
+ * 球速が伸びたら肩力も一緒に上がるので、**投手の肩力は独立して育てない**。
+ */
+export function armFromVelocity(velocity: number): number {
+  return Math.round(Math.min(ABILITY_MAX, Math.max(ABILITY_MIN, velocityScore(velocity) + 5)))
+}
+
+/**
+ * 球速1km/h ぶんの「能力値換算」。
+ *
+ * カード定義の `amount` は1〜100の能力を想定した値なので、
+ * そのまま km/h に足すと球速だけ極端に伸びる。
+ * 100点ぶんの尺度が35km/h（`velocityScore`）なので 0.35 が等価。
+ * そこから**少し多めに**して、球速が伸びる手応えを出している。
+ */
+const VELOCITY_GAIN_RATE = 0.45
 
 /**
  * 練習1回あたりの倍率。
@@ -266,7 +293,10 @@ function roundRandom(rng: Rng, value: number): number {
 /** その選手がこの効果の対象かどうか */
 function isTargetOf(player: Player, gain: PracticeGain): boolean {
   // 投手能力は投手にしか存在しない
+  if (gain.key === 'velocity' && !player.pitching) return false
   if (PITCHING_KEYS.includes(gain.key) && !player.isPitcher) return false
+  // 投手の肩力は球速に連動するので、練習で直接は動かさない
+  if (gain.key === 'arm' && player.pitching) return false
 
   if (gain.target === 'pitcher') return player.isPitcher
   if (gain.target === 'batter') return !player.isPitcher
@@ -291,8 +321,13 @@ function calcGrowth(
   const current = getAbility(player, gain.key)
   if (current === null) return 0
 
+  // 球速だけ尺度が違う。伸びにくさの判定も km/h ではなく0〜100に直して見る
+  const isVelocity = gain.key === 'velocity'
+  const scaled = isVelocity ? velocityScore(current) : current
+
   const raw =
     gain.amount *
+    (isVelocity ? VELOCITY_GAIN_RATE : 1) *
     PRACTICE_GROWTH_SCALE *
     // 得意な能力は伸び、苦手な能力はほとんど動かない。
     // ここが無いと、他の補正が丸めで潰れて全員が同じ「+1」になる
@@ -300,7 +335,7 @@ function calcGrowth(
     motivationMultiplierFor(player) *
     GRADE_MULTIPLIER[player.grade] *
     conditionMultiplierFor(player) *
-    diminishingMultiplier(current) *
+    diminishingMultiplier(scaled) *
     effectOf(player.personality).growth *
     rareMultiplier
 
@@ -311,6 +346,7 @@ function calcGrowth(
 
 /** 能力値を取得する。その選手が持たない能力なら null */
 export function getAbility(player: Player, key: GrowableKey): number | null {
+  if (key === 'velocity') return player.pitching?.velocity ?? null
   if (PITCHING_KEYS.includes(key)) {
     if (!player.pitching) return null
     return player.pitching[key as 'control' | 'stamina' | 'breaking']
@@ -329,6 +365,21 @@ export function raiseAbility(
 ): { player: Player; change: AbilityChange | null } {
   const before = getAbility(player, key)
   if (before === null) return { player, change: null }
+
+  // 球速は km/h。1〜100ではないので専用の範囲で丸め、肩力も連れて動かす
+  if (key === 'velocity') {
+    const after = clamp(before + delta, VELOCITY_MIN, VELOCITY_MAX)
+    if (after === before) return { player, change: null }
+
+    return {
+      player: {
+        ...player,
+        pitching: { ...player.pitching!, velocity: after },
+        batting: { ...player.batting, arm: armFromVelocity(after) },
+      },
+      change: { playerId: player.id, key, before, after },
+    }
+  }
 
   const after = clamp(before + delta, ABILITY_MIN, ABILITY_MAX)
   if (after === before) return { player, change: null }

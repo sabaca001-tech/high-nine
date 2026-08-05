@@ -40,7 +40,7 @@ export const GROWTH_RANGE_LABELS: Record<GrowthRange, string> = {
   month: '直近1ヶ月',
 }
 
-/** 比べたい能力（弾道と球速は伸び方が特殊なので外す） */
+/** 比べたい能力（弾道だけは伸び方が特殊なので外す） */
 const KEYS: GrowableKey[] = [
   'meet',
   'power',
@@ -48,6 +48,7 @@ const KEYS: GrowableKey[] = [
   'arm',
   'fielding',
   'catching',
+  'velocity',
   'control',
   'stamina',
   'breaking',
@@ -60,6 +61,7 @@ function valueOf(snapshot: AbilitySnapshot, key: GrowableKey): number | undefine
 
 /** いまの能力値 */
 function currentOf(player: Player, key: GrowableKey): number | undefined {
+  if (key === 'velocity') return player.pitching?.velocity
   if (key === 'control' || key === 'stamina' || key === 'breaking') {
     return player.pitching?.[key]
   }

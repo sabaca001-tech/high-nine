@@ -1,4 +1,5 @@
 import type { Player } from '@/core/types/player'
+import { velocityScore } from '@/core/types/player'
 import styles from './AbilityRadar.module.css'
 
 /**
@@ -19,12 +20,6 @@ const RADIUS = 33
 
 type RadarAxis = { label: string; value: number }
 
-/** 球速(km/h)を他の能力と同じ 1〜100 の尺度に直す */
-function velocityToScale(velocity: number): number {
-  // 110km/h で0、160km/h で100
-  return Math.max(0, Math.min(100, ((velocity - 110) / 50) * 100))
-}
-
 /** その選手のレーダーの軸を決める */
 function axesOf(player: Player): RadarAxis[] {
   const b = player.batting
@@ -32,12 +27,14 @@ function axesOf(player: Player): RadarAxis[] {
   if (player.pitching) {
     const p = player.pitching
     return [
-      { label: '球速', value: velocityToScale(p.velocity) },
+      // 投手は打撃で評価しない。守備位置としての動きを見たいので走力を入れる。
+      // 肩力は球速に比例する（growth.ts の armFromVelocity）ので軸にしない
+      { label: '球速', value: velocityScore(p.velocity) },
       { label: '制球', value: p.control },
       { label: '変化', value: p.breaking },
       { label: 'スタミナ', value: p.stamina },
       { label: '守備', value: b.fielding },
-      { label: '打撃', value: Math.round((b.meet + b.power) / 2) },
+      { label: '走力', value: b.speed },
     ]
   }
 

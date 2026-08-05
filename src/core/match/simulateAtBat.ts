@@ -9,6 +9,7 @@
 import type { Rng } from '@/core/rng/random'
 import { effectOf } from '@/core/player/personality'
 import type { Motivation, Player } from '@/core/types/player'
+import { velocityScore } from '@/core/types/player'
 import type { PlayResult } from '@/core/types/match'
 
 export type AtBatContext = {
@@ -45,13 +46,16 @@ function trustFactor(trust: number): number {
   return 0.95 + (trust / 100) * 0.1
 }
 
+/**
+ * 球威に占める球速の比重。
+ *
+ * 0.55にしていた頃は、球速が伸びても打たれ方がほとんど変わらず、
+ * **球速を上げる意味が薄かった**。速球はそれだけで打者を差し込む。
+ */
+const VELOCITY_WEIGHT = 0.7
+
 function has(player: Player, skillId: string): boolean {
   return player.skills.includes(skillId)
-}
-
-/** 球速(km/h) を 0〜100 に正規化する */
-function velocityScore(velocity: number): number {
-  return clamp(((velocity - 115) / 45) * 100, 0, 100)
 }
 
 export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
@@ -98,7 +102,9 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
 
   // 投手能力を持たない選手が登板した場合は極端に弱くする
   let stuff = pitching
-    ? (velocityScore(pitching.velocity) * 0.55 + pitching.breaking * 0.45) * pitcherBoost
+    ? (velocityScore(pitching.velocity) * VELOCITY_WEIGHT +
+        pitching.breaking * (1 - VELOCITY_WEIGHT)) *
+      pitcherBoost
     : 20
   let control = pitching ? pitching.control * pitcherBoost : 20
   let strikeoutBonus = 0

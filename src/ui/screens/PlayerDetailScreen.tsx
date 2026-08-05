@@ -180,7 +180,12 @@ function AbilityTab({ player }: { player: Player }) {
         <AbilityRow label={ABILITY_LABELS.meet} value={b.meet} />
         <AbilityRow label={ABILITY_LABELS.power} value={b.power} />
         <AbilityRow label={ABILITY_LABELS.speed} value={b.speed} />
-        <AbilityRow label={ABILITY_LABELS.arm} value={b.arm} />
+        {/* 投手の肩力は球速に比例するので、独立して育てられないことを添える */}
+        <AbilityRow
+          label={ABILITY_LABELS.arm}
+          value={b.arm}
+          note={player.pitching ? '球速に比例' : undefined}
+        />
         <AbilityRow label={ABILITY_LABELS.fielding} value={b.fielding} />
         <AbilityRow label={ABILITY_LABELS.catching} value={b.catching} />
       </section>
@@ -521,13 +526,25 @@ function TrainingTab({ player }: { player: Player }) {
 }
 
 /** 能力1行。ランク・ゲージ・数値をまとめて出す */
-function AbilityRow({ label, value }: { label: string; value: number }) {
+function AbilityRow({
+  label,
+  value,
+  /** 「球速に比例」のような但し書き */
+  note,
+}: {
+  label: string
+  value: number
+  note?: string
+}) {
   const rank = toRank(value)
   const color = rankColorOf(rank)
 
   return (
     <div className={styles.abilityRow}>
-      <span className={styles.abilityLabel}>{label}</span>
+      <span className={styles.abilityLabel}>
+        {label}
+        {note && <span className={styles.abilityNote}>{note}</span>}
+      </span>
       <span className={styles.abilityRank} style={{ color }}>
         {rank}
       </span>

@@ -368,6 +368,13 @@
   white-space: nowrap;
 }
 
+/* 「球速に比例」のような但し書き。ラベルの後ろに小さく添える */
+.abilityNote {
+  margin-left: var(--sp-1);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
 .abilityRank {
   font-size: var(--fs-lg);
   font-weight: 800;

@@ -325,7 +325,8 @@ function rollJuniorStats(rng: Rng, isPitcher: boolean, rating: number): JuniorSt
       pitching: {
         games: rng.int(8, 24),
         era: round2(clamp(4.6 - (rating - 34) * 0.06 + (rng.float() - 0.5) * 1.2, 0.3, 6.5)),
-        velocity: Math.round(clamp(112 + (rating - 34) * 0.55 + rng.int(-4, 4), 105, 148)),
+        // 高校の球速と同じ尺度で出す（createPlayer の velocityFor に合わせる）
+        velocity: Math.round(clamp(110 + rating * 0.5 + rng.int(-3, 3), 105, 150)),
       },
     }
   }

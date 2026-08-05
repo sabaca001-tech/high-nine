@@ -1,6 +1,7 @@
 /** 能力値の表示・評価に関する変換 */
 
 import type { Player } from '@/core/types/player'
+import { velocityScore } from '@/core/types/player'
 
 /** F〜S のランク表記 */
 export type Rank = 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
@@ -40,10 +41,10 @@ export function trajectoryStars(trajectory: number): string {
 export function overallRating(player: Player): number {
   if (player.isPitcher && player.pitching) {
     const p = player.pitching
-    // 球速は 120〜160km/h を 0〜100 に正規化して扱う
-    const velocityScore = clamp01((p.velocity - 120) / 40) * 100
+    // 球速の尺度は types/player.ts に一本化してある。
+    // 判定（simulateAtBat）と総合で別々の式を持つと、同じ球速が違う意味になる
     const score =
-      velocityScore * 0.3 + p.control * 0.25 + p.stamina * 0.2 + p.breaking * 0.25
+      velocityScore(p.velocity) * 0.4 + p.control * 0.22 + p.stamina * 0.16 + p.breaking * 0.22
     return Math.round(score)
   }
 
@@ -58,6 +59,3 @@ export function overallRating(player: Player): number {
   return Math.round(score)
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value))
-}

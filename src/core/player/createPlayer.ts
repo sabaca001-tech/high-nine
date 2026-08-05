@@ -4,6 +4,7 @@ import type { Rng } from '@/core/rng/random'
 import { createAptitudes } from '@/core/lineup/aptitude'
 import { rollInitialPitches } from './pitchDefs'
 import { snapshotOf } from '@/core/types/player'
+import { armFromVelocity } from './growth'
 import { emptyCareerStats } from './careerStats'
 import type {
   Grade,
@@ -130,6 +131,18 @@ export const GRADE_BASE: Record<Grade, number> = {
 const TALENT_SPREAD = 16
 
 /**
+ * 球速（km/h）。素質（base）が速さになる。
+ *
+ * **実際の高校生の帯に収める。** `velocityScore` の逆算で置いていた頃は
+ * 素質の高い3年生が154km/hに達し、プロでも稀な球速になっていた。
+ *  平均的な1年（base36）で129km/h、平均的な3年（base50）で139km/h、
+ *  素質に恵まれた3年（base66）で147km/h。
+ */
+function velocityFor(rng: Rng, base: number, grade: Grade): number {
+  return Math.round(110 + clampAbility(base) * 0.5 + grade * 1.2 + rng.int(-3, 3))
+}
+
+/**
  * 能力ごとのばらつき幅（±）。
  * こちらは「打撃は良いが守備は苦手」といった凸凹を作るためのもの。
  * 素質の差（`TALENT_SPREAD`）と役割が違う。
@@ -206,13 +219,14 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
       meet: isPitcher ? clampAbility(ability() - 12) : ability(),
       power: isPitcher ? clampAbility(ability() - 12) : ability(),
       speed: ability(),
+      // 投手の肩力は球速から導く（下で上書きする）
       arm: ability(),
       fielding: ability(),
       catching: ability(),
     },
     pitching: isPitcher
       ? {
-          velocity: 118 + rng.int(0, 14) + Math.round(talentBonus * 0.3) + grade * 2,
+          velocity: velocityFor(rng, base, grade),
           control: ability(),
           stamina: ability(),
           breaking,
@@ -230,6 +244,11 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     history: [],
     stats: emptyCareerStats(),
     u18: [],
+  }
+
+  // 投手の肩力は球速に比例させる。速い球を投げる腕が送球だけ弱いのは不自然
+  if (player.pitching) {
+    player.batting = { ...player.batting, arm: armFromVelocity(player.pitching.velocity) }
   }
 
   // 入学時点を推移の起点として残す

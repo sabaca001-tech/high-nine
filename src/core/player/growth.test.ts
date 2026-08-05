@@ -2,9 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { Motivation, Player } from '@/core/types/player'
-import { applyCardCost, applyPractice, CARD_COST_SCALE, getAbility, raiseAbility } from './growth'
+import {
+  applyCardCost,
+  applyPractice,
+  armFromVelocity,
+  CARD_COST_SCALE,
+  getAbility,
+  raiseAbility,
+} from './growth'
 import { emptyCareerStats } from './careerStats'
-import { createGrowthAptitude } from './createPlayer'
+import { VELOCITY_MAX } from '@/core/types/player'
+import { createGrowthAptitude, createInitialRoster } from './createPlayer'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
 
 /** テスト用の選手を作る（乱数を使わず値を固定する） */
@@ -376,5 +384,73 @@ describe('createGrowthAptitude', () => {
     }
     expect(total / count).toBeGreaterThan(0.93)
     expect(total / count).toBeLessThan(1.07)
+  })
+})
+
+
+describe('球速の成長', () => {
+  /** 投球練習・走り込みを繰り返して球速がどこまで伸びるか */
+  function trained(kind: 'pitching' | 'stamina', times: number, seed = 51): Player {
+    const rng = createRng(seed)
+    let player = makePitcher({ grade: 1 })
+    for (let i = 0; i < times; i++) {
+      player = applyPractice(rng, [player], PRACTICE_DEFS[kind], false).players[0]
+    }
+    return player
+  }
+
+  it('練習で球速が伸びる', () => {
+    const before = makePitcher().pitching!.velocity
+    expect(trained('pitching', 40).pitching!.velocity).toBeGreaterThan(before)
+  })
+
+  it('走り込みがいちばん伸びる', () => {
+    const running = trained('stamina', 40).pitching!.velocity
+    const throwing = trained('pitching', 40).pitching!.velocity
+    expect(running).toBeGreaterThan(throwing)
+  })
+
+  it('3年間ぶん練習しても上限を超えない', () => {
+    expect(trained('stamina', 400).pitching!.velocity).toBeLessThanOrEqual(VELOCITY_MAX)
+  })
+
+  it('野手の球速は動かない（そもそも持たない）', () => {
+    const rng = createRng(3)
+    const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.pitching, false)
+    expect(changes.every((c) => c.key !== 'velocity')).toBe(true)
+  })
+})
+
+describe('投手の肩力は球速に比例する', () => {
+  it('生成した時点で比例している', () => {
+    const roster = createInitialRoster(createRng(61))
+    for (const player of roster) {
+      if (!player.pitching) continue
+      expect(player.batting.arm).toBe(armFromVelocity(player.pitching.velocity))
+    }
+  })
+
+  it('球速が伸びると肩力も上がる', () => {
+    const before = makePitcher({ grade: 1 })
+    const { player: after } = raiseAbility(before, 'velocity', 8)
+
+    expect(after.pitching!.velocity).toBe(before.pitching!.velocity + 8)
+    expect(after.batting.arm).toBeGreaterThan(before.batting.arm)
+    expect(after.batting.arm).toBe(armFromVelocity(after.pitching!.velocity))
+  })
+
+  it('投手は遠投で肩力が直接は伸びない（球速経由で上がる）', () => {
+    const rng = createRng(7)
+    const { changes } = applyPractice(rng, [makePitcher()], PRACTICE_DEFS.shoulder, false)
+    expect(changes.every((c) => c.key !== 'arm')).toBe(true)
+  })
+
+  it('野手は遠投で肩力が伸びる', () => {
+    const rng = createRng(7)
+    let player = makePlayer()
+    for (let i = 0; i < 20; i++) {
+      player = applyPractice(rng, [player], PRACTICE_DEFS.shoulder, false).players[0]
+    }
+    expect(player.batting.arm).toBeGreaterThan(40)
   })
 })

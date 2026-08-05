@@ -95,6 +95,7 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     gains: [
       { key: 'control', amount: 6, target: 'pitcher' },
       { key: 'stamina', amount: 4, target: 'pitcher' },
+      { key: 'velocity', amount: 3, target: 'pitcher' },
     ],
     conditionDelta: -7,
     trustDelta: 0,
@@ -115,6 +116,8 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     description: 'スタミナと走力が伸びるが、消耗が激しい',
     gains: [
       { key: 'stamina', amount: 7, target: 'pitcher' },
+      // 下半身ができると球が速くなる。球速がいちばん伸びる練習
+      { key: 'velocity', amount: 6, target: 'pitcher' },
       { key: 'speed', amount: 4, target: 'batter' },
     ],
     conditionDelta: -15,
@@ -286,6 +289,7 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     gains: [
       { key: 'control', amount: 6, target: 'pitcher' },
       { key: 'stamina', amount: 6, target: 'pitcher' },
+      { key: 'velocity', amount: 4, target: 'pitcher' },
     ],
     conditionDelta: -10,
     trustDelta: 0,

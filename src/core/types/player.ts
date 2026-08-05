@@ -82,7 +82,10 @@ export type PitchingAbilities = {
 
 /**
  * 成長対象になる能力のキー。
- * 弾道と球速は成長のしかたが特殊なため、ここには含めない。
+ * 弾道だけは伸び方が特殊なので含めない。
+ *
+ * **球速（velocity）は km/h の実数値**で、他の能力（1〜100）と尺度が違う。
+ * `getAbility` / `raiseAbility` / `calcGrowth` が個別に扱う。
  */
 export type GrowableKey =
   | 'meet'
@@ -91,11 +94,12 @@ export type GrowableKey =
   | 'arm'
   | 'fielding'
   | 'catching'
+  | 'velocity'
   | 'control'
   | 'stamina'
   | 'breaking'
 
-export const ABILITY_LABELS: Record<GrowableKey | 'trajectory' | 'velocity', string> = {
+export const ABILITY_LABELS: Record<GrowableKey | 'trajectory', string> = {
   trajectory: '弾道',
   meet: 'ミート',
   power: 'パワー',
@@ -119,6 +123,34 @@ export const APTITUDE_WEAK = 0.8
 /** 能力値の下限・上限 */
 export const ABILITY_MIN = 1
 export const ABILITY_MAX = 100
+
+/**
+ * 球速の下限・上限（km/h）。
+ * 他の能力と違って1〜100ではないので、専用の範囲で丸める。
+ */
+export const VELOCITY_MIN = 100
+export const VELOCITY_MAX = 158
+
+/**
+ * 球速を他の能力と同じ 0〜100 の尺度に直す。
+ *
+ * **判定にも表示にも同じ関数を使うこと。** 以前は
+ * `simulateAtBat`（115〜160）・`rating`（120〜160）・レーダー（110〜160）で
+ * それぞれ別の式を持っていて、同じ球速が画面と判定で違う意味になっていた。
+ */
+export function velocityScore(velocity: number): number {
+  return Math.min(100, Math.max(0, ((velocity - VELOCITY_BASE) / VELOCITY_RANGE) * 100))
+}
+
+/**
+ * 球速の尺度。115km/h で0、150km/h で100。
+ *
+ * 上を160に取っていた頃は、実際に出る球速（120〜148）が
+ * 0〜73にしか広がらず、**球速の良し悪しが数字に出なかった**。
+ * 高校生が実際に投げる帯に合わせて詰めてある。
+ */
+const VELOCITY_BASE = 115
+const VELOCITY_RANGE = 35
 
 /**
  * やる気。-2(絶不調) 〜 +2(絶好調)。
@@ -268,7 +300,7 @@ export function isAvailable(player: Player): boolean {
 /** 能力がひとつ変動したことを表す。差分表示（ミート 32 → 35）に使う */
 export type AbilityChange = {
   playerId: string
-  key: GrowableKey | 'trajectory' | 'velocity'
+  key: GrowableKey | 'trajectory'
   before: number
   after: number
 }
