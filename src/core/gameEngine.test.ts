@@ -257,11 +257,10 @@ describe('日単位の移動', () => {
       ...base,
       boardPosition: cellOfDay(dayOf(4, 29)),
       hand: base.hand.map((card) => ({ ...card, number: 5 as const })),
-      // 途中に必ず止まるマスが無いようにする
+      // 途中で足が止まらないよう、通る道はすべて何も起きないマスにする。
+      // 大会・合宿だけでなく**分岐マス**も止まる（phase が fork になる）
       board: base.board.map((cell) =>
-        cell.kind === 'tournament' || cell.kind === 'camp'
-          ? { index: cell.index, kind: 'blank' as const }
-          : cell,
+        cell.kind === 'goal' ? cell : { index: cell.index, kind: 'blank' as const },
       ),
     }
 
@@ -272,7 +271,7 @@ describe('日単位の移動', () => {
     }
 
     expect(next.month).toBe(6)
-    // 5月と6月の両方の月替わりが記録されている
+    // 5月と6月の両方の月替わりが記録されている（下の for の回数と揃えること）
     const months = next.log.filter((entry) => /^1年目 \d+月$/.test(entry.text))
     expect(months.length).toBeGreaterThanOrEqual(2)
   })
@@ -792,12 +791,36 @@ describe('大会', () => {
     throw new Error('初戦敗退するシードが見つからない')
   })
 
-  it('大会の成績で評判が上がる（負けても下がらない）', () => {
-    const state = untilTournament(startedGame({ seed: 86 }))
-    const before = state.reputation
+  /**
+   * 評判は**1試合ごとに動く**（matchReputation）ので、
+   * 「大会に出れば上がる」ではなくなった。勝ち上がれば上がり、初戦で負ければ下がる。
+   */
+  it('勝ち上がれば評判が上がる', () => {
+    for (let seed = 200; seed < 280; seed++) {
+      const state = untilTournament(startedGame({ seed, regionId: 'tottori' }))
+      const before = state.reputation
+      const played = playOutTournament(state)
+      if (played.tournament!.results.filter((r) => r.won).length < 2) continue
 
-    const finished = applyCommand(playOutTournament(state), { type: 'finishTournament' }).state
-    expect(finished.reputation).toBeGreaterThanOrEqual(before)
+      const finished = applyCommand(played, { type: 'finishTournament' }).state
+      expect(finished.reputation).toBeGreaterThan(before)
+      return
+    }
+    throw new Error('2勝以上するシードが見つからない')
+  })
+
+  it('初戦で敗れると評判が下がる', () => {
+    for (let seed = 400; seed < 480; seed++) {
+      const state = untilTournament(startedGame({ seed }))
+      const before = state.reputation
+      const played = playOutTournament(state)
+      if (played.tournament!.results.some((r) => r.won)) continue
+
+      const finished = applyCommand(played, { type: 'finishTournament' }).state
+      expect(finished.reputation).toBeLessThan(before)
+      return
+    }
+    throw new Error('初戦敗退するシードが見つからない')
   })
 
   it('地区大会で優勝しないと全国大会は開かれない', () => {
@@ -2012,14 +2035,12 @@ describe('試合での成長', () => {
       const before = new Map(state.players.map((p) => [p.id, overallRating(p)]))
 
       const after = applyCommand(state, { type: 'finishMatch' })
-      // 成長したことがイベントに出ている
-      if (after.events.some((event) => event.type === 'ability')) {
-        const grown = after.state.players.filter(
-          (player) => overallRating(player) > (before.get(player.id) ?? 0),
-        )
-        expect(grown.length).toBeGreaterThan(0)
-        found = true
-      }
+      // ability イベントには**下降も含まれる**（打てなかった選手は落ちる）ので、
+      // イベントの有無ではなく「総合が上がった選手が居るか」で見る
+      const grown = after.state.players.filter(
+        (player) => overallRating(player) > (before.get(player.id) ?? 0),
+      )
+      if (grown.length > 0) found = true
     }
 
     expect(found).toBe(true)

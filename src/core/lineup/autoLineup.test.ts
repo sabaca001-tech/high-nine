@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from '@/core/player/createPlayer'
 import { LINEUP_SIZE } from '@/core/types/lineup'
-import type { Position } from '@/core/types/player'
+import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, createAptitudes, defenseScore, isPlayable } from './aptitude'
 import { overallRating } from '@/core/player/rating'
 import { AUTO_LINEUP_PLANS, autoLineup, repairLineup, starterOf, validateLineup } from './autoLineup'
@@ -179,15 +179,28 @@ describe('おまかせの方針', () => {
   })
 
   it('能力優先は総合の高い選手が多く入る', () => {
-    const sum = (lineup: ReturnType<typeof autoLineup>) =>
-      lineup.slots.reduce((total, slot) => {
-        const player = roster.find((p) => p.id === slot.playerId)!
-        return total + overallRating(player)
+    /**
+     * 野手8人ぶんの総合の合計。
+     * **投手枠は除く。** どの方針でも投手は投球能力（pitcherValue）で選ぶので、
+     * 混ぜると方針の違いが埋もれる。
+     */
+    const sum = (players: Player[], plan: Parameters<typeof autoLineup>[1]) =>
+      autoLineup(players, plan).slots.reduce((total, slot) => {
+        if (slot.position === 'P') return total
+        return total + overallRating(players.find((p) => p.id === slot.playerId)!)
       }, 0)
 
-    expect(sum(autoLineup(roster, 'ability'))).toBeGreaterThan(
-      sum(autoLineup(roster, 'balanced')),
-    )
+    // 1つの部員名簿だけでは差が出ないことがある。
+    // 学年差を縮めてから選手同士が近くなり、どちらの方針でも同じ9人が並ぶ回がある
+    let ability = 0
+    let balanced = 0
+    for (let seed = 1; seed <= 20; seed++) {
+      const players = createInitialRoster(createRng(seed))
+      ability += sum(players, 'ability')
+      balanced += sum(players, 'balanced')
+    }
+
+    expect(ability).toBeGreaterThan(balanced)
   })
 
   it('若手優先は下級生が多く入る', () => {

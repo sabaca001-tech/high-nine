@@ -167,3 +167,40 @@ describe('性格の出現率', () => {
     expect(geniusTotal / geniusCount).toBeGreaterThan(otherTotal / otherCount)
   })
 })
+
+
+describe('学年による差', () => {
+  /** その学年の総合を集める */
+  function ratings(grade: 1 | 2 | 3, count = 400): number[] {
+    const rng = createRng(91 + grade)
+    return Array.from({ length: count }, (_, i) =>
+      overallRating(createPlayer(rng, { id: `p${i}`, grade, isPitcher: false })),
+    )
+  }
+
+  const first = ratings(1)
+  const third = ratings(3)
+  const average = (list: number[]) => list.reduce((a, b) => a + b, 0) / list.length
+
+  it('平均では3年生のほうが上', () => {
+    expect(average(third)).toBeGreaterThan(average(first))
+  })
+
+  it('学年の差は選手ごとの差より小さい', () => {
+    // これが逆だと「3年生＞2年生＞1年生」で並んでしまい、
+    // 強い1年生も弱い3年生も生まれない
+    const gradeGap = average(third) - average(first)
+    const spread = Math.max(...first) - Math.min(...first)
+    expect(gradeGap).toBeLessThan(spread / 2)
+  })
+
+  it('1年生の上位は3年生の平均を超える（強い1年は強い）', () => {
+    const topFirst = [...first].sort((a, b) => b - a)[Math.floor(first.length * 0.1)]
+    expect(topFirst).toBeGreaterThan(average(third))
+  })
+
+  it('3年生の下位は1年生の平均を下回る（弱い3年は弱い）', () => {
+    const lowThird = [...third].sort((a, b) => a - b)[Math.floor(third.length * 0.1)]
+    expect(lowThird).toBeLessThan(average(first))
+  })
+})

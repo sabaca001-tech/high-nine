@@ -29,9 +29,13 @@ const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
  * 計算上は 13.4 / 61 ≒ 0.22。そこから実測で調整している。
  * **入学時の能力（`GRADE_BASE`）を上げたぶん、ここを下げてある。**
  * 「低いところから大きく伸ばす」より「良い素材を採って仕上げる」ゲームにしたい。
+ *
+ * 学年差を縮めたときも合わせて下げる。3年間の伸びが
+ * `GRADE_BASE[3] - GRADE_BASE[1]`（＝14）とおおよそ釣り合っていないと、
+ * 3年生になった選手が初期3年生を大きく追い越してしまう。
  * 変えたら必ず seasonBalance.test.ts を回すこと。
  */
-export const PRACTICE_GROWTH_SCALE = 0.19
+export const PRACTICE_GROWTH_SCALE = 0.11
 
 /**
  * カード1枚あたりの体力・信頼度の倍率。

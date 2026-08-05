@@ -160,12 +160,21 @@ describe('applyCardCost', () => {
 
 describe('applyPractice', () => {
   it('打撃練習でミートとパワーが伸びる', () => {
+    // 1回の伸びは1未満のことがあり（端数は確率で切り上げる）、
+    // **1回だけ見ても動かない**。何度か重ねて確かめる
     const rng = createRng(1)
-    const { players, changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.batting, false)
+    let player = makePlayer()
+    const keys = new Set<string>()
 
-    expect(players[0].batting.meet).toBeGreaterThan(40)
-    expect(players[0].batting.power).toBeGreaterThan(40)
-    expect(changes.map((c) => c.key).sort()).toEqual(['meet', 'power'])
+    for (let i = 0; i < 10; i++) {
+      const result = applyPractice(rng, [player], PRACTICE_DEFS.batting, false)
+      player = result.players[0]
+      for (const change of result.changes) keys.add(change.key)
+    }
+
+    expect(player.batting.meet).toBeGreaterThan(40)
+    expect(player.batting.power).toBeGreaterThan(40)
+    expect([...keys].sort()).toEqual(['meet', 'power'])
   })
 
   it('体力・信頼度には手を触れない（applyCardCost の担当）', () => {

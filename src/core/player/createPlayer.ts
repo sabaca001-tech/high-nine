@@ -96,23 +96,45 @@ const FIELDER_POSITIONS: Position[] = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 
  * 学年ごとの能力ベース値。
  * 1年生は低く、3年生は高い。ここに乱数の振れ幅を足す。
  *
- * **入学時点を高めに取ってある。** 低いところから始めて長く伸ばす形だと、
- * 1年生は誰も使えず、3年間ずっと同じ顔ぶれで戦うことになっていた。
- * 入学時の差（＝どんな素材を採れたか）が効く形にして、
+ * **学年の差は、選手ごとの差（`ABILITY_SPREAD` ±14）より小さく取ってある。**
+ * 学年差のほうが大きいと、誰が入ってきても「3年生＞2年生＞1年生」で並んでしまい、
+ * 強い1年生も弱い3年生も生まれない。
+ * いまは1年の上位（36+14＝50）が3年の平均に並び、
+ * 3年の下位（50-14＝36）が1年の平均まで落ちる。
+ *
+ * 入学時点を高めに取っているのは、低いところから長く伸ばす形だと
+ * 1年生が誰も使えず、3年間ずっと同じ顔ぶれで戦うことになっていたため。
  * そのぶん練習で伸びる量を抑えている（`PRACTICE_GROWTH_SCALE`）。
  *
  * **ここを変えたら `OPPONENT_BASE_RATING` も直す。**
- * 相手チームも同じ値で作るので、平均（(28+43+55)/3 ＝ 42）が
+ * 相手チームも同じ値で作るので、平均（(36+44+50)/3 ＝ 43）が
  * 「互角」の基準になっている。
  */
 export const GRADE_BASE: Record<Grade, number> = {
-  1: 28,
-  2: 43,
-  3: 55,
+  1: 36,
+  2: 44,
+  3: 50,
 }
 
-/** 能力のばらつき幅（±） */
-const ABILITY_SPREAD = 14
+/**
+ * 選手ごとの素質の差（±）。**全能力をまとめて上下させる。**
+ *
+ * これが無いと「強い1年生」も「弱い3年生」も生まれない。
+ * `ABILITY_SPREAD` は能力ごとに独立して振るので、
+ * 6項目の平均である総合ではほぼ打ち消し合ってしまい（±3程度）、
+ * **学年差だけが総合に残る**という状態になっていた。
+ *
+ * 学年差（1年→3年で14）より大きく取ることで、
+ * 1年の上位が3年の平均に並び、3年の下位が1年の平均まで落ちる。
+ */
+const TALENT_SPREAD = 16
+
+/**
+ * 能力ごとのばらつき幅（±）。
+ * こちらは「打撃は良いが守備は苦手」といった凸凹を作るためのもの。
+ * 素質の差（`TALENT_SPREAD`）と役割が違う。
+ */
+const ABILITY_SPREAD = 10
 
 /**
  * 本職の投手になる割合。
@@ -137,6 +159,12 @@ export type CreatePlayerOptions = {
    * 推薦入学の逸材などを作るときに使う。
    */
   talentBonus?: number
+  /**
+   * 選手ごとの素質の振れ幅（±）。省略時は `TALENT_SPREAD`。
+   * **0を渡すと `talentBonus` どおりの能力になる。**
+   * スカウトのように「素質◯◯」と示してから入学させる場合に使う。
+   */
+  talentSpread?: number
   /** すでに部内で使われている名前。同姓同名を避けるために渡す */
   takenNames?: readonly string[]
 }
@@ -150,7 +178,13 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   // 決まった性格が入学時の能力にも効く
   const personality = rng.weighted(PERSONALITY_WEIGHTS)
   const genius = personality === '天才肌'
-  const base = GRADE_BASE[grade] + talentBonus + (genius ? GENIUS_TALENT_BONUS : 0)
+
+  // 選手ごとの素質。全能力をまとめて上下させるので、総合にそのまま出る。
+  // 素質を指定して作る場合（スカウトした選手）は振らない
+  const spread = options.talentSpread ?? TALENT_SPREAD
+  const talent = spread > 0 ? rng.int(-spread, spread) : 0
+
+  const base = GRADE_BASE[grade] + talentBonus + talent + (genius ? GENIUS_TALENT_BONUS : 0)
 
   /** base を中心にばらつかせた能力値を1つ作る */
   const ability = (): number =>

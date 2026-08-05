@@ -362,18 +362,40 @@ describe('大差の試合での交代', () => {
     expect(withRest / games).toBeGreaterThan(0.5)
   })
 
-  it('接戦では経験を積ませる交代は起きない', () => {
-    for (let seed = 1; seed <= 40; seed++) {
+  it('一度も大差がつかなかった試合では、経験を積ませる交代は起きない', () => {
+    let checked = 0
+
+    for (let seed = 1; seed <= 60; seed++) {
       const result = play(seed)
-      if (Math.abs(result.finalScore.player - result.finalScore.opponent) >= 7) continue
-      // 途中で一時的に大差がつくことはあるので、最終スコアが接戦でも起きうる。
-      // ここでは「1点差以内」に絞って、確実に競っていた試合だけを見る
-      if (Math.abs(result.finalScore.player - result.finalScore.opponent) > 1) continue
+      if (reachedBlowout(result)) continue
+
+      checked += 1
       expect(result.events.some((event) => event.text.includes('経験を積ませる'))).toBe(false)
     }
+
+    expect(checked).toBeGreaterThan(5)
   })
 })
 
+
+/**
+ * 試合中に一度でも7点差がついたか。
+ *
+ * **最終スコアでは判定できない。** 7回に8点差でも、そこから追いつくことがある。
+ * 先攻（相手）が打ってから後攻（自校）が打つので、半回ごとに見る。
+ */
+function reachedBlowout(result: MatchResult): boolean {
+  let player = 0
+  let opponent = 0
+
+  for (const line of result.innings) {
+    opponent += line.opponent
+    if (Math.abs(player - opponent) >= 7) return true
+    player += line.player
+    if (Math.abs(player - opponent) >= 7) return true
+  }
+  return false
+}
 
 describe('大差の試合', () => {
   /** こちらが大きく格上。序盤で試合が壊れる組み合わせ */
@@ -408,18 +430,17 @@ describe('大差の試合', () => {
     expect(youthAppeared).toBe(true)
   })
 
-  it('互角の相手との試合では、大差の交代がめったに起きない', () => {
-    // **最終スコアだけでは判定できない。** 途中で7点差がついてから
-    // 追い上げた試合もあるので、「起きない」ではなく「めったに起きない」を見る
-    let games = 0
-    let rested = 0
+  it('大差にならなければ投手も代わらない', () => {
+    let checked = 0
 
     for (let seed = 1; seed < 80; seed++) {
       const result = play(seed, 0)
-      games += 1
-      if (result.events.some((e) => e.text.includes('経験を積ませる'))) rested += 1
+      if (reachedBlowout(result)) continue
+
+      checked += 1
+      expect(result.events.some((e) => e.text.includes('経験を積ませる'))).toBe(false)
     }
 
-    expect(rested / games).toBeLessThan(0.25)
+    expect(checked).toBeGreaterThan(10)
   })
 })

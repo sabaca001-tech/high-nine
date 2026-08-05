@@ -1916,6 +1916,8 @@ function resolveScouting(
         // 総合22（＝ごく普通の新入生）で入ってきていた。
         // カードに出す数字と実際が食い違うと、通う判断そのものが成り立たない
         talentBonus: prospect.rating - GRADE_BASE[1],
+        // 素質を示してから獲った選手なので、そこからさらに振らない
+        talentSpread: 0,
         takenNames: state.players.map((p) => p.name),
       })
       // 触れ込みの特殊能力を持って入学してくる。ここがスカウトの意味
