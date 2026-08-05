@@ -109,6 +109,13 @@ export const ABILITY_LABELS: Record<GrowableKey | 'trajectory' | 'velocity', str
   breaking: '変化球',
 }
 
+/**
+ * 伸びやすさの判定に使うしきい値。
+ * 表示（「得意」「苦手」）と計算で同じ値を見るために1か所に置く。
+ */
+export const APTITUDE_STRONG = 1.2
+export const APTITUDE_WEAK = 0.8
+
 /** 能力値の下限・上限 */
 export const ABILITY_MIN = 1
 export const ABILITY_MAX = 100
@@ -169,6 +176,15 @@ export type Player = {
   /** 残り離脱月数。0なら健康（MVPでは常に0） */
   injuryMonths: number
   personality: Personality
+  /**
+   * 能力ごとの伸びやすさ。1.0が標準で、書かれていない能力は1.0。
+   *
+   * **これが無いと、練習の結果が全員同じになる。**
+   * やる気・学年・体力の補正はあったが、1回の伸びが1〜2という小さな値なので
+   * 整数に丸めた時点で差が消え、誰を見ても「+1」しか出ていなかった。
+   * 得意な能力は目に見えて伸び、苦手な能力はほとんど動かない。
+   */
+  growthAptitude: Partial<Record<GrowableKey, number>>
   /** 全ポジションの適性 */
   aptitudes: Record<Position, Aptitude>
   /** 習得している特殊能力のid */

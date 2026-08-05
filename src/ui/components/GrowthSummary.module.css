@@ -1,30 +1,53 @@
 /*
- * 成長の結果。件数が多い月があるので**高さに上限**を置く。
+ * 成長の結果。件数が多い日があるので**高さに上限**を置く。
  * 上限が無いと下にある手札を画面外へ押し出してしまう（実際に押し出された）。
  */
 .panel {
   flex: 0 1 auto;
   min-height: 0;
-  max-height: 76px;
+  max-height: 92px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  gap: var(--sp-1);
+  flex-direction: column;
+  gap: 2px;
   padding: var(--sp-2);
   background: var(--bg-panel-2);
   border-radius: var(--radius);
 }
 
+/* 1選手ぶん。名前を左に固定して、伸びた能力を右に流す */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.name {
+  flex: 0 0 5.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.gains {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .chip {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-  padding: 2px var(--sp-2);
+  gap: 3px;
+  padding: 1px var(--sp-1);
   background: var(--bg-base);
   border-radius: 999px;
-  font-size: var(--fs-xs);
+  font-size: 10px;
   color: var(--text-sub);
 }
 
@@ -36,8 +59,4 @@
 .down {
   color: var(--bad);
   font-weight: 700;
-}
-
-.count {
-  color: var(--text-dim);
 }

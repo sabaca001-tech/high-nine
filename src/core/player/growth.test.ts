@@ -4,6 +4,8 @@ import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { Motivation, Player } from '@/core/types/player'
 import { applyCardCost, applyPractice, CARD_COST_SCALE, getAbility, raiseAbility } from './growth'
 import { emptyCareerStats } from './careerStats'
+import { createGrowthAptitude } from './createPlayer'
+import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
 
 /** テスト用の選手を作る（乱数を使わず値を固定する） */
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -28,6 +30,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     condition: 100,
     injuryMonths: 0,
     personality: 'クール',
+    growthAptitude: {},
     aptitudes: {
       P: 'G', C: 'F', '1B': 'C', '2B': 'B', '3B': 'B', SS: 'C', LF: 'B', CF: 'S', RF: 'B',
     },
@@ -274,5 +277,95 @@ describe('applyPractice', () => {
       return total
     }
     expect(totalGrowth(30)).toBeGreaterThan(totalGrowth(85))
+  })
+})
+
+
+describe('伸びやすさの個人差', () => {
+  /** 同じ練習を repeat 回してミートがどれだけ伸びたか */
+  function meetGain(aptitude: number, repeat = 60, seed = 31): number {
+    const rng = createRng(seed)
+    let player = makePlayer({ growthAptitude: { meet: aptitude } })
+    for (let i = 0; i < repeat; i++) {
+      player = applyPractice(rng, [player], PRACTICE_DEFS.batting, false).players[0]
+    }
+    return player.batting.meet - 40
+  }
+
+  it('得意な能力ほど伸びる', () => {
+    expect(meetGain(1.5)).toBeGreaterThan(meetGain(1.0))
+    expect(meetGain(1.0)).toBeGreaterThan(meetGain(0.5))
+  })
+
+  it('記録が無ければ標準（1.0）として扱う', () => {
+    const rng = createRng(7)
+    const withNone = applyPractice(
+      rng,
+      [{ ...makePlayer(), growthAptitude: {} }],
+      PRACTICE_DEFS.batting,
+      false,
+    )
+    expect(withNone.changes.length).toBeGreaterThanOrEqual(0)
+  })
+
+  it('1回の練習でも選手ごとに差が出る', () => {
+    // 得意と苦手を並べて何度も練習させ、伸び方が割れることを確かめる。
+    // ここが割れないと、画面には全員「+1」しか出てこない
+    const rng = createRng(41)
+    const strong = makePlayer({ id: 'strong', growthAptitude: { meet: 1.6 } })
+    const weak = makePlayer({ id: 'weak', growthAptitude: { meet: 0.5 } })
+
+    let differed = 0
+    for (let i = 0; i < 80; i++) {
+      const { changes } = applyPractice(rng, [strong, weak], PRACTICE_DEFS.batting, false)
+      const gain = (id: string) =>
+        changes
+          .filter((c) => c.playerId === id && c.key === 'meet')
+          .reduce((sum, c) => sum + (c.after - c.before), 0)
+      if (gain('strong') !== gain('weak')) differed += 1
+    }
+
+    expect(differed).toBeGreaterThan(40)
+  })
+})
+
+describe('createGrowthAptitude', () => {
+  it('得意2つ・苦手2つが決まる', () => {
+    const aptitude = createGrowthAptitude(createRng(3), false)
+    const values = Object.values(aptitude)
+    expect(values.filter((value) => value >= APTITUDE_STRONG)).toHaveLength(2)
+    expect(values.filter((value) => value <= APTITUDE_WEAK)).toHaveLength(2)
+  })
+
+  it('野手に投手能力の得意・苦手は付かない', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const aptitude = createGrowthAptitude(createRng(seed), false)
+      for (const key of ['control', 'stamina', 'breaking']) {
+        expect(aptitude[key as keyof typeof aptitude]).toBeUndefined()
+      }
+    }
+  })
+
+  it('投手には投手能力も候補に入る', () => {
+    const keys = new Set<string>()
+    for (let seed = 1; seed < 60; seed++) {
+      for (const key of Object.keys(createGrowthAptitude(createRng(seed), true))) keys.add(key)
+    }
+    expect([...keys].some((key) => ['control', 'stamina', 'breaking'].includes(key))).toBe(true)
+  })
+
+  it('平均は1.0前後（チーム全体の成長速度は変わらない）', () => {
+    let total = 0
+    let count = 0
+    const ALL_KEYS = 6
+    for (let seed = 1; seed < 300; seed++) {
+      const aptitude = createGrowthAptitude(createRng(seed), false)
+      const values = Object.values(aptitude)
+      // 記録の無い能力は1.0として数える
+      total += values.reduce((sum, value) => sum + value, 0) + (ALL_KEYS - values.length)
+      count += ALL_KEYS
+    }
+    expect(total / count).toBeGreaterThan(0.93)
+    expect(total / count).toBeLessThan(1.07)
   })
 })

@@ -82,6 +82,17 @@
   margin: 0;
 }
 
+/* 伸びやすい／伸びにくい能力。色で「得か損か」が一目で分かるようにする */
+.strong {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.weak {
+  color: var(--bad);
+  font-weight: 700;
+}
+
 .overall {
   flex: 0 0 auto;
   text-align: center;

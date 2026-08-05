@@ -11,6 +11,7 @@ import {
 } from '@/core/player/trainingFocus'
 import type { TrainingFocus } from '@/core/player/trainingFocus'
 import { effectOf } from '@/core/player/personality'
+import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
 import { overallRating, toRank, trajectoryStars } from '@/core/player/rating'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { Skill, SkillRank } from '@/core/types/skill'
@@ -101,6 +102,22 @@ export function PlayerDetailScreen() {
           <p className={styles.name}>{player.name}</p>
           <p className={styles.meta}>
             {player.personality} — {effectOf(player.personality).summary}
+          </p>
+          {/*
+            伸びやすい能力は選手ごとに違う。ここが見えないと
+            「なぜこの選手だけ伸びないのか」が分からない
+          */}
+          <p className={styles.meta}>
+            {strongKeys(player).length > 0 && (
+              <>
+                得意 <span className={styles.strong}>{labelsOf(strongKeys(player))}</span>
+              </>
+            )}
+            {weakKeys(player).length > 0 && (
+              <>
+                {'　'}苦手 <span className={styles.weak}>{labelsOf(weakKeys(player))}</span>
+              </>
+            )}
           </p>
         </div>
         <div className={styles.overall}>
@@ -528,4 +545,24 @@ function Gauge({
       <span className={styles.gaugeValue}>{value}</span>
     </div>
   )
+}
+
+
+/** 伸びやすい能力（練習で目に見えて伸びる） */
+function strongKeys(player: Player): GrowableKey[] {
+  return aptitudeKeys(player, (value) => value >= APTITUDE_STRONG)
+}
+
+/** 伸びにくい能力（練習してもほとんど動かない） */
+function weakKeys(player: Player): GrowableKey[] {
+  return aptitudeKeys(player, (value) => value <= APTITUDE_WEAK)
+}
+
+function aptitudeKeys(player: Player, match: (value: number) => boolean): GrowableKey[] {
+  const entries = Object.entries(player.growthAptitude ?? {}) as [GrowableKey, number][]
+  return entries.filter(([, value]) => match(value)).map(([key]) => key)
+}
+
+function labelsOf(keys: GrowableKey[]): string {
+  return keys.map((key) => ABILITY_LABELS[key]).join('・')
 }

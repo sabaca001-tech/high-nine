@@ -7,6 +7,7 @@ import { snapshotOf } from '@/core/types/player'
 import { emptyCareerStats } from './careerStats'
 import type {
   Grade,
+  GrowableKey,
   Motivation,
   Personality,
   Player,
@@ -180,6 +181,7 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     condition: 70 + rng.int(0, 30),
     injuryMonths: 0,
     personality,
+    growthAptitude: createGrowthAptitude(rng, isPitcher),
     aptitudes: createAptitudes(rng, position),
     skills: [],
     history: [],
@@ -190,6 +192,55 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   // 入学時点を推移の起点として残す
   const at = options.enrolledAt
   return at ? { ...player, history: [snapshotOf(player, at.year, at.month)] } : player
+}
+
+/**
+ * 能力ごとの伸びやすさを決める。
+ *
+ * 得意を2つ、苦手を2つ選ぶ。**平均が1.0前後になるように配分する**
+ * （得意 1.25〜1.6／苦手 0.6〜0.8）ので、チーム全体の成長速度は変わらない。
+ * 変わるのは「誰のどの能力が伸びるか」だけ。
+ *
+ * これが無いと、1回の練習で全員が同じだけ伸びる。
+ * やる気や学年の補正はあっても、1〜2という小さな値を整数に丸めた時点で
+ * 差が消えてしまい、画面には「+1」しか出てこなかった。
+ */
+export function createGrowthAptitude(
+  rng: Rng,
+  isPitcher: boolean,
+): Partial<Record<GrowableKey, number>> {
+  // 持っていない能力に得意・苦手を付けても意味が無い
+  const pool: GrowableKey[] = isPitcher
+    ? [...BATTING_KEYS, 'control', 'stamina', 'breaking']
+    : [...BATTING_KEYS]
+
+  const shuffled = [...pool]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = rng.int(0, i)
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  const aptitude: Partial<Record<GrowableKey, number>> = {}
+  for (const key of shuffled.slice(0, STRONG_COUNT)) {
+    aptitude[key] = round2(1.25 + rng.float() * 0.35)
+  }
+  for (const key of shuffled.slice(STRONG_COUNT, STRONG_COUNT + WEAK_COUNT)) {
+    // 0.5まで下げると苦手な能力が事実上凍りつき、総合が伸び残る。
+    // 「遅い」であって「動かない」ではない水準にする
+    aptitude[key] = round2(0.6 + rng.float() * 0.2)
+  }
+  return aptitude
+}
+
+/** 得意・苦手にする能力の数 */
+const STRONG_COUNT = 2
+const WEAK_COUNT = 2
+
+/** 野手も投手も持っている能力 */
+const BATTING_KEYS: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
 }
 
 /**

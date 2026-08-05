@@ -1622,8 +1622,14 @@ describe('怪我と離脱', () => {
 
     const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
     expect(next.players[0].batting.meet).toBe(state.players[0].batting.meet)
-    // 他の選手は伸びている
-    expect(next.players[1].batting.meet).toBeGreaterThan(state.players[1].batting.meet)
+
+    // 他の選手は伸びている。
+    // **特定の1人で判定してはいけない。** 伸びやすさは選手ごとに違うので、
+    // ミートが苦手な選手を引くとその1人だけ動かないことがある
+    const grew = next.players.filter(
+      (player, index) => index > 0 && player.batting.meet > state.players[index].batting.meet,
+    )
+    expect(grew.length).toBeGreaterThan(0)
   })
 
   it('離脱中の選手は体力も減らない', () => {

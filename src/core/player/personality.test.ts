@@ -37,6 +37,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     condition: 100,
     injuryMonths: 0,
     personality: 'クール',
+    growthAptitude: {},
     aptitudes: {
       P: 'G',
       C: 'F',

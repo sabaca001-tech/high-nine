@@ -57,8 +57,10 @@ import type { Tournament } from './tournament'
  *            増えた手数ぶん、1手あたりの成長と消耗を薄めた。
  * v24 → v25: ProSeason に ability（そのシーズンの実力）を追加。
  *            プロ入りで能力がプロの物差しへ置き換わるようになった。
+ * v25 → v26: Player に growthAptitude（能力ごとの伸びやすさ）を追加。
+ *            練習の結果が選手ごとに変わるようになった。
  */
-export const SAVE_VERSION = 25
+export const SAVE_VERSION = 26
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12

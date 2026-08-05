@@ -17,6 +17,7 @@ import type { Player, Position } from '@/core/types/player'
 import { REPUTATION_INITIAL } from '@/core/types/season'
 import { monthlyFunds } from '@/core/shop/funds'
 import { rollInitialPitches } from '@/core/player/pitchDefs'
+import { createGrowthAptitude } from '@/core/player/createPlayer'
 import { createBoard, GOAL_INDEX, placeSeasonTournaments } from '@/core/board/boardDefs'
 import { createTournament } from '@/core/tournament/tournament'
 import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
@@ -118,6 +119,9 @@ export function migrate(raw: unknown): GameState | null {
   }
   if (version < 25) {
     data = migrateV24ToV25(data)
+  }
+  if (version < 26) {
+    data = migrateV25ToV26(data)
   }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
@@ -657,6 +661,26 @@ function migrateV24ToV25(raw: Record<string, unknown>): Record<string, unknown> 
   })
 
   return { ...raw, version: 25, graduates }
+}
+
+/**
+ * v25 → v26
+ *  - Player に growthAptitude（能力ごとの伸びやすさ）を追加
+ *
+ * 得意・苦手は乱数で決まるが、セーブを読むたびに変わっては困るので
+ * シードを固定して一度だけ決める。
+ */
+function migrateV25ToV26(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.players)) return { ...raw, version: 26 }
+
+  const rng = createRng(typeof raw.rngState === 'number' ? raw.rngState : 1)
+  const players = raw.players.map((value) => {
+    if (!isRecord(value)) return value
+    if (isRecord(value.growthAptitude)) return value
+    return { ...value, growthAptitude: createGrowthAptitude(rng, value.isPitcher === true) }
+  })
+
+  return { ...raw, version: 26, players }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

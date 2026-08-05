@@ -267,6 +267,14 @@ function isTargetOf(player: Player, gain: PracticeGain): boolean {
   return true
 }
 
+/**
+ * その選手にとってその能力が伸びやすいか。
+ * 記録が無い能力は標準（1.0）とみなす（古いセーブや簡易生成の選手のため）。
+ */
+export function aptitudeMultiplier(player: Player, key: GrowableKey): number {
+  return player.growthAptitude?.[key] ?? 1
+}
+
 /** 成長量を計算する。端数は確率で切り上げ */
 function calcGrowth(
   rng: Rng,
@@ -280,6 +288,9 @@ function calcGrowth(
   const raw =
     gain.amount *
     PRACTICE_GROWTH_SCALE *
+    // 得意な能力は伸び、苦手な能力はほとんど動かない。
+    // ここが無いと、他の補正が丸めで潰れて全員が同じ「+1」になる
+    aptitudeMultiplier(player, gain.key) *
     motivationMultiplierFor(player) *
     GRADE_MULTIPLIER[player.grade] *
     conditionMultiplierFor(player) *
