@@ -6,6 +6,13 @@ import { isAvailable } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, defenseScore, POSITION_WEIGHT } from './aptitude'
 import { overallRating } from '@/core/player/rating'
+import {
+  battingScore,
+  clutchScore,
+  onBaseScore,
+  runningScore,
+  sluggingScore,
+} from './battingTraits'
 import { FATIGUE_AVOID, FATIGUE_MAX, fatigueOf } from '@/core/player/fatigue'
 import { pitcherValue } from '@/core/match/teamState'
 
@@ -135,49 +142,108 @@ export function autoLineup(players: Player[], plan: AutoLineupPlan = 'balanced')
 }
 
 /**
- * 打順を決める。高校野球でよくある組み方に寄せた単純なルール。
- *  1番: 走力が高い
- *  2番: ミートが高い
- *  3-4番: 打力（ミート＋パワー）が高い
- *  以降: 打力順
- *  投手は最後に回す（打撃が弱いことが多いため）
+ * 打順を決める。
+ *
+ * **打順ごとに見たいものが違う。** ミートとパワーの平均で並べていた頃は、
+ * 「四球を選べる打者」も「一発のある打者」も同じ扱いで、
+ * 誰を何番に置いても同じ打線に見えていた。
+ *
+ * | 打順 | 何を見るか |
+ * |---|---|
+ * | 1 | 出塁力＋走力。塁に出てかき回す |
+ * | 2 | 出塁力。とにかく塁に置く |
+ * | 3 | チームで最も優秀な打者（ミート寄り） |
+ * | 4 | チームで最も優秀な打者（パワー寄り） |
+ * | 5 | 長打＋勝負強さ。走者が残った場面が回る |
+ * | 6 | ミート |
+ * | 7 | 長打 |
+ * | 8 | 残り |
+ * | 9 | **打力がいちばん低い選手** |
  */
 function battingOrder(slots: LineupSlot[], players: Player[]): LineupSlot[] {
-  const find = (id: string) => players.find((p) => p.id === id)
-
-  const hitting = (slot: LineupSlot): number => {
-    const player = find(slot.playerId)
-    if (!player) return 0
-    return player.batting.meet * 0.55 + player.batting.power * 0.45
+  const byId = new Map(players.map((player) => [player.id, player]))
+  const of = (slot: LineupSlot): Player | undefined => byId.get(slot.playerId)
+  const bat = (slot: LineupSlot): number => {
+    const player = of(slot)
+    return player ? battingScore(player) : 0
   }
-  const speed = (slot: LineupSlot): number => find(slot.playerId)?.batting.speed ?? 0
-  const meet = (slot: LineupSlot): number => find(slot.playerId)?.batting.meet ?? 0
+
+  /** その打順で見たい持ち味。値が大きいほどその打順に向く */
+  const scoreFor = (order: number, slot: LineupSlot): number => {
+    const player = of(slot)
+    if (!player) return -Infinity
+
+    const onBase = onBaseScore(player)
+    const slug = sluggingScore(player)
+    const total = battingScore(player)
+
+    switch (order) {
+      case 1:
+        return onBase * 0.6 + runningScore(player) * 0.4
+      case 2:
+        return onBase
+      case 3:
+        // チームで最も優秀な打者。ミート寄りに見る
+        return total + player.batting.meet * 0.35
+      case 4:
+        // 同じく最も優秀な打者。こちらはパワー寄り
+        return total + slug * 0.45
+      case 5:
+        return slug * 0.6 + total * 0.4 + clutchScore(player)
+      case 6:
+        return player.batting.meet
+      case 7:
+        return slug
+      default:
+        // 8番。残った中から打力の高い順
+        return total
+    }
+  }
 
   const remaining = [...slots]
-  const order: LineupSlot[] = []
+  /** 打順 → 選手。埋めた順ではなく打順で持つ */
+  const assigned = new Map<number, LineupSlot>()
 
-  // 投手は打順を最後にするため、いったん外に出す
-  const pitcherIndex = remaining.findIndex((slot) => slot.position === 'P')
-  const pitcher = pitcherIndex >= 0 ? remaining.splice(pitcherIndex, 1)[0] : null
-
-  const take = (score: (slot: LineupSlot) => number) => {
-    if (remaining.length === 0) return
-    const best = remaining.reduce((a, b) => (score(b) > score(a) ? b : a))
-    remaining.splice(remaining.indexOf(best), 1)
-    order.push(best)
+  const place = (order: number, slot: LineupSlot) => {
+    assigned.set(order, slot)
+    remaining.splice(remaining.indexOf(slot), 1)
   }
 
-  take(speed) // 1番
-  take(meet) // 2番
-  take(hitting) // 3番
-  take(hitting) // 4番
+  // **9番から決める。** 上から埋めると、最後に残った選手が
+  // たまたま打てる選手ということが起きる
+  const worst = remaining.reduce((a, b) => (bat(b) < bat(a) ? b : a))
+  place(9, worst)
 
-  // 残りは打力順
-  remaining.sort((a, b) => hitting(b) - hitting(a))
-  order.push(...remaining)
+  // **投手は下位に固定する。** 打力で選ぶと、ミートの高い投手が
+  // 2番に入ることがあった（実際に入った）。
+  // 9番が投手でなければ8番に置く
+  const pitcher = remaining.find((slot) => slot.position === 'P')
+  if (pitcher) place(8, pitcher)
 
-  if (pitcher) order.push(pitcher)
-  return order
+  // **3番と4番は2人まとめて取る。**
+  // どちらも「チームで最も優秀な打者」の枠なので、まず打力上位2人を確保し、
+  // そのうち長打力の高いほうを4番に置く。
+  // 1人ずつ選ぶと、パワー型が先に3番を取ってしまうことがあった（実際にあった）
+  if (remaining.length >= 2) {
+    const best = [...remaining].sort((a, b) => bat(b) - bat(a)).slice(0, 2)
+    const [power, contact] = [...best].sort(
+      (a, b) => sluggingScore(of(b)!) - sluggingScore(of(a)!),
+    )
+    place(4, power)
+    place(3, contact)
+  }
+
+  // **中軸を先に埋める。** 1番・2番から埋めると上位打者が先に抜けて、
+  // 5番に打力の低い選手が残る（実際に残った）
+  for (const order of [5, 1, 2, 6, 7, 8]) {
+    if (assigned.has(order) || remaining.length === 0) continue
+    const best = remaining.reduce((a, b) => (scoreFor(order, b) > scoreFor(order, a) ? b : a))
+    place(order, best)
+  }
+
+  return Array.from({ length: slots.length }, (_, i) => assigned.get(i + 1)).filter(
+    (slot): slot is LineupSlot => slot !== undefined,
+  )
 }
 
 /** 先発投手を取り出す */

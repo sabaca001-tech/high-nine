@@ -6,6 +6,7 @@ import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, createAptitudes, defenseScore, isPlayable } from './aptitude'
 import { overallRating } from '@/core/player/rating'
 import { AUTO_LINEUP_PLANS, autoLineup, repairLineup, starterOf, validateLineup } from './autoLineup'
+import { battingScore, onBaseScore, runningScore, sluggingScore } from './battingTraits'
 
 describe('createAptitudes', () => {
   it('メインポジションは必ずS', () => {
@@ -74,20 +75,30 @@ describe('autoLineup', () => {
     }
   })
 
-  it('投手の打順は最後になる', () => {
+  it('9番はスタメンで打力がいちばん低い選手', () => {
+    // **投手を固定で最後に置くのはやめた。** たいていは投手が該当するが、
+    // 打てる投手を9番に固定する理由は無い
     const roster = createInitialRoster(createRng(9))
     const lineup = autoLineup(roster)
-    expect(lineup.slots[LINEUP_SIZE - 1].position).toBe('P')
+    const byId = new Map(roster.map((p) => [p.id, p]))
+    const bat = (id: string) => battingScore(byId.get(id)!)
+
+    const last = bat(lineup.slots[LINEUP_SIZE - 1].playerId)
+    for (const slot of lineup.slots.slice(0, LINEUP_SIZE - 1)) {
+      expect(bat(slot.playerId)).toBeGreaterThanOrEqual(last)
+    }
   })
 
-  it('1番打者は打線の中で走力が高い方に入る', () => {
+  it('1番打者は走力が上位に入る', () => {
+    // **走力最速とは限らない。** 出塁力も見るし、
+    // 足の速い選手がチーム最高の打者なら3番・4番に取られる
     const roster = createInitialRoster(createRng(11))
     const lineup = autoLineup(roster)
     const speedOf = (id: string) => roster.find((p) => p.id === id)?.batting.speed ?? 0
 
-    const leadoff = speedOf(lineup.slots[0].playerId)
-    const others = lineup.slots.slice(1, 8).map((s) => speedOf(s.playerId))
-    expect(leadoff).toBeGreaterThanOrEqual(Math.max(...others))
+    const speeds = lineup.slots.map((s) => speedOf(s.playerId)).sort((a, b) => b - a)
+    const median = speeds[Math.floor(speeds.length / 2)]
+    expect(speedOf(lineup.slots[0].playerId)).toBeGreaterThan(median)
   })
 
   it('部員がちょうど9人でも成立する', () => {
@@ -220,5 +231,81 @@ describe('おまかせの方針', () => {
       const player = roster.find((p) => p.id === slot.playerId)!
       expect(player.pitching).not.toBeNull()
     }
+  })
+})
+
+
+describe('打順の組み方', () => {
+  const roster = createInitialRoster(createRng(77))
+  const lineup = autoLineup(roster)
+  const byId = new Map(roster.map((p) => [p.id, p]))
+  const at = (order: number) => byId.get(lineup.slots[order - 1].playerId)!
+
+  /** スタメン9人 */
+  const starters = lineup.slots.map((slot) => byId.get(slot.playerId)!)
+
+  it('1番は出塁力と走力の両方が上位', () => {
+    const rank = (score: (p: (typeof starters)[number]) => number, player: (typeof starters)[number]) =>
+      starters.filter((other) => score(other) > score(player)).length
+
+    // どちらか片方だけ飛び抜けた選手ではなく、両方そこそこ上にいる
+    expect(rank(onBaseScore, at(1)) + rank(runningScore, at(1))).toBeLessThan(7)
+  })
+
+  it('2番は1番より出塁力が高いか、ほぼ並ぶ', () => {
+    // 1番は走力も見るので、純粋な出塁力では2番が上回ることがある
+    const top2 = [onBaseScore(at(1)), onBaseScore(at(2))]
+    const others = starters
+      .filter((p) => p !== at(1) && p !== at(2))
+      .map(onBaseScore)
+    expect(Math.min(...top2)).toBeGreaterThanOrEqual(Math.min(...others))
+  })
+
+  it('3番と4番に打力の上位が入る', () => {
+    const middle = [battingScore(at(3)), battingScore(at(4))]
+    const lower = [6, 7, 8, 9].map((order) => battingScore(at(order)))
+    expect(Math.min(...middle)).toBeGreaterThan(Math.min(...lower))
+  })
+
+  it('4番は3番より長打力が高い', () => {
+    expect(sluggingScore(at(4))).toBeGreaterThanOrEqual(sluggingScore(at(3)))
+  })
+
+  it('9番はスタメンで打力が最下位', () => {
+    const last = battingScore(at(9))
+    for (const player of starters) {
+      expect(battingScore(player)).toBeGreaterThanOrEqual(last)
+    }
+  })
+
+  it('投手は8番か9番に入る', () => {
+    // 打力だけで決めると、ミートの高い投手が2番に入ることがあった
+    const pitcherOrder = lineup.slots.findIndex((slot) => slot.position === 'P') + 1
+    expect(pitcherOrder).toBeGreaterThanOrEqual(8)
+  })
+
+  it('3番と4番に最も優秀な打者が入る', () => {
+    // 「チームで最も優秀な打者」の枠。上位打線から埋めていた頃は
+    // 3番のほうが1番より弱いという並びになっていた。
+    // 3番はミート寄り・4番はパワー寄りに選ぶので、
+    // 1人ずつ比べると前後することがある。**2人の合計**で見る
+    let middle = 0
+    let top = 0
+
+    for (let seed = 1; seed <= 20; seed++) {
+      const players = createInitialRoster(createRng(seed))
+      const slots = autoLineup(players).slots
+      const scoreAt = (order: number) =>
+        battingScore(players.find((p) => p.id === slots[order - 1].playerId)!)
+
+      middle += scoreAt(3) + scoreAt(4)
+      top += scoreAt(1) + scoreAt(2)
+    }
+
+    expect(middle).toBeGreaterThan(top)
+  })
+
+  it('9人が重複なく並ぶ', () => {
+    expect(new Set(lineup.slots.map((s) => s.playerId)).size).toBe(LINEUP_SIZE)
   })
 })

@@ -54,6 +54,20 @@ function trustFactor(trust: number): number {
  */
 const VELOCITY_WEIGHT = 0.7
 
+/**
+ * 球威の基準合わせ。
+ *
+ * 球速の尺度を実際に出る帯（115〜150km/h）に詰めたので、
+ * **同じ投手の球速スコアが12ほど上がった**。比重も0.7に上げたぶんと合わせて
+ * `stuff` が押し上がり、投手全体が一律に強くなって
+ * 打率が .28 → .24 まで落ちていた。
+ *
+ * 狙いは「球速の重要度を上げる」ことで、投手の底上げではない。
+ * 尺度を変えたぶんをここで戻す。
+ * **`velocityScore` の範囲か `VELOCITY_WEIGHT` を触ったら、ここも測り直す。**
+ */
+const STUFF_BASELINE = 13
+
 function has(player: Player, skillId: string): boolean {
   return player.skills.includes(skillId)
 }
@@ -103,7 +117,8 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   // 投手能力を持たない選手が登板した場合は極端に弱くする
   let stuff = pitching
     ? (velocityScore(pitching.velocity) * VELOCITY_WEIGHT +
-        pitching.breaking * (1 - VELOCITY_WEIGHT)) *
+        pitching.breaking * (1 - VELOCITY_WEIGHT) -
+        STUFF_BASELINE) *
       pitcherBoost
     : 20
   let control = pitching ? pitching.control * pitcherBoost : 20

@@ -5,6 +5,7 @@ import { overallRating } from './rating'
 import {
   autoSquad,
   FIRST_SQUAD_SIZE,
+  squadPriority,
   firstSquadSet,
   repairSquad,
   SECOND_SQUAD_MULTIPLIER,
@@ -18,14 +19,25 @@ describe('autoSquad', () => {
     expect(autoSquad(players)).toHaveLength(FIRST_SQUAD_SIZE)
   })
 
-  it('総合の高い順に選ぶ', () => {
+  it('優先度の高い順に選ぶ（総合＋学年の下駄）', () => {
     const squad = autoSquad(players)
     const byId = new Map(players.map((player) => [player.id, player]))
-    const ratings = squad.map((id) => overallRating(byId.get(id)!))
+    const scores = squad.map((id) => squadPriority(byId.get(id)!))
 
-    for (let i = 1; i < ratings.length; i++) {
-      expect(ratings[i]).toBeLessThanOrEqual(ratings[i - 1])
+    for (let i = 1; i < scores.length; i++) {
+      expect(scores[i]).toBeLessThanOrEqual(scores[i - 1])
     }
+  })
+
+  it('同じ総合なら下級生を残す', () => {
+    // 3年生は夏で抜けるので、ベンチ入りさせても得られるものが少ない
+    const senior = players.find((p) => p.grade === 3)!
+    const junior = { ...players.find((p) => p.grade === 1)!, id: 'same' }
+    const sameRating = { ...senior.batting }
+
+    expect(
+      squadPriority({ ...junior, batting: sameRating, pitching: senior.pitching }),
+    ).toBeGreaterThan(squadPriority(senior))
   })
 
   it('離脱中の選手は選ばない', () => {
@@ -83,5 +95,39 @@ describe('squadMultiplierOf', () => {
 
     expect(squadMultiplierOf(inSquad, squad)).toBe(1)
     expect(squadMultiplierOf(outOfSquad.id, squad)).toBe(SECOND_SQUAD_MULTIPLIER)
+  })
+})
+
+
+describe('ベンチ入りの学年', () => {
+  const roster = createInitialRoster(createRng(83))
+  const byId = new Map(roster.map((p) => [p.id, p]))
+
+  it('総合の低い上級生より、総合の高い下級生が残る', () => {
+    const squad = new Set(autoSquad(roster))
+    const outside = roster.filter((p) => !squad.has(p.id))
+    const inside = roster.filter((p) => squad.has(p.id))
+    if (outside.length === 0) return
+
+    // ベンチ外に落ちた1年生より総合が低い3年生が枠に残っていたら、
+    // 学年の下駄（10）を超える差があるはず
+    for (const junior of outside.filter((p) => p.grade === 1)) {
+      for (const senior of inside.filter((p) => p.grade === 3)) {
+        if (overallRating(senior) >= overallRating(junior)) continue
+        expect(overallRating(junior) - overallRating(senior)).toBeLessThan(10)
+      }
+    }
+  })
+
+  it('繰り上げも同じ物差しで決まる', () => {
+    // 半分だけ指定して、残りが優先度順に埋まることを見る
+    const partial = autoSquad(roster).slice(0, 5)
+    const filled = repairSquad(partial, roster)
+
+    expect(filled).toHaveLength(FIRST_SQUAD_SIZE)
+    const promoted = filled.slice(5).map((id) => squadPriority(byId.get(id)!))
+    for (let i = 1; i < promoted.length; i++) {
+      expect(promoted[i]).toBeLessThanOrEqual(promoted[i - 1])
+    }
   })
 })

@@ -12,7 +12,7 @@
  */
 
 import { overallRating } from './rating'
-import type { Player } from '@/core/types/player'
+import type { Grade, Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
 
 /** ベンチ入りの定員 */
@@ -22,13 +22,42 @@ export const FIRST_SQUAD_SIZE = 20
 export const SECOND_SQUAD_MULTIPLIER = 0.75
 
 /**
- * 総合上位でベンチ入りを埋める。
+ * ベンチ入りを決めるときの、学年ごとの下駄。
+ *
+ * **同じ総合なら下級生を残す。** 3年生は夏で引退するので、
+ * ベンチ入りさせても得られるものが少ない。
+ * 逆に下級生はベンチ外だと伸びが75%に落ちるので、
+ * 使わないとしても枠に入れておく価値がある。
+ *
+ * 総合の差がこれより大きければ、上級生でもきちんと残る。
+ * 「弱い上級生を外して強い下級生を入れる」だけで、
+ * 「強い上級生を外す」ことにはならない。
+ */
+const GRADE_BONUS: Record<Grade, number> = {
+  1: 10,
+  2: 5,
+  3: 0,
+}
+
+/**
+ * ベンチ入りの優先度。高いほど枠に残す。
+ * `autoSquad` と `repairSquad` で**同じ物差しを使う**。
+ */
+export function squadPriority(player: Player): number {
+  return overallRating(player) + GRADE_BONUS[player.grade]
+}
+
+/**
+ * ベンチ入りを埋める。
  * 新規ゲームと、指定が壊れたときの作り直しに使う。
+ *
+ * 総合だけで並べていた頃は、**引退間近の弱い3年生が枠を占め**、
+ * 伸びしろのある1年生がベンチ外に落ちていた。
  */
 export function autoSquad(players: Player[]): string[] {
   return [...players]
     .filter(isAvailable)
-    .sort((a, b) => overallRating(b) - overallRating(a))
+    .sort((a, b) => squadPriority(b) - squadPriority(a))
     .slice(0, FIRST_SQUAD_SIZE)
     .map((player) => player.id)
 }
@@ -65,7 +94,7 @@ export function repairSquad(squad: readonly string[], players: Player[]): string
   const inSquad = new Set(kept)
   const promoted = [...players]
     .filter((player) => !inSquad.has(player.id))
-    .sort((a, b) => overallRating(b) - overallRating(a))
+    .sort((a, b) => squadPriority(b) - squadPriority(a))
     .slice(0, FIRST_SQUAD_SIZE - kept.length)
     .map((player) => player.id)
 
