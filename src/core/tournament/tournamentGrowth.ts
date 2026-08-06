@@ -1,8 +1,8 @@
 /**
- * 大会を戦い抜いたことによる成長。
+ * 大会の1勝ごとの成長。
  *
- * 1試合ごとの成長（`matchGrowth`）とは別に、**大会が終わった時点で**
- * 勝ち上がった深さに応じてチーム全体が伸びる。
+ * 1試合ごとの成長（`matchGrowth`）とは別に、**1つ勝つたびに**
+ * その試合を戦ったメンバー全体が伸びる。
  *
  * 練習試合を10回こなすより、県大会を勝ち上がった1週間のほうが選手は変わる、
  * というのが狙い。大会が「積み上げた力を確かめるだけの場」ではなく、
@@ -11,6 +11,10 @@
  * 併せて、勝ち上がった選手には特殊能力が身につくことがある。
  * 特訓マスに止まるのを待つしかなかった習得経路に、
  * 「勝てば付く」という道を足す。優勝したときだけ金特に手が届く。
+ *
+ * **大会が終わってからまとめて配るのはやめた。**
+ * 準決勝で伸びた選手が決勝で活きない、勝ち上がっている実感が
+ * 最後の画面まで来ないなど、試合と手応えが切り離されていた。
  */
 
 import type { Rng } from '@/core/rng/random'
@@ -19,7 +23,7 @@ import { grantSkill } from '@/core/skill/grantSkill'
 import type { AbilityChange, GrowableKey, Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
 import type { SkillId, SkillRank } from '@/core/types/skill'
-import type { Tournament, TournamentKind } from '@/core/types/tournament'
+import type { TournamentKind } from '@/core/types/tournament'
 
 /**
  * 大会の格。全国は1試合の重みが違う。
@@ -33,13 +37,12 @@ const STAGE_WEIGHT: Record<TournamentKind, number> = {
 }
 
 /**
- * 1つ勝ったところまで来たことへの上乗せ。
- * **1勝もできなければ経験は0。** 出ただけで伸びるなら、
- * 「大会の結果で伸びる」という筋が通らなくなる。
+ * 1勝ぶんの経験。**負けた試合では何も起きない。**
+ * 出ただけで伸びるなら「大会の結果で伸びる」という筋が通らない。
  */
-const PARTICIPATION = 0.5
+const WIN_POINT = 1
 
-/** 優勝の上乗せ。ここだけ勝ち星1つぶんより大きい */
+/** 優勝を決めた試合への上乗せ。ここだけ勝ち星1つぶんより大きい */
 const CHAMPION_BONUS = 2
 
 /** この点数で能力が1上がる */
@@ -85,14 +88,18 @@ export function applyTournamentGrowth(
   rng: Rng,
   players: Player[],
   params: {
-    tournament: Tournament
+    kind: TournamentKind
+    /** この試合に勝ったか。負けた試合では何も起きない */
+    won: boolean
+    /** この勝利で優勝が決まったか */
+    champion: boolean
     /** スタメンの選手ID */
     starters: string[]
     /** ベンチ入りの選手ID */
     squad: string[]
   },
 ): TournamentGrowthResult {
-  const points = experiencePoints(params.tournament)
+  const points = matchExperience(params.kind, params.won, params.champion)
   if (points <= 0) {
     return { players, changes: [], skills: [], points: 0 }
   }
@@ -123,8 +130,8 @@ export function applyTournamentGrowth(
 
     const chance = Math.min(SKILL_CHANCE_MAX, gained * SKILL_CHANCE_PER_POINT)
     if (rng.chance(chance)) {
-      // 金特は優勝したチームの、信頼を得ている選手だけ
-      const canAimGold = params.tournament.champion && current.trust >= GOLD_TRUST
+      // 金特は優勝を決めた試合の、信頼を得ている選手だけ
+      const canAimGold = params.champion && current.trust >= GOLD_TRUST
       const rank: SkillRank = canAimGold && rng.chance(GOLD_SHARE) ? 'gold' : 'blue'
       const result = grantSkill(rng, current, rank)
       current = result.player
@@ -145,16 +152,16 @@ export function applyTournamentGrowth(
 }
 
 /**
- * 大会全体の経験点。
- *
- * 勝ち星がそのまま重みになる。**1勝もできなければ0**で、何も起きない。
+ * 1試合ぶんの経験点。**負ければ0**で、何も起きない。
+ * 優勝を決めた試合だけ上乗せがある。
  */
-export function experiencePoints(tournament: Tournament): number {
-  const wins = tournament.results.filter((result) => result.won).length
-  if (wins === 0) return 0
-
-  const raw = wins + PARTICIPATION + (tournament.champion ? CHAMPION_BONUS : 0)
-  return raw * STAGE_WEIGHT[tournament.kind]
+export function matchExperience(
+  kind: TournamentKind,
+  won: boolean,
+  champion: boolean,
+): number {
+  if (!won) return 0
+  return (WIN_POINT + (champion ? CHAMPION_BONUS : 0)) * STAGE_WEIGHT[kind]
 }
 
 /**

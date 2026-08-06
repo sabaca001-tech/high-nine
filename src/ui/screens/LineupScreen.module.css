@@ -18,6 +18,39 @@
   flex: 0 0 auto;
 }
 
+/*
+ * 入れ替える相手を待っている状態。
+ * 色だけでは「次のタップで入れ替わる」ことが伝わらないので言葉でも出す。
+ */
+.picked {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.pickedName {
+  font-weight: 800;
+}
+
+.pickedCancel {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-on-accent);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .hint {
   flex: 1 1 auto;
   font-size: var(--fs-xs);

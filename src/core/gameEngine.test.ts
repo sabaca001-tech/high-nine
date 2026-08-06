@@ -746,49 +746,48 @@ describe('大会', () => {
     throw new Error('地区大会に優勝するシードが見つからない')
   })
 
-  it('勝ち上がって大会を終えるとチームが伸びる', () => {
-    // 勝ち上がるまでシードを変えて探す。初戦敗退では伸びないのが正しい挙動
-    for (let seed = 300; seed < 360; seed++) {
+  it('1つ勝つたびにチームが伸びる（大会の終わりではなく試合ごと）', () => {
+    for (let seed = 300; seed < 380; seed++) {
       const inTournament = untilTournament(startedGame({ seed, regionId: 'tottori' }))
-      const played = playOutTournament(inTournament)
-      const wins = played.tournament!.results.filter((result) => result.won).length
-      if (wins < 3) continue
-
       const before = new Map(
-        played.players.map((player) => [player.id, overallRating(player)] as const),
+        inTournament.players.map((p) => [p.id, overallRating(p)] as const),
       )
-      const result = applyCommand(played, { type: 'finishTournament' })
 
-      // 大会そのものの経験でスタメンが伸びている
-      const grew = result.state.players.filter(
+      // 1試合だけ進める。勝てたシードを探す
+      const played = runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state)
+      const finished = applyCommand(played, { type: 'finishMatch' })
+      if (!finished.state.tournament?.results.some((r) => r.won)) continue
+
+      // **大会を終える前に**もう伸びている
+      const grew = finished.state.players.filter(
         (player) => overallRating(player) > (before.get(player.id) ?? 0),
       )
       expect(grew.length).toBeGreaterThan(0)
       expect(
-        result.events.some(
+        finished.events.some(
           (event) => event.type === 'message' && event.text.includes('一回り大きくなった'),
         ),
       ).toBe(true)
       return
     }
-    throw new Error('3回戦以上まで勝ち上がるシードが見つからない')
+    throw new Error('1回戦に勝つシードが見つからない')
   })
 
-  it('初戦敗退では大会の経験による成長は起きない', () => {
-    for (let seed = 400; seed < 460; seed++) {
+  it('負けた試合では大会の経験による成長は起きない', () => {
+    for (let seed = 400; seed < 480; seed++) {
       const inTournament = untilTournament(startedGame({ seed }))
-      const played = playOutTournament(inTournament)
-      if (played.tournament!.results.some((result) => result.won)) continue
+      const played = runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state)
+      const finished = applyCommand(played, { type: 'finishMatch' })
+      if (finished.state.tournament?.results.some((r) => r.won)) continue
 
-      const result = applyCommand(played, { type: 'finishTournament' })
       expect(
-        result.events.some(
+        finished.events.some(
           (event) => event.type === 'message' && event.text.includes('一回り大きくなった'),
         ),
       ).toBe(false)
       return
     }
-    throw new Error('初戦敗退するシードが見つからない')
+    throw new Error('1回戦で負けるシードが見つからない')
   })
 
   /**

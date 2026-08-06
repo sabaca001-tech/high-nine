@@ -2,47 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
-import { findRegion } from '@/core/types/region'
 import type { Player } from '@/core/types/player'
-import type { Tournament, TournamentKind } from '@/core/types/tournament'
-import { createTournament } from './tournament'
-import { applyTournamentGrowth, experiencePoints } from './tournamentGrowth'
+import { applyTournamentGrowth, matchExperience } from './tournamentGrowth'
 
-const KANAGAWA = findRegion('kanagawa')
 const roster = createInitialRoster(createRng(11))
-
-/** 指定した回戦まで勝ち上がった大会を作る */
-function played(
-  kind: TournamentKind,
-  wins: number,
-  options: { champion?: boolean; lost?: boolean } = {},
-): Tournament {
-  const base = createTournament(kind, KANAGAWA)
-  const results = Array.from({ length: wins }, (_, i) => ({
-    round: i + 1,
-    roundName: `${i + 1}回戦`,
-    opponentName: `相手${i + 1}`,
-    scoreFor: 3,
-    scoreAgainst: 1,
-    won: true,
-  }))
-  if (options.lost) {
-    results.push({
-      round: wins + 1,
-      roundName: `${wins + 1}回戦`,
-      opponentName: '強豪',
-      scoreFor: 0,
-      scoreAgainst: 5,
-      won: false,
-    })
-  }
-  return {
-    ...base,
-    results,
-    champion: options.champion ?? false,
-    eliminated: options.lost ?? false,
-  }
-}
 
 /** スタメン9人・ベンチ入り20人という想定の編成 */
 function squadOf(players: Player[]): { starters: string[]; squad: string[] } {
@@ -50,56 +13,53 @@ function squadOf(players: Player[]): { starters: string[]; squad: string[] } {
   return { starters: ids.slice(0, 9), squad: ids.slice(0, 20) }
 }
 
-describe('experiencePoints', () => {
-  it('勝ち上がるほど大きくなる', () => {
-    expect(experiencePoints(played('summerPref', 4, { lost: true }))).toBeGreaterThan(
-      experiencePoints(played('summerPref', 1, { lost: true })),
+const { starters, squad } = squadOf(roster)
+
+/** 1勝ぶんの成長を適用する */
+function win(seed: number, options: { champion?: boolean; kind?: 'summerPref' | 'nationals' } = {}) {
+  return applyTournamentGrowth(createRng(seed), roster, {
+    kind: options.kind ?? 'summerPref',
+    won: true,
+    champion: options.champion ?? false,
+    starters,
+    squad,
+  })
+}
+
+describe('matchExperience', () => {
+  it('負けた試合では0', () => {
+    expect(matchExperience('summerPref', false, false)).toBe(0)
+  })
+
+  it('勝てば経験が入る', () => {
+    expect(matchExperience('summerPref', true, false)).toBeGreaterThan(0)
+  })
+
+  it('優勝を決めた試合は上乗せがある', () => {
+    expect(matchExperience('summerPref', true, true)).toBeGreaterThan(
+      matchExperience('summerPref', true, false) * 2,
     )
   })
 
-  it('優勝には上乗せがある', () => {
-    const champion = experiencePoints(played('summerPref', 8, { champion: true }))
-    const runnerUp = experiencePoints(played('summerPref', 7, { lost: true }))
-    expect(champion).toBeGreaterThan(runnerUp + 1)
-  })
-
-  it('全国大会は同じ勝ち数でも得るものが大きい', () => {
-    expect(experiencePoints(played('nationals', 3, { lost: true }))).toBeGreaterThan(
-      experiencePoints(played('summerPref', 3, { lost: true })),
+  it('全国大会は1勝の重みが違う', () => {
+    expect(matchExperience('nationals', true, false)).toBeGreaterThan(
+      matchExperience('summerPref', true, false),
     )
   })
 
-  it('1勝もできなければ0（出ただけでは伸びない）', () => {
-    expect(experiencePoints(played('summerPref', 0, { lost: true }))).toBe(0)
-    expect(experiencePoints(played('summerPref', 1, { lost: true }))).toBeGreaterThan(0)
+  it('秋季大会は夏より軽い（新チームの腕試し）', () => {
+    expect(matchExperience('autumnPref', true, false)).toBeLessThan(
+      matchExperience('summerPref', true, false),
+    )
   })
 })
 
 describe('applyTournamentGrowth', () => {
-  it('勝ち上がるとスタメンが伸びる', () => {
-    const { starters, squad } = squadOf(roster)
-    const result = applyTournamentGrowth(createRng(1), roster, {
-      tournament: played('summerPref', 8, { champion: true }),
-      starters,
-      squad,
-    })
-
-    // 総合はいくつもの能力の平均なので、+4程度では動かない選手もいる。
-    // 「スタメンの大半に変化が出ている」ことで確かめる
-    const grownIds = new Set(result.changes.map((change) => change.playerId))
-    expect(starters.filter((id) => grownIds.has(id)).length).toBeGreaterThanOrEqual(7)
-
-    const totalGain = result.changes.reduce(
-      (total, change) => total + (change.after - change.before),
-      0,
-    )
-    expect(totalGain).toBeGreaterThan(20)
-  })
-
-  it('初戦敗退では何も起きない', () => {
-    const { starters, squad } = squadOf(roster)
+  it('負けた試合では何も起きない', () => {
     const result = applyTournamentGrowth(createRng(2), roster, {
-      tournament: played('summerPref', 0, { lost: true }),
+      kind: 'summerPref',
+      won: false,
+      champion: false,
       starters,
       squad,
     })
@@ -109,29 +69,61 @@ describe('applyTournamentGrowth', () => {
     expect(result.players).toEqual(roster)
   })
 
-  it('ベンチ外の選手は伸びない', () => {
-    const { starters, squad } = squadOf(roster)
-    const outsider = roster.find((player) => !squad.includes(player.id))!
-    const result = applyTournamentGrowth(createRng(3), roster, {
-      tournament: played('nationals', 6, { champion: true }),
+  it('1勝ごとにスタメンが伸びる', () => {
+    // 1試合ぶんは小さいので、何度か回して合計で見る
+    let total = 0
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const change of win(seed).changes) total += change.after - change.before
+    }
+    expect(total).toBeGreaterThan(0)
+  })
+
+  it('勝ち上がるほど積み上がる', () => {
+    // 3試合勝った状態を順に適用すると、1試合だけより伸びる
+    const rng = createRng(9)
+    let players = roster
+    let total = 0
+    for (let i = 0; i < 3; i++) {
+      const result = applyTournamentGrowth(rng, players, {
+        kind: 'summerPref',
+        won: true,
+        champion: false,
+        starters,
+        squad,
+      })
+      players = result.players
+      for (const change of result.changes) total += change.after - change.before
+    }
+
+    const single = applyTournamentGrowth(createRng(9), roster, {
+      kind: 'summerPref',
+      won: true,
+      champion: false,
       starters,
       squad,
     })
+    const singleTotal = single.changes.reduce((sum, c) => sum + (c.after - c.before), 0)
 
-    expect(result.changes.some((change) => change.playerId === outsider.id)).toBe(false)
+    expect(total).toBeGreaterThan(singleTotal)
+  })
+
+  it('ベンチ外の選手は伸びない', () => {
+    const outsider = roster.find((player) => !squad.includes(player.id))!
+    let touched = false
+    for (let seed = 1; seed <= 40; seed++) {
+      if (win(seed, { champion: true }).changes.some((c) => c.playerId === outsider.id)) {
+        touched = true
+      }
+    }
+    expect(touched).toBe(false)
   })
 
   it('スタメンはベンチ入りより伸びる', () => {
-    const { starters, squad } = squadOf(roster)
-    const tournament = played('summerPref', 8, { champion: true })
-
-    // 乱数のぶれを均すため、何度も回して合計で比べる
     let starterTotal = 0
     let benchTotal = 0
-    const rng = createRng(7)
-    for (let i = 0; i < 60; i++) {
-      const result = applyTournamentGrowth(rng, roster, { tournament, starters, squad })
-      for (const change of result.changes) {
+
+    for (let seed = 1; seed <= 120; seed++) {
+      for (const change of win(seed, { champion: true }).changes) {
         if (starters.includes(change.playerId)) starterTotal += change.after - change.before
         else benchTotal += change.after - change.before
       }
@@ -141,45 +133,44 @@ describe('applyTournamentGrowth', () => {
     expect(starterTotal).toBeGreaterThan(benchTotal)
   })
 
-  it('優勝すると特殊能力が身につくことがある', () => {
-    const { starters, squad } = squadOf(roster)
-    // 信頼度を上げておくと金特にも手が届く
+  it('優勝を決めた試合では金特に手が届く', () => {
     const trusted = roster.map((player) => ({ ...player, trust: 80 }))
-    const tournament = played('nationals', 6, { champion: true })
-
-    const rng = createRng(13)
     const ranks = new Set<string>()
-    for (let i = 0; i < 40; i++) {
-      const result = applyTournamentGrowth(rng, trusted, { tournament, starters, squad })
+
+    for (let seed = 1; seed <= 120; seed++) {
+      const result = applyTournamentGrowth(createRng(seed), trusted, {
+        kind: 'nationals',
+        won: true,
+        champion: true,
+        starters,
+        squad,
+      })
       for (const news of result.skills) ranks.add(news.rank)
     }
 
     expect(ranks.has('blue')).toBe(true)
     expect(ranks.has('gold')).toBe(true)
-    // 赤（マイナス能力）が付くことはない
     expect(ranks.has('red')).toBe(false)
   })
 
-  it('優勝していなければ金特は付かない', () => {
-    const { starters, squad } = squadOf(roster)
+  it('優勝を決めていない試合では金特は付かない', () => {
     const trusted = roster.map((player) => ({ ...player, trust: 90 }))
-    const tournament = played('summerPref', 7, { lost: true })
 
-    const rng = createRng(17)
-    for (let i = 0; i < 60; i++) {
-      const result = applyTournamentGrowth(rng, trusted, { tournament, starters, squad })
+    for (let seed = 1; seed <= 120; seed++) {
+      const result = applyTournamentGrowth(createRng(seed), trusted, {
+        kind: 'summerPref',
+        won: true,
+        champion: false,
+        starters,
+        squad,
+      })
       for (const news of result.skills) expect(news.rank).toBe('blue')
     }
   })
 
   it('元の選手を書き換えない', () => {
-    const { starters, squad } = squadOf(roster)
     const before = overallRating(roster[0])
-    applyTournamentGrowth(createRng(5), roster, {
-      tournament: played('summerPref', 8, { champion: true }),
-      starters,
-      squad,
-    })
+    win(5, { champion: true })
     expect(overallRating(roster[0])).toBe(before)
   })
 })

@@ -13,15 +13,18 @@ type Props = {
 /**
  * すごろくの盤面。1マス＝1日で1年365マスある。
  *
- * 全部を並べると読めないので、**現在地の前後だけを切り出して**表示する。
- * 前を少し残すのは「どこから来たか」が分かるようにするため。
+ * 全部を並べると読めないので、**現在地から先だけを切り出して**表示する。
  *
- * 先を3週間ぶん見せているのは、飛ばせない大会・合宿のマスに
- * **止まる前から気づける**ようにするため。カードは最大5マスしか進まないので、
- * 判断そのものには手前の数マスがあれば足りる。
+ * **現在地を左端に置く。** 過ぎたマスを左に残していた頃は、
+ * 手札で進める5マス先が画面の外に出てしまい、
+ * 「どのカードでどこに止まるか」が読めなかった。
+ * どこから来たかより、これからどこへ行くかのほうが判断に要る。
+ *
+ * 先は2週間ぶん見せる。カードは最大5マスしか進まないので、
+ * 判断には5マスあれば足りる。その先は大会・合宿に気づくための余白。
  */
-const BEHIND = 4
-const AHEAD = 24
+const BEHIND = 0
+const AHEAD = 14
 
 /** 大会・合宿は日付と名前を出す。飛ばせないマスなので予定として読めるようにする */
 function noteOf(cell: BoardCell): string | null {
@@ -40,9 +43,10 @@ export function BoardTrack({ board, position }: Props) {
   const currentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // 現在地を**左端**に寄せる。中央に寄せると先が見えなくなる
     currentRef.current?.scrollIntoView({
       behavior: 'smooth',
-      inline: 'center',
+      inline: 'start',
       block: 'nearest',
     })
   }, [position])

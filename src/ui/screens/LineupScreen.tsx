@@ -103,6 +103,69 @@ export function LineupEditor() {
     setSquad(game.squad.filter((id) => id !== item.id))
   }
 
+  /**
+   * タップで選んだ2人を入れ替える。
+   *
+   * **ドラッグだけだと届かない組み合わせがある。** 一覧が長いと
+   * スタメンの上のほうとベンチ入りの下のほうが同時に画面に入らず、
+   * つまんだまま運べなかった（実際に入れ替えられなかった）。
+   *
+   * 「置く」ドラッグと違い、こちらは**そのまま入れ替える**。
+   * どちらを掴んだかに関係なく結果が同じになる。
+   */
+  const swapPlayers = (aId: string, bId: string) => {
+    if (!game || aId === bId) return
+
+    const starterIds = game.lineup.slots.map((slot) => slot.playerId)
+    const inSquad = new Set(game.squad)
+    const zoneOf = (id: string) =>
+      starterIds.includes(id) ? ZONE_STARTER : inSquad.has(id) ? ZONE_BENCH : ZONE_OUT
+
+    const zoneA = zoneOf(aId)
+    const zoneB = zoneOf(bId)
+
+    // ── スタメン同士。打順を入れ替える ──
+    if (zoneA === ZONE_STARTER && zoneB === ZONE_STARTER) {
+      const slots = [...game.lineup.slots]
+      const i = starterIds.indexOf(aId)
+      const j = starterIds.indexOf(bId)
+      slots[i] = { ...slots[i], playerId: bId }
+      slots[j] = { ...slots[j], playerId: aId }
+      setLineup({ slots })
+      return
+    }
+
+    // ── 片方がスタメン。控えを上げ、押し出された選手が相手の居た場所へ ──
+    if (zoneA === ZONE_STARTER || zoneB === ZONE_STARTER) {
+      const starterId = zoneA === ZONE_STARTER ? aId : bId
+      const otherId = zoneA === ZONE_STARTER ? bId : aId
+      const otherZone = zoneA === ZONE_STARTER ? zoneB : zoneA
+
+      const slots = [...game.lineup.slots]
+      const index = starterIds.indexOf(starterId)
+      slots[index] = { ...slots[index], playerId: otherId }
+      setLineup({ slots })
+
+      // 相手がベンチ外なら、押し出されたスタメンがベンチ外へ下がる。
+      // ベンチ入りなら両方ともベンチ入りのまま
+      const next = game.squad.filter((id) => id !== otherId && id !== starterId)
+      next.push(otherId)
+      if (otherZone === ZONE_BENCH) next.push(starterId)
+      setSquad(next)
+      return
+    }
+
+    // ── ベンチ入りとベンチ外。所属を入れ替える ──
+    if (zoneA !== zoneB) {
+      const benchId = zoneA === ZONE_BENCH ? aId : bId
+      const outId = zoneA === ZONE_BENCH ? bId : aId
+      setSquad([...game.squad.filter((id) => id !== benchId), outId])
+      return
+    }
+
+    // 同じ列の控え同士。並び順に意味が無いので何もしない
+  }
+
   const drag = useDragAndDrop(handleDrop)
 
   if (!game) return null
@@ -136,7 +199,19 @@ export function LineupEditor() {
     // プレート全体を掴めるようにすると一覧がスクロールできなくなる
     onHandlePointerDown: (event: ReactPointerEvent) =>
       drag.handlePointerDown({ id, from: zone }, event),
-    onClick: () => setSelectedId(id),
+    onClick: () => {
+      if (selectedId === null) {
+        setSelectedId(id)
+        return
+      }
+      // 同じ選手をもう一度タップしたら選択を解く
+      if (selectedId === id) {
+        setSelectedId(null)
+        return
+      }
+      swapPlayers(selectedId, id)
+      setSelectedId(null)
+    },
     selected: selectedId === id,
     dragging: drag.dragging?.id === id,
   })
@@ -150,7 +225,7 @@ export function LineupEditor() {
         onPointerCancel={drag.handlePointerUp}
       >
         <div className={styles.toolbar}>
-          <p className={styles.hint}>⠿ をつまんで移動／タップで能力表示</p>
+          <p className={styles.hint}>タップで選択 → もう1人タップで入れ替え（⠿ で移動）</p>
           <button
             type="button"
             className={styles.autoButton}
@@ -177,6 +252,24 @@ export function LineupEditor() {
                 <span className={styles.planNote}>{plan.description}</span>
               </button>
             ))}
+          </div>
+        )}
+
+        {/*
+          選択中であることを言葉でも出す。
+          色だけだと「次にタップしたら入れ替わる」ことが伝わらない
+        */}
+        {selected && (
+          <div className={styles.picked}>
+            <span className={styles.pickedName}>{selected.name}</span>
+            を入れ替える相手をタップ
+            <button
+              type="button"
+              className={styles.pickedCancel}
+              onClick={() => setSelectedId(null)}
+            >
+              やめる
+            </button>
           </div>
         )}
 

@@ -47,8 +47,11 @@
 }
 
 .selected {
+  /* **選択中は強く出す。** 次にタップした相手と入れ替わるので、
+     どれを選んでいるか一目で分からないと事故になる */
   border-color: #fff;
-  box-shadow: 0 0 0 2px var(--accent);
+  box-shadow: 0 0 0 3px var(--accent);
+  transform: scale(1.02);
 }
 
 /* つまんでいる間は元の場所を薄くして、どこから動かしたか分かるようにする */

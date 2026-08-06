@@ -809,52 +809,18 @@ function finishTournament(state: GameState): EngineResult {
     })
   }
 
-  // 大会を戦い抜いたことによる成長。**引退処理より先に行う。**
-  // あとにすると、3年生が最後の夏で得たものがOB名鑑の記録に載らない
-  const rng = createRng(state.rngState)
-  const grown = applyTournamentGrowth(rng, state.players, {
-    tournament,
-    starters: state.lineup.slots.map((slot) => slot.playerId),
-    squad: state.squad,
-  })
+  // 大会での成長は**1試合ごと**に済んでいる（finishMatch）。
+  // ここでまとめて配っていた頃は、準決勝で伸びた選手が決勝で活きず、
+  // 勝ち上がっている実感が最後の画面まで来なかった
 
-  if (grown.changes.length > 0) {
-    events.push({ type: 'ability', changes: grown.changes })
-    events.push({
-      type: 'message',
-      text: `${tournament.name}を戦い抜き、${
-        new Set(grown.changes.map((change) => change.playerId)).size
-      }人が一回り大きくなった`,
-      tone: 'good',
-    })
-  }
-  for (const news of grown.skills) {
-    const skill = findSkill(news.skillId)
-    if (!skill) continue
-    events.push({
-      type: 'message',
-      text:
-        news.rank === 'gold'
-          ? `${news.playerName}が大舞台で覚醒し、金の特殊能力「${skill.name}」を身につけた！`
-          : `${news.playerName}が大会での経験から特殊能力「${skill.name}」を身につけた`,
-      tone: 'good',
-    })
-  }
-
-  // 夏が終われば3年生は引退する。成長を反映した選手で判定する
-  const retired = retireThirdYears(
-    { ...state, players: grown.players, rngState: rng.state },
-    tournament,
-    events,
-  )
+  // 夏が終われば3年生は引退する
+  const retired = retireThirdYears(state, tournament, events)
 
   const { log: log2, serial: serial2 } = appendLog(state.log, events, state.serial)
 
   return {
     state: {
       ...state,
-      players: grown.players,
-      rngState: rng.state,
       ...retired,
       tournament: null,
       board,
@@ -1140,6 +1106,40 @@ function finishMatch(state: GameState): EngineResult {
       won,
     })
 
+    // **1つ勝つたびに、その試合を戦ったメンバーが伸びる。**
+    // 大会が終わってからまとめて配っていた頃は、
+    // 準決勝で伸びた選手が決勝で活きず、手応えが試合と切り離されていた
+    const grown = applyTournamentGrowth(rng, players, {
+      kind: tournament.kind,
+      won,
+      champion: tournament.champion,
+      starters: state.lineup.slots.map((slot) => slot.playerId),
+      squad: state.squad,
+    })
+
+    if (grown.changes.length > 0) {
+      events.push({ type: 'ability', changes: grown.changes })
+      events.push({
+        type: 'message',
+        text: `${roundName(state.tournament.round, state.tournament.totalRounds)}を勝ち抜き、${
+          new Set(grown.changes.map((change) => change.playerId)).size
+        }人が一回り大きくなった`,
+        tone: 'good',
+      })
+    }
+    for (const news of grown.skills) {
+      const skill = findSkill(news.skillId)
+      if (!skill) continue
+      events.push({
+        type: 'message',
+        text:
+          news.rank === 'gold'
+            ? `${news.playerName}が大舞台で覚醒し、金の特殊能力「${skill.name}」を身につけた！`
+            : `${news.playerName}が大会での経験から特殊能力「${skill.name}」を身につけた`,
+        tone: 'good',
+      })
+    }
+
     // **勝っただけならまだ大会は終わらない。** 次の回戦は盤面の先のマスにあるので、
     // いったん普通の進行に戻す。連戦にすると試合の合間に手を打つ余地が無い
     const over = isTournamentOver(tournament)
@@ -1159,7 +1159,7 @@ function finishMatch(state: GameState): EngineResult {
       state: {
         ...state,
         rngState: rng.state,
-        players,
+        players: grown.players,
         rivals,
         pendingMatch: null,
         // 1試合ごとの評判はここで動かす。強い相手を倒すほど大きく上がるので、
