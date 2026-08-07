@@ -175,11 +175,22 @@ describe('大会の日程', () => {
     expect(monthOfDay(dayOfTournament('springNationals'))).toBe(3)
   })
 
-  it('冬合宿は12月にある', () => {
+  it('合宿は夏（8月）と冬（12月）の2回ある', () => {
     const board = createBoard(createRng(10))
-    const camp = board.find((cell) => cell.kind === 'camp')!
+    const camps = board.filter((cell) => cell.kind === 'camp')
 
-    expect(monthOfDay(dayOfCell(camp.index))).toBe(12)
-    expect(camp.index).toBe(cellOfDay(dayOf(12, 26)))
+    expect(camps).toHaveLength(2)
+    expect(camps.map((cell) => monthOfDay(dayOfCell(cell.index)))).toEqual([8, 12])
+    expect(camps[0].index).toBe(cellOfDay(dayOf(8, 25)))
+    expect(camps[1].index).toBe(cellOfDay(dayOf(12, 26)))
+  })
+
+  it('夏合宿は夏の全国大会が終わったあとに置かれる', () => {
+    const board = createBoard(createRng(11))
+    const summerCamp = board.filter((cell) => cell.kind === 'camp')[0]
+    // 全国大会は最大6回戦（中1日）。最後の回戦より後でないと日程が重なる
+    const lastNationals = cellOfDay(dayOfTournament('nationals')) + ROUND_GAP * 5
+
+    expect(summerCamp.index).toBeGreaterThan(lastNationals)
   })
 })

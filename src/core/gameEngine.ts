@@ -68,7 +68,14 @@ import {
 import type { ScoutRegion, ScoutResult } from '@/core/scout/scouting'
 import { createTraits, shiftTraits } from '@/core/scout/scoutTraits'
 import { playU18, selectU18, U18_SQUAD_SIZE } from '@/core/player/u18'
-import { applyCamp, findCampPlan, CAMP_AFTERGLOW } from '@/core/camp/campDefs'
+import {
+  applyCamp,
+  campSeasonOf,
+  findCampPlan,
+  CAMP_AFTERGLOW,
+  CAMP_SEASON_LABELS,
+} from '@/core/camp/campDefs'
+import { findEventChoice, findPlayerEvent } from '@/core/event/playerEvents'
 import { advanceSeason } from '@/core/season/graduation'
 import { applyStreaks } from '@/core/player/streak'
 import {
@@ -89,13 +96,16 @@ import { formatFunds, FUNDS_MAX, monthlyFunds, tournamentPrize } from '@/core/sh
 import { scoutTripCost, tournamentTravel } from '@/core/shop/travel'
 import { monthlyUpkeep, UNPAID_TRUST_PENALTY } from '@/core/shop/upkeep'
 import {
-  findManager,
-  groundMultiplier,
+  advanceManagers,
+  findManagerRole,
   managerConditionCost,
   managerDefenseBonus,
   managerFundsRate,
   managerGrowthBonus,
   managerRecovery,
+} from '@/core/staff/managers'
+import {
+  groundMultiplier,
   clampGroundLevel,
   GROUND_DECAY_STEPS,
   GROUND_LEVEL_MIN,
@@ -204,7 +214,8 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     springBerth: false,
     funds: monthlyFunds(REPUTATION_INITIAL),
     groundLevel: 1,
-    managerId: null,
+    managers: [],
+    pendingEvent: null,
     equipment: [],
     pendingFork: false,
     reputation: REPUTATION_INITIAL,
@@ -284,14 +295,14 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return finishTournament(state)
     case 'chooseCampPlan':
       return chooseCampPlan(state, command.planId)
+    case 'choosePlayerEventChoice':
+      return choosePlayerEventChoice(state, command.choiceId)
     case 'buyItem':
       return buyItem(state, command.itemId)
     case 'setTrainingFocus':
       return setTrainingFocus(state, command.playerId, command.focus)
     case 'upgradeGround':
       return upgradeGround(state, command.steps ?? 1)
-    case 'hireManager':
-      return hireManager(state, command.managerId)
     case 'buyEquipment':
       return buyEquipment(state, command.equipmentId)
     case 'visitScoutRegion':
@@ -390,30 +401,6 @@ function buyEquipment(state: GameState, equipmentId: string): EngineResult {
       ...state,
       equipment: [...state.equipment, equipmentId],
       funds: state.funds - equipment.price,
-      serial,
-      log,
-    },
-    events,
-  }
-}
-
-/** マネージャーを雇う。1人だけ在籍できる */
-function hireManager(state: GameState, managerId: string): EngineResult {
-  const manager = findManager(managerId)
-  if (!manager || state.managerId === managerId || state.funds < manager.hireCost) {
-    return { state, events: [] }
-  }
-
-  const events: GameEvent[] = [
-    { type: 'message', text: `${manager.name}がマネージャーに就任した`, tone: 'good' },
-  ]
-  const { log, serial } = appendLog(state.log, events, state.serial)
-
-  return {
-    state: {
-      ...state,
-      managerId: manager.id,
-      funds: state.funds - manager.hireCost,
       serial,
       log,
     },
@@ -522,7 +509,12 @@ function applyConvertTraining(players: GameState['players']): {
   return { players: updated, events }
 }
 
-/** 冬合宿の方針を決めて実施する */
+/**
+ * 合宿の方針を決めて実施する。
+ *
+ * **能力は伸びない。** 伸びるのは特殊能力を掴んだ選手だけで、
+ * 誰が掴むかは選べない（信頼度が高いほど選ばれやすい）。
+ */
 function chooseCampPlan(state: GameState, planId: string): EngineResult {
   const plan = findCampPlan(planId)
   if (state.phase !== 'camp' || !plan) {
@@ -530,19 +522,43 @@ function chooseCampPlan(state: GameState, planId: string): EngineResult {
   }
 
   const rng = createRng(state.rngState)
-  const firstSquad = firstSquadSet(state.squad)
-  const { players, changes } = applyCamp(
-    rng,
-    state.players,
-    plan,
-    groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managerId),
-    (player) => squadMultiplierOf(player.id, firstSquad),
-  )
+  const season = campSeasonOf(state.month)
+  const { players, granted, missed } = applyCamp(rng, state.players, plan, {
+    squad: state.squad,
+    facilityMultiplier: groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managers),
+  })
 
   const events: GameEvent[] = [
-    { type: 'message', text: `冬合宿：${plan.label}に打ち込んだ`, tone: 'good' },
+    {
+      type: 'message',
+      text: `${CAMP_SEASON_LABELS[season]}：${plan.label}を打った`,
+      tone: 'normal',
+    },
   ]
-  if (changes.length > 0) events.push({ type: 'ability', changes })
+  for (const news of granted) {
+    const skill = findSkill(news.skillId)
+    if (!skill) continue
+    events.push({
+      type: 'message',
+      text:
+        news.rank === 'gold'
+          ? `${news.playerName}が合宿で覚醒！ 「${skill.name}」を身につけた`
+          : `${news.playerName}が「${skill.name}」を身につけた`,
+      tone: 'good',
+    })
+  }
+  for (const news of missed) {
+    const skill = findSkill(news.skillId)
+    if (!skill) continue
+    events.push({
+      type: 'message',
+      text: `${news.playerName}は「${skill.name}」に挑んだが、あと一歩だった`,
+      tone: 'normal',
+    })
+  }
+  if (granted.length === 0 && missed.length === 0) {
+    events.push({ type: 'message', text: '手応えのある選手は現れなかった', tone: 'normal' })
+  }
 
   const { log, serial } = appendLog(state.log, events, state.serial)
 
@@ -553,6 +569,85 @@ function chooseCampPlan(state: GameState, planId: string): EngineResult {
       players,
       // 合宿の成果はしばらく練習にも効く
       practiceBoost: CAMP_AFTERGLOW,
+      serial,
+      phase: 'cardSelect',
+      log,
+    },
+    events,
+  }
+}
+
+/**
+ * 個人イベントで選択肢を選び、結果を返す。
+ *
+ * 効果が入るのは**ここだけ**。マスに止まった時点では
+ * 「誰に何が起きたか」しか決まっていない（`resolveCell`）。
+ * 先に効果まで決めてしまうと、選択が結果を変えられない。
+ */
+function choosePlayerEventChoice(state: GameState, choiceId: string): EngineResult {
+  const pending = state.pendingEvent
+  if (state.phase !== 'playerEvent' || !pending) return { state, events: [] }
+
+  const event = findPlayerEvent(pending.eventId)
+  const target = state.players.find((player) => player.id === pending.playerId)
+
+  // 対象が消えている・定義が見つからない場合は、選択待ちのまま詰まらせない。
+  // ここで抜けないと、どの選択肢を押しても進めない状態になる
+  if (!event || !target) {
+    return {
+      state: { ...state, pendingEvent: null, phase: 'cardSelect' },
+      events: [],
+    }
+  }
+
+  // 知らない選択肢は何もしない（合宿の方針と同じ扱い）
+  const choice = findEventChoice(event, choiceId)
+  if (!choice) return { state, events: [] }
+
+  // 部費が要る選択肢は、払えるときだけ通す（借金は作らない）
+  if (choice.cost !== undefined && state.funds < choice.cost) {
+    return { state, events: [] }
+  }
+
+  const rng = createRng(state.rngState)
+  const outcome = choice.resolve(rng, target)
+  const teamTrust = outcome.teamTrustDelta ?? 0
+
+  const players = state.players.map((player) => {
+    if (player.id === target.id) {
+      return teamTrust === 0
+        ? outcome.player
+        : { ...outcome.player, trust: clamp(outcome.player.trust + teamTrust, 0, 100) }
+    }
+    return teamTrust === 0
+      ? player
+      : { ...player, trust: clamp(player.trust + teamTrust, 0, 100) }
+  })
+
+  const events: GameEvent[] = [
+    { type: 'message', text: outcome.text, tone: outcome.tone },
+  ]
+  if (outcome.changes.length > 0) events.push({ type: 'ability', changes: outcome.changes })
+
+  const fundsDelta = outcome.fundsDelta ?? 0
+  if (fundsDelta !== 0) {
+    events.push({
+      type: 'message',
+      text: `部費 ${formatFunds(Math.abs(fundsDelta))} を使った`,
+      tone: 'normal',
+    })
+  }
+
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      rngState: rng.state,
+      players,
+      lineup: repairLineup(state.lineup, players),
+      funds: clamp(state.funds + fundsDelta, 0, FUNDS_MAX),
+      pendingEvent: null,
       serial,
       phase: 'cardSelect',
       log,
@@ -639,7 +734,7 @@ function startMatch(state: GameState): EngineResult {
     opponentStrength: setup.opponentStrength,
     kind: setup.kind,
     ...(setup.decisive ? { decisive: true } : {}),
-    defenseBonus: managerDefenseBonus(state.managerId),
+    defenseBonus: managerDefenseBonus(state.managers),
   })
 
   return {
@@ -1265,7 +1360,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     rng,
     state.players,
     PRACTICE_DEFS[card.kind],
-    managerConditionCost(state.managerId),
+    managerConditionCost(state.managers),
   )
 
   // 投手の疲労は**進んだ日数**で抜ける。
@@ -1305,8 +1400,8 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     perPlayerMultiplier: (player) => squadMultiplierOf(player.id, firstSquad),
     // グラウンド整備とマネージャーは常時かかる恒久的な倍率
     facilityMultiplier:
-      groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managerId),
-    defenseBonus: managerDefenseBonus(state.managerId),
+      groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managers),
+    defenseBonus: managerDefenseBonus(state.managers),
     // 練習試合が他県への遠征になることがあるので、所在地と部費を渡す
     region: findRegion(state.regionId),
     funds: monthly.funds,
@@ -1337,6 +1432,8 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     phase = 'lineupCheck'
   } else if (outcome.fork) {
     phase = 'fork'
+  } else if (outcome.playerEvent) {
+    phase = 'playerEvent'
   } else if (cell.kind === 'tournament' && cell.tournamentKind) {
     // 大会マスに止まった。まだ始まっていなければ開幕させる
     if (!tournament || tournament.kind !== cell.tournamentKind) {
@@ -1374,6 +1471,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       pendingMatch: null,
       pendingSetup: outcome.matchSetup ?? null,
       pendingFork: outcome.fork === true,
+      pendingEvent: outcome.playerEvent ?? null,
       tournament,
       // 遠征費などマスで発生した収支。部費は0を下回らせない
       funds: clamp(monthly.funds + (outcome.fundsDelta ?? 0), 0, FUNDS_MAX),
@@ -1545,7 +1643,7 @@ export function applyOneMonth(
   events.push({ type: 'message', text: `${state.year}年目 ${month}月`, tone: 'normal' })
 
   // 月をまたぐと少しだけ体力が戻る。トレーナーが居るとさらに回復する
-  const recovery = 10 + managerRecovery(state.managerId)
+  const recovery = 10 + managerRecovery(state.managers)
   players = players.map((player) => ({
     ...player,
     condition: Math.min(100, player.condition + recovery),
@@ -1562,7 +1660,7 @@ export function applyOneMonth(
   }
 
   // 月初に部費が支給され、設備と備品の維持費が引かれる
-  const income = Math.round(monthlyFunds(state.reputation) * managerFundsRate(state.managerId))
+  const income = Math.round(monthlyFunds(state.reputation) * managerFundsRate(state.managers))
   const upkeep = monthlyUpkeep(players.length, state.groundLevel)
   const unpaid = funds + income < upkeep.total
   funds = clamp(funds + income - upkeep.total, 0, FUNDS_MAX)
@@ -1762,6 +1860,15 @@ function advanceYear(state: GameState): EngineResult {
   const players = [...change.players, ...scouted.joined]
   serial = change.serial
 
+  // マネージャーも部員。3年生を送り出し、確率で新しく1人入部してくる
+  const managerChange = advanceManagers(rng, {
+    managers: state.managers,
+    year,
+    serial,
+    takenNames: players.map((player) => player.name),
+  })
+  serial = managerChange.serial
+
   // ライバル校の1年を進める。強豪は強豪のまま、力をつける学校も出てくる
   const rivals: RivalSchool[] = []
   const rivalNews: string[] = []
@@ -1796,6 +1903,22 @@ function advanceYear(state: GameState): EngineResult {
   })
   for (const news of change.careerNews) {
     events.push({ type: 'message', text: news, tone: 'good' })
+  }
+  for (const manager of managerChange.graduated) {
+    const role = findManagerRole(manager.roleId)
+    events.push({
+      type: 'message',
+      text: `マネージャーの${manager.name}が卒業した（${role?.label ?? ''}）`,
+      tone: 'normal',
+    })
+  }
+  if (managerChange.joined) {
+    const role = findManagerRole(managerChange.joined.roleId)
+    events.push({
+      type: 'message',
+      text: `${managerChange.joined.name}がマネージャーとして入部した。${role?.label ?? ''}を任せる`,
+      tone: 'good',
+    })
   }
   // ログには会いに行った候補だけを出す。視察した県の全員を流すと埋まってしまう
   for (const result of scouted.results.filter((entry) => entry.approached)) {
@@ -1850,6 +1973,7 @@ function advanceYear(state: GameState): EngineResult {
         rested,
       ),
       graduates,
+      managers: managerChange.managers,
       pendingSeason,
       rivals,
       // 訪問の記録と候補は使い切り。次の秋にまた視察して回る。

@@ -12,7 +12,8 @@ import type { RivalSchool } from '@/core/rival/rivals'
 import type { ScoutResult } from '@/core/scout/scouting'
 import { TRAIT_LABELS } from '@/core/scout/scoutTraits'
 import { EQUIPMENTS } from '@/core/shop/equipmentDefs'
-import { findManager, groundName, GROUND_LEVEL_MAX } from '@/core/shop/facility'
+import { groundName, GROUND_LEVEL_MAX } from '@/core/shop/facility'
+import { findManagerRole, MANAGER_JOIN_CHANCE } from '@/core/staff/managers'
 import { formatFunds, monthlyFunds } from '@/core/shop/funds'
 import { monthlyUpkeep } from '@/core/shop/upkeep'
 import { uniformName } from '@/core/team/uniforms'
@@ -234,7 +235,6 @@ function FacilityTab() {
   const game = useGameStore((s) => s.game)!
   const setScreen = useGameStore((s) => s.setScreen)
 
-  const manager = findManager(game.managerId)
   const upkeep = monthlyUpkeep(game.players.length, game.groundLevel)
   const income = monthlyFunds(game.reputation)
 
@@ -261,14 +261,23 @@ function FacilityTab() {
       </Section>
 
       <Section title="マネージャー">
-        {manager ? (
-          <>
-            <Row label="在籍" value={manager.name} />
-            <p className={styles.note}>{manager.description}</p>
-          </>
+        {game.managers.length > 0 ? (
+          game.managers.map((manager) => {
+            const role = findManagerRole(manager.roleId)
+            return (
+              <div key={manager.id}>
+                <Row label={`${manager.grade}年 ${manager.name}`} value={role?.label ?? ''} />
+                <p className={styles.note}>{role?.description}</p>
+              </div>
+            )
+          })
         ) : (
-          <p className={styles.note}>まだ在籍していません。</p>
+          <p className={styles.note}>いまは在籍していません。</p>
         )}
+        <p className={styles.note}>
+          マネージャーは雇えません。毎年 約{Math.round(MANAGER_JOIN_CHANCE * 100)}%
+          の確率で入部してきて、3年間在籍します。
+        </p>
       </Section>
 
       <Section title="練習器具">

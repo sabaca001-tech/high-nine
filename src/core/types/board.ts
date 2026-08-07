@@ -13,11 +13,12 @@ export type CellKind =
   | 'rest' // 緑: 体力が大きく回復
   | 'boost' // 黄: 練習効率アップ
   | 'training' // 特: 特訓（特殊能力の取得に挑戦）
+  | 'event' // 人: 部員1人に起きる出来事。監督が選ぶ
   | 'alumni' // OB: 卒業生の訪問
   | 'match' // 試: 練習試合
   | 'fork' // 分: ルート分岐。この先の道筋を選ぶ
   | 'tournament' // 大会。必ず止まる
-  | 'camp' // 冬合宿。必ず止まる
+  | 'camp' // 合宿（夏・冬）。必ず止まる
   | 'blank' // 何も起きない
   | 'goal' // 年度末（3月31日）
 
@@ -29,11 +30,12 @@ export const CELL_LABELS: Record<CellKind, string> = {
   rest: '休養',
   boost: '練習効率アップ',
   training: '特訓',
+  event: '部員の出来事',
   alumni: 'OB訪問',
   match: '練習試合',
   fork: 'ルート分岐',
   tournament: '大会',
-  camp: '冬合宿',
+  camp: '合宿',
   blank: '何もなし',
   goal: '年度末',
 }
@@ -47,6 +49,7 @@ export const CELL_MARKS: Record<CellKind, string> = {
   rest: '緑',
   boost: '黄',
   training: '特',
+  event: '人',
   alumni: 'OB',
   match: '試',
   fork: '分',

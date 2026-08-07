@@ -66,10 +66,10 @@ type GameStore = {
   playTournamentMatch: () => void
   finishTournament: () => void
   chooseCampPlan: (planId: string) => void
+  choosePlayerEventChoice: (choiceId: string) => void
   buyItem: (itemId: string) => void
   setTrainingFocus: (playerId: string, focus: TrainingFocus) => void
   upgradeGround: (steps?: number) => void
-  hireManager: (managerId: string) => void
   buyEquipment: (equipmentId: string) => void
   visitScoutRegion: (regionId: string) => void
   approachProspect: (prospectId: string) => void
@@ -196,6 +196,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     dispatch(set, game, { type: 'chooseCampPlan', planId })
   },
 
+  choosePlayerEventChoice: (choiceId) => {
+    const { game } = get()
+    if (!game) return
+    dispatch(set, game, { type: 'choosePlayerEventChoice', choiceId })
+  },
+
   buyItem: (itemId) => {
     const { game } = get()
     if (!game) return
@@ -218,12 +224,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { game } = get()
     if (!game) return
     dispatch(set, game, { type: 'buyEquipment', equipmentId })
-  },
-
-  hireManager: (managerId) => {
-    const { game } = get()
-    if (!game) return
-    dispatch(set, game, { type: 'hireManager', managerId })
   },
 
   visitScoutRegion: (regionId) => {

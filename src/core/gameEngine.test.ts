@@ -42,6 +42,7 @@ import { benchPlayers } from './match/teamState'
 import { localRivals, nationalRivals } from './rival/rivals'
 import { isTournamentOver } from './types/tournament'
 import { overallRating } from './player/rating'
+import { findPlayerEvent } from './event/playerEvents'
 import {
   findScoutRegion,
   MAX_APPROACHES,
@@ -845,13 +846,13 @@ describe('大会', () => {
   })
 })
 
-describe('冬合宿', () => {
+describe('合宿', () => {
   /** 合宿マスに止まるまで進める */
   const reachCamp = (seed: number) => playUntilPhase(startedGame({ seed }), 'camp')
 
-  it('12月の合宿マスに止まると合宿フェーズになる', () => {
+  it('最初に来るのは8月の夏合宿', () => {
     const state = reachCamp(91)
-    expect(state.month).toBe(12)
+    expect(state.month).toBe(8)
     expect(state.phase).toBe('camp')
     // 合宿マスも飛ばせない
     expect(state.board[state.boardPosition].kind).toBe('camp')
@@ -866,15 +867,17 @@ describe('冬合宿', () => {
     expect(next).toBe(state)
   })
 
-  it('方針を選ぶと能力が伸び、練習フェーズへ戻る', () => {
+  it('方針を選んでも能力値は伸びない。伸びるのは特殊能力', () => {
     const state = reachCamp(93)
     const sumMeet = (s: GameState) => s.players.reduce((t, p) => t + p.batting.meet, 0)
+    const sumSkills = (s: GameState) => s.players.reduce((t, p) => t + p.skills.length, 0)
     const before = sumMeet(state)
 
     const { state: next } = applyCommand(state, { type: 'chooseCampPlan', planId: 'batting' })
 
     expect(next.phase).toBe('cardSelect')
-    expect(sumMeet(next)).toBeGreaterThan(before)
+    expect(sumMeet(next)).toBe(before)
+    expect(sumSkills(next)).toBeGreaterThanOrEqual(sumSkills(state))
     // 合宿の余韻で練習効率バフが付く
     expect(next.practiceBoost).not.toBeNull()
   })
@@ -885,17 +888,18 @@ describe('冬合宿', () => {
     expect(next).toBe(state)
   })
 
-  it('合宿は年に1回だけ', () => {
+  it('合宿は年に2回（夏と冬）', () => {
     let state = reachCamp(95)
+    expect(state.month).toBe(8)
     state = applyCommand(state, { type: 'chooseCampPlan', planId: 'batting' }).state
 
-    // 年度末まで進めても、もう合宿は起きない
-    let camps = 0
+    // 年度末までに、もう1回だけ合宿が来る
+    const months: number[] = []
     while (state.phase !== 'yearEnd') {
       state = playStep(state)
-      if (state.phase === 'camp') camps += 1
+      if (state.phase === 'camp') months.push(state.month)
     }
-    expect(camps).toBe(0)
+    expect(months).toEqual([12])
   })
 })
 
@@ -1467,7 +1471,7 @@ describe('練習以外のカード', () => {
   })
 })
 
-describe('グラウンド整備とマネージャー', () => {
+describe('グラウンド整備', () => {
   it('部費を払うとグラウンドが1段階上がる', () => {
     const state: GameState = { ...startedGame({ seed: 201 }), funds: 200_000 }
     const { state: next } = applyCommand(state, { type: 'upgradeGround' })
@@ -1529,28 +1533,31 @@ describe('グラウンド整備とマネージャー', () => {
     expect(build(5)).toBeGreaterThan(build(1))
   })
 
-  it('マネージャーを雇える。1人だけ在籍する', () => {
-    const state: GameState = { ...startedGame({ seed: 205 }), funds: 500_000 }
-
-    const hired = applyCommand(state, { type: 'hireManager', managerId: 'trainer' }).state
-    expect(hired.managerId).toBe('trainer')
-
-    const swapped = applyCommand(hired, { type: 'hireManager', managerId: 'chief' }).state
-    expect(swapped.managerId).toBe('chief')
+  it('マネージャーは部費では雇えない。最初は誰もいない', () => {
+    const state = startedGame({ seed: 205 })
+    expect(state.managers).toEqual([])
   })
 
-  it('同じマネージャーは雇い直せない', () => {
-    const state: GameState = {
-      ...startedGame({ seed: 206 }),
-      funds: 500_000,
-      managerId: 'trainer',
+  it('年度を重ねるとマネージャーが入部してくる。役割は重複しない', () => {
+    let state = startedGame({ seed: 206 })
+    let sawManager = false
+
+    for (let i = 0; i < 8; i++) {
+      state = applyCommand(playYear(state), { type: 'finishSeason' }).state
+      if (state.managers.length > 0) sawManager = true
+      const roles = state.managers.map((m) => m.roleId)
+      expect(new Set(roles).size).toBe(roles.length)
     }
-    expect(applyCommand(state, { type: 'hireManager', managerId: 'trainer' }).state).toBe(state)
+
+    expect(sawManager).toBe(true)
   })
 
-  it('主務を雇うと毎月の部費が増える', () => {
+  it('主務が在籍すると毎月の部費が増える', () => {
     const base = startedGame({ seed: 207 })
-    const withChief: GameState = { ...base, managerId: 'chief' }
+    const withChief: GameState = {
+      ...base,
+      managers: [{ id: 'm1', name: 'テスト 主務', roleId: 'chief', grade: 1, joinedYear: 1 }],
+    }
 
     // 月をまたいだ時点の支給額で比べる
     const plain = playUntilMonth(base, 5).funds - base.funds
@@ -1558,7 +1565,7 @@ describe('グラウンド整備とマネージャー', () => {
     expect(boosted).toBeGreaterThan(plain)
   })
 
-  it('トレーナーを雇うと月替わりの体力回復が増える', () => {
+  it('トレーナーが在籍すると月替わりの体力回復が増える', () => {
     const base = startedGame({ seed: 208 })
     // 月替わりの回復だけを見たいので、体力を落とした状態から月をまたぐ
     const atMonthEnd: GameState = {
@@ -1571,7 +1578,15 @@ describe('グラウンド整備とマネージャー', () => {
 
     // 同じ手順で進めるよう、休養カードを選ばない固定の選び方にする
     const plain = playUntilMonth(atMonthEnd, 5)
-    const withTrainer = playUntilMonth({ ...atMonthEnd, managerId: 'trainer' }, 5)
+    const withTrainer = playUntilMonth(
+      {
+        ...atMonthEnd,
+        managers: [
+          { id: 'm1', name: 'テスト トレーナー', roleId: 'trainer', grade: 1, joinedYear: 1 },
+        ],
+      },
+      5,
+    )
 
     expect(average(withTrainer)).toBeGreaterThan(average(plain))
   })
@@ -1808,6 +1823,76 @@ describe('投手の疲労', () => {
     const next = applyCommand(state, { type: 'autoLineup' }).state
     const starterId = next.lineup.slots.find((slot) => slot.position === 'P')?.playerId
     expect(starterId).not.toBe(ace.id)
+  })
+})
+
+describe('個人イベント', () => {
+  /** イベントマスに止まるまで進める */
+  const reachEvent = (seed: number) => playUntilPhase(startedGame({ seed }), 'playerEvent')
+
+  it('イベントマスに止まると選択待ちになる', () => {
+    const state = reachEvent(301)
+    expect(state.phase).toBe('playerEvent')
+    expect(state.pendingEvent).not.toBeNull()
+    expect(state.board[state.boardPosition].kind).toBe('event')
+    // 対象は在籍している部員
+    expect(state.players.some((p) => p.id === state.pendingEvent!.playerId)).toBe(true)
+  })
+
+  it('選ぶまでカードを選べない', () => {
+    const state = reachEvent(302)
+    const { state: next } = applyCommand(state, {
+      type: 'selectCard',
+      cardId: state.hand[0].id,
+    })
+    expect(next).toBe(state)
+  })
+
+  it('選ぶと結果が出て、練習フェーズへ戻る', () => {
+    const state = reachEvent(303)
+    const event = findPlayerEvent(state.pendingEvent!.eventId)!
+
+    const { state: next, events } = applyCommand(state, {
+      type: 'choosePlayerEventChoice',
+      choiceId: event.choices[0].id,
+    })
+
+    expect(next.phase).toBe('cardSelect')
+    expect(next.pendingEvent).toBeNull()
+    expect(events.some((e) => e.type === 'message')).toBe(true)
+  })
+
+  it('存在しない選択肢は受け付けない', () => {
+    const state = reachEvent(304)
+    const { state: next } = applyCommand(state, {
+      type: 'choosePlayerEventChoice',
+      choiceId: 'unknown',
+    })
+    expect(next).toBe(state)
+  })
+
+  it('部費が足りない選択肢は選べない', () => {
+    // 部費が要る選択肢を持つイベントに当たるまで探す
+    for (let seed = 310; seed < 400; seed++) {
+      const reached = playUntilPhase(startedGame({ seed }), 'playerEvent')
+      const event = findPlayerEvent(reached.pendingEvent!.eventId)!
+      const paid = event.choices.find((choice) => choice.cost !== undefined)
+      if (!paid) continue
+
+      const broke: GameState = { ...reached, funds: 0 }
+      const { state: next } = applyCommand(broke, {
+        type: 'choosePlayerEventChoice',
+        choiceId: paid.id,
+      })
+      expect(next).toBe(broke)
+      return
+    }
+    throw new Error('部費が要る選択肢のイベントに当たらなかった')
+  })
+
+  it('1年通しても進行が止まらず、セーブできる形のまま', () => {
+    const state = playYear(startedGame({ seed: 305 }))
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state)
   })
 })
 

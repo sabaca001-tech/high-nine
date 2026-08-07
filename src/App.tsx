@@ -7,6 +7,7 @@ import { PlayerDetailScreen } from '@/ui/screens/PlayerDetailScreen'
 import { AlumniScreen } from '@/ui/screens/AlumniScreen'
 import { CampScreen } from '@/ui/screens/CampScreen'
 import { ForkScreen } from '@/ui/screens/ForkScreen'
+import { PlayerEventScreen } from '@/ui/screens/PlayerEventScreen'
 import { NewGameScreen } from '@/ui/screens/NewGameScreen'
 import { SeasonScreen } from '@/ui/screens/SeasonScreen'
 import { DataScreen } from '@/ui/screens/DataScreen'
@@ -54,8 +55,11 @@ function Screen() {
   // 大会中も同様。勝ち抜くか敗退するまで離脱させない
   if (game.phase === 'tournament' && game.tournament) return <TournamentScreen />
 
-  // 冬合宿は方針を選ぶまで進めない
+  // 合宿は方針を選ぶまで進めない
   if (game.phase === 'camp') return <CampScreen />
+
+  // 個人イベントも選ぶまで進めない
+  if (game.phase === 'playerEvent' && game.pendingEvent) return <PlayerEventScreen />
 
   // ルート分岐も選ぶまで進めない
   if (game.phase === 'fork') return <ForkScreen />

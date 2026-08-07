@@ -1,8 +1,11 @@
 /**
- * グラウンドレベルとマネージャー。
+ * グラウンドレベル。
  *
- * どちらも部費で買う**恒久的な強化**で、消耗品しか無かった
+ * 部費で買う**恒久的な強化**で、消耗品しか無かった
  * ショップに長期の使い道を与える。
+ *
+ * マネージャーはここにあったが、買うものではなくなったので
+ * `src/core/staff/managers.ts` へ移した。
  */
 
 /**
@@ -89,81 +92,3 @@ export function groundDecayChance(level: number): number {
 
 /** 荒れたときに下がる段階数 */
 export const GROUND_DECAY_STEPS = 2
-// ── マネージャー ──────────────────────────────
-
-export type ManagerId = 'recorder' | 'trainer' | 'nutritionist' | 'analyst' | 'chief'
-
-export type Manager = {
-  id: ManagerId
-  name: string
-  description: string
-  hireCost: number
-}
-
-/**
- * マネージャーは1人だけ雇える。
- * 雇い直すと前のマネージャーは退任する。
- */
-export const MANAGERS: Manager[] = [
-  {
-    id: 'recorder',
-    name: '記録係',
-    description: '練習の成長量が8%上がる',
-    hireCost: 180_000,
-  },
-  {
-    id: 'trainer',
-    name: 'トレーナー',
-    description: '月が変わるときの体力回復が15増える',
-    hireCost: 180_000,
-  },
-  {
-    id: 'nutritionist',
-    name: '栄養士',
-    description: '練習での体力消費が25%減る',
-    hireCost: 200_000,
-  },
-  {
-    id: 'analyst',
-    name: '分析担当',
-    description: '試合での守備力が上がる',
-    hireCost: 220_000,
-  },
-  {
-    id: 'chief',
-    name: '主務',
-    description: '毎月の部費が30%増える',
-    hireCost: 250_000,
-  },
-]
-
-const MANAGER_BY_ID = new Map(MANAGERS.map((manager) => [manager.id, manager]))
-
-export function findManager(id: string | null): Manager | undefined {
-  return id ? MANAGER_BY_ID.get(id as ManagerId) : undefined
-}
-
-/** マネージャーによる練習成長の倍率 */
-export function managerGrowthBonus(managerId: string | null): number {
-  return managerId === 'recorder' ? 1.08 : 1
-}
-
-/** マネージャーによる体力消費の倍率 */
-export function managerConditionCost(managerId: string | null): number {
-  return managerId === 'nutritionist' ? 0.75 : 1
-}
-
-/** マネージャーによる月替わりの体力回復の上乗せ */
-export function managerRecovery(managerId: string | null): number {
-  return managerId === 'trainer' ? 15 : 0
-}
-
-/** マネージャーによる守備力の上乗せ */
-export function managerDefenseBonus(managerId: string | null): number {
-  return managerId === 'analyst' ? 8 : 0
-}
-
-/** マネージャーによる部費の倍率 */
-export function managerFundsRate(managerId: string | null): number {
-  return managerId === 'chief' ? 1.3 : 1
-}

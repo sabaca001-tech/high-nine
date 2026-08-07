@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampGroundLevel,
-  findManager,
   GROUND_DECAY_STEPS,
   GROUND_LEVEL_MAX,
   GROUND_LEVEL_MIN,
@@ -10,12 +9,6 @@ import {
   groundName,
   groundUpgradeCost,
   groundUpgradeCostFor,
-  MANAGERS,
-  managerConditionCost,
-  managerDefenseBonus,
-  managerFundsRate,
-  managerGrowthBonus,
-  managerRecovery,
 } from './facility'
 
 describe('グラウンドの段階', () => {
@@ -71,41 +64,5 @@ describe('グラウンドの段階', () => {
 
   it('1回で下がるのは数段階まで', () => {
     expect(GROUND_DECAY_STEPS).toBeLessThanOrEqual(3)
-  })
-})
-
-describe('マネージャー', () => {
-  it('idが重複せず、雇用費が正の値', () => {
-    expect(new Set(MANAGERS.map((m) => m.id)).size).toBe(MANAGERS.length)
-    for (const manager of MANAGERS) {
-      expect(manager.hireCost).toBeGreaterThan(0)
-    }
-  })
-
-  it('findManager で引ける', () => {
-    expect(findManager('recorder')?.name).toBe('記録係')
-    expect(findManager(null)).toBeUndefined()
-    expect(findManager('存在しない')).toBeUndefined()
-  })
-
-  it('それぞれ別の効果を持つ', () => {
-    expect(managerGrowthBonus('recorder')).toBeGreaterThan(1)
-    expect(managerConditionCost('nutritionist')).toBeLessThan(1)
-    expect(managerRecovery('trainer')).toBeGreaterThan(0)
-    expect(managerDefenseBonus('analyst')).toBeGreaterThan(0)
-    expect(managerFundsRate('chief')).toBeGreaterThan(1)
-  })
-
-  it('雇っていなければ効果は無い', () => {
-    expect(managerGrowthBonus(null)).toBe(1)
-    expect(managerConditionCost(null)).toBe(1)
-    expect(managerRecovery(null)).toBe(0)
-    expect(managerDefenseBonus(null)).toBe(0)
-    expect(managerFundsRate(null)).toBe(1)
-  })
-
-  it('担当外のマネージャーには効果が乗らない', () => {
-    expect(managerGrowthBonus('trainer')).toBe(1)
-    expect(managerFundsRate('analyst')).toBe(1)
   })
 })

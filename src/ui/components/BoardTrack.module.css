@@ -141,6 +141,11 @@
   background: linear-gradient(160deg, #d8c8ff, #5a3fc0);
   color: #fff;
 }
+/* 個人イベント。止まると必ず選択を求められるので、練習マスとはっきり分ける */
+.event {
+  background: linear-gradient(160deg, #ffd9a8, #d96a1f);
+  color: #fff;
+}
 
 /* 大会マスは飛ばせないので、いちばん目立たせる */
 .tournament {

@@ -7,8 +7,12 @@
   padding-right: env(safe-area-inset-right);
   max-width: 560px;
   margin: 0 auto;
-  /* 冬の合宿なので寒色系の背景にする */
+  /* 冬は寒色、夏は夕焼けの暖色。同じ画面でも季節が伝わるようにする */
   background: linear-gradient(to bottom, #17303f, var(--bg-base) 45%);
+}
+
+.screen[data-season='summer'] {
+  background: linear-gradient(to bottom, #4a2a1c, var(--bg-base) 45%);
 }
 
 .header {
@@ -93,8 +97,18 @@
   border-color: var(--accent);
 }
 
-.icon {
-  line-height: 0;
+/* 方針の記号。1文字なので四角く囲って絵の代わりにする */
+.mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  font-size: var(--fs-md);
+  font-weight: 800;
+  color: var(--accent);
 }
 
 .label {

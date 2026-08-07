@@ -22,6 +22,8 @@ import type { ScoutingState } from '@/core/scout/scouting'
 import type { TraitMap } from '@/core/scout/scoutTraits'
 import type { UniformId } from '@/core/team/uniforms'
 import type { Tournament } from './tournament'
+import type { TeamManager } from '@/core/staff/managers'
+import type { PendingPlayerEvent } from '@/core/event/playerEvents'
 
 /**
  * セーブデータのバージョン。
@@ -61,8 +63,10 @@ import type { Tournament } from './tournament'
  *            練習の結果が選手ごとに変わるようになった。
  * v26 → v27: scouting に nationalTeam（U15日本代表の30人）を追加。
  * v27 → v28: Player に fatigue（投手の疲労）を追加。連投でパフォーマンスが落ちる。
+ * v28 → v29: マネージャーを購入制から入部制に変更（managerId → managers）。
+ *            個人イベントのマスとフェーズ（pendingEvent）を追加。
  */
-export const SAVE_VERSION = 28
+export const SAVE_VERSION = 29
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
@@ -75,7 +79,8 @@ export type Phase =
   | 'yearEnd' // 年度末（3月31日）の結果表示
   | 'newSeason' // 卒業と新入生加入の報告
   | 'tournament' // 大会の進行中（次の試合を待っている）
-  | 'camp' // 冬合宿の方針選択
+  | 'camp' // 合宿の方針選択
+  | 'playerEvent' // 部員1人に起きた出来事の選択
   | 'fork' // ルート分岐の選択
 
 /**
@@ -172,8 +177,11 @@ export type GameState = {
   funds: number
   /** グラウンドの整備段階 1〜99。練習の成長量にかかる。放っておくと荒れて下がる */
   groundLevel: number
-  /** 在籍しているマネージャー。1人だけ */
-  managerId: string | null
+  /**
+   * 在籍しているマネージャー。**買うものではなく入部してくる。**
+   * 役割は重複せず、3年生は年度替わりで卒業する。
+   */
+  managers: TeamManager[]
   /**
    * 持っている練習器具のid。
    * 買うと対応する練習カードが手札に出るようになり、壊れると出なくなる。
@@ -181,6 +189,11 @@ export type GameState = {
   equipment: string[]
   /** ルート分岐の選択待ちなら true */
   pendingFork: boolean
+  /**
+   * 選択待ちの個人イベント。無ければ null。
+   * 定義そのものは持たず id だけを持つ（セーブに関数を入れないため）。
+   */
+  pendingEvent: PendingPlayerEvent | null
   /** 学校の評判 0〜100。勝つほど上がり、新入生の質と人数を決める */
   reputation: number
   /** OB名鑑。卒業していった選手の記録（新しい順） */
@@ -237,16 +250,16 @@ export type GameCommand =
   | { type: 'playTournamentMatch' }
   /** 大会を終えて次の月へ進む */
   | { type: 'finishTournament' }
-  /** 冬合宿の方針を決める */
+  /** 合宿の方針を決める */
   | { type: 'chooseCampPlan'; planId: string }
+  /** 個人イベントで選択肢を選ぶ */
+  | { type: 'choosePlayerEventChoice'; choiceId: string }
   /** ショップでアイテムを買う（買った瞬間に効果が出る） */
   | { type: 'buyItem'; itemId: string }
   /** 選手ごとの練習方針を決める（コンバートもここで指示する） */
   | { type: 'setTrainingFocus'; playerId: string; focus: TrainingFocus }
   /** グラウンドを整備する。steps 段階ぶんまとめて上げられる（既定1） */
   | { type: 'upgradeGround'; steps?: number }
-  /** マネージャーを雇う */
-  | { type: 'hireManager'; managerId: string }
   /** 練習器具を買う。対応する練習カードが手札に出るようになる */
   | { type: 'buyEquipment'; equipmentId: string }
   /** スカウトで県を視察する。出張費を払い、候補が挙がる */

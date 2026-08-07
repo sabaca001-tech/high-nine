@@ -6,6 +6,8 @@ import { applyPractice, clamp, raiseAbility } from '@/core/player/growth'
 import { overallRating } from '@/core/player/rating'
 import { pickOpponentName } from '@/core/match/opponent'
 import { attemptTraining, removeRedSkill } from '@/core/skill/grantSkill'
+import { eventText, findPlayerEvent, pickPlayerEvent } from '@/core/event/playerEvents'
+import type { PendingPlayerEvent } from '@/core/event/playerEvents'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { PracticeCard } from '@/core/types/card'
 import type { BoardCell } from '@/core/types/board'
@@ -33,6 +35,8 @@ export type CellOutcome = {
   matchSetup?: PendingMatchSetup
   /** ルート分岐に止まった。UI で道筋を選ばせる */
   fork?: boolean
+  /** 個人イベントに止まった。UI で選択肢を選ばせる */
+  playerEvent?: PendingPlayerEvent
   /** 部費の増減。遠征費など。省略時は0 */
   fundsDelta?: number
   /** 評判の増減。省略時は0 */
@@ -97,6 +101,8 @@ export function resolveCell(
       return resolveBoost(rng, players)
     case 'training':
       return resolveTraining(rng, players)
+    case 'event':
+      return resolvePlayerEventCell(rng, players)
     case 'alumni':
       return resolveAlumni(rng, players)
     case 'match':
@@ -223,6 +229,32 @@ function resolveTraining(rng: Rng, players: Player[]): CellOutcome {
         tone: 'good',
       },
     ],
+  }
+}
+
+/**
+ * イベントマス: 部員1人に出来事が起きる。
+ *
+ * ここでは**誰に何が起きたかを決めるだけ**で、効果は選択のあとに入る
+ * （`gameEngine` の `choosePlayerEventChoice`）。
+ * 対象がいなければ何も起きない日として流す。
+ */
+function resolvePlayerEventCell(rng: Rng, players: Player[]): CellOutcome {
+  const pending = pickPlayerEvent(rng, players)
+  const event = pending ? findPlayerEvent(pending.eventId) : undefined
+  const target = pending ? players.find((p) => p.id === pending.playerId) : undefined
+
+  if (!pending || !event || !target) {
+    return {
+      players,
+      events: [{ type: 'message', text: '特に何事もなく1日が過ぎた', tone: 'normal' }],
+    }
+  }
+
+  return {
+    players,
+    events: [{ type: 'message', text: eventText(event, target.name), tone: 'normal' }],
+    playerEvent: pending,
   }
 }
 

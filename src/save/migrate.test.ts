@@ -23,7 +23,8 @@ function makeV1Save(): Record<string, unknown> {
     springBerth: _spring,
     funds: _funds,
     groundLevel: _ground,
-    managerId: _manager,
+    managers: _managers,
+    pendingEvent: _pendingEvent,
     ...rest
   } = state
 
@@ -79,7 +80,8 @@ describe('migrate', () => {
       springBerth: _spring,
       funds: _funds,
       groundLevel: _ground,
-      managerId: _manager,
+      managers: _managers,
+      pendingEvent: _pendingEvent,
       ...rest
     } = state
     const v2 = { ...rest, version: 2 }
@@ -104,7 +106,8 @@ describe('migrate', () => {
       springBerth: _spring,
       funds: _funds,
       groundLevel: _ground,
-      managerId: _manager,
+      managers: _managers,
+      pendingEvent: _pendingEvent,
       ...rest
     } = state
     const v3 = { ...rest, version: 3 }
@@ -126,7 +129,8 @@ describe('migrate', () => {
       springBerth: _spring,
       funds: _funds,
       groundLevel: _ground,
-      managerId: _manager,
+      managers: _managers,
+      pendingEvent: _pendingEvent,
       ...rest
     } = state
     const v4 = { ...rest, version: 4 }
@@ -146,7 +150,8 @@ describe('migrate', () => {
       springBerth: _spring,
       funds: _funds,
       groundLevel: _ground,
-      managerId: _manager,
+      managers: _managers,
+      pendingEvent: _pendingEvent,
       ...rest
     } = state
     const v5 = { ...rest, version: 5 }
@@ -159,7 +164,13 @@ describe('migrate', () => {
 
   it('v6のセーブを現行バージョンへ移行できる', () => {
     const state = createInitialState({ seed: 8888 })
-    const { funds: _funds, groundLevel: _ground, managerId: _manager, ...rest } = state
+    const {
+      funds: _funds,
+      groundLevel: _ground,
+      managers: _managers,
+      pendingEvent: _pendingEvent,
+      ...rest
+    } = state
     const v6 = { ...rest, version: 6 }
 
     const migrated = migrate(v6)
@@ -171,14 +182,19 @@ describe('migrate', () => {
 
   it('v7のセーブを現行バージョンへ移行できる', () => {
     const state = createInitialState({ seed: 9999 })
-    const { groundLevel: _ground, managerId: _manager, ...rest } = state
+    const {
+      groundLevel: _ground,
+      managers: _managers,
+      pendingEvent: _pendingEvent,
+      ...rest
+    } = state
     const v7 = { ...rest, version: 7 }
 
     const migrated = migrate(v7)
     expect(migrated).not.toBeNull()
     expect(migrated!.version).toBe(SAVE_VERSION)
     expect(migrated!.groundLevel).toBe(1)
-    expect(migrated!.managerId).toBeNull()
+    expect(migrated!.managers).toEqual([])
   })
 
   it('v1移行は何度やっても同じ結果になる（適性がぶれない）', () => {

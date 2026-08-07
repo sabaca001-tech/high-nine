@@ -22,11 +22,14 @@ export type GameEvent =
   /** 月が進んだ */
   | { type: 'monthAdvanced'; year: number; month: number }
   /** 汎用メッセージ（イベントの説明文など） */
-  | { type: 'message'; text: string; tone: 'normal' | 'good' | 'bad' }
+  | { type: 'message'; text: string; tone: EventTone }
+
+/** 出来事の色合い。ログの表示色に使う */
+export type EventTone = 'normal' | 'good' | 'bad'
 
 /** 画面に残すログ1行 */
 export type LogEntry = {
   id: string
   text: string
-  tone: 'normal' | 'good' | 'bad'
+  tone: EventTone
 }

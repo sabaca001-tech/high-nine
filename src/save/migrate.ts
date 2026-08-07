@@ -17,7 +17,7 @@ import type { Player, Position } from '@/core/types/player'
 import { REPUTATION_INITIAL } from '@/core/types/season'
 import { monthlyFunds } from '@/core/shop/funds'
 import { rollInitialPitches } from '@/core/player/pitchDefs'
-import { createGrowthAptitude } from '@/core/player/createPlayer'
+import { createGrowthAptitude, pickName } from '@/core/player/createPlayer'
 import { createBoard, GOAL_INDEX, placeSeasonTournaments } from '@/core/board/boardDefs'
 import { createTournament } from '@/core/tournament/tournament'
 import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
@@ -128,6 +128,9 @@ export function migrate(raw: unknown): GameState | null {
   }
   if (version < 28) {
     data = migrateV27ToV28(data)
+  }
+  if (version < 29) {
+    data = migrateV28ToV29(data)
   }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
@@ -723,6 +726,36 @@ function migrateV27ToV28(raw: Record<string, unknown>): Record<string, unknown> 
   )
 
   return { ...raw, version: 28, players }
+}
+
+/**
+ * v28 → v29
+ *  - マネージャーを購入制から入部制に変更（managerId → managers）
+ *  - 個人イベントのマスとフェーズ（pendingEvent）を追加
+ *
+ * 雇っていたマネージャーは**そのまま在籍させる**。部費を払って得たものを
+ * 移行で取り上げない。学年は3年（次の年度替わりで卒業）にしておく。
+ *
+ * 盤面にはイベントマスが無いままだが、
+ * 年度が変わればイベントマス入りの盤面が作られる。
+ */
+function migrateV28ToV29(raw: Record<string, unknown>): Record<string, unknown> {
+  const managers: Record<string, unknown>[] = []
+  if (typeof raw.managerId === 'string' && raw.managerId.length > 0) {
+    const serial = typeof raw.serial === 'number' ? raw.serial : 0
+    // 雇っていた頃は人名を持っていなかったので、ここで1つ振る
+    const rng = createRng(typeof raw.rngState === 'number' ? raw.rngState : 1)
+    managers.push({
+      id: `manager-${serial}`,
+      name: pickName(rng, []),
+      roleId: raw.managerId,
+      grade: 3,
+      joinedYear: typeof raw.year === 'number' ? raw.year : 1,
+    })
+  }
+
+  const { managerId: _managerId, ...rest } = raw
+  return { ...rest, version: 29, managers, pendingEvent: null }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

@@ -11,14 +11,17 @@
 
 import { applyCommand, createInitialState } from './gameEngine'
 import type { NewGameOptions } from './gameEngine'
+import { findPlayerEvent } from './event/playerEvents'
 import { isTournamentOver } from './types/tournament'
 import type { GameState } from './types/game'
 
 export type AutoPlayOptions = {
   /** カードの選び方。既定は手札の先頭（無戦略プレイ） */
   chooseCard?: (state: GameState) => string
-  /** 冬合宿の方針。既定は打ち込み */
+  /** 合宿の方針。既定は打撃合宿 */
   chooseCampPlan?: (state: GameState) => string
+  /** 個人イベントの選択。既定は最初の選択肢 */
+  choosePlayerEventChoice?: (state: GameState) => string
   /** ルート分岐の選び方。既定は練習の道 */
   chooseRoute?: (state: GameState) => string
   /** 1年ぶんの操作回数の上限。超えたら例外 */
@@ -46,6 +49,8 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
   const chooseCard = options.chooseCard ?? ((s: GameState) => s.hand[0].id)
   const chooseCampPlan = options.chooseCampPlan ?? (() => 'batting')
   const chooseRoute = options.chooseRoute ?? (() => 'practice')
+  const choosePlayerEventChoice =
+    options.choosePlayerEventChoice ?? ((s: GameState) => firstChoiceId(s))
 
   switch (state.phase) {
     case 'lineupCheck':
@@ -75,6 +80,12 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
         planId: chooseCampPlan(state),
       }).state
 
+    case 'playerEvent':
+      return applyCommand(state, {
+        type: 'choosePlayerEventChoice',
+        choiceId: choosePlayerEventChoice(state),
+      }).state
+
     case 'fork':
       return applyCommand(state, { type: 'chooseRoute', routeId: chooseRoute(state) }).state
 
@@ -84,6 +95,21 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
     case 'yearEnd':
       return applyCommand(state, { type: 'advanceYear' }).state
   }
+}
+
+/**
+ * 選択待ちの個人イベントの、最初の選択肢のid。
+ * 無戦略プレイの既定値。**部費が要る選択肢は避ける**
+ * （払えないと選べず、進行が止まってしまう）。
+ */
+function firstChoiceId(state: GameState): string {
+  const pending = state.pendingEvent
+  const event = pending ? findPlayerEvent(pending.eventId) : undefined
+  if (!event) return ''
+  const affordable = event.choices.filter(
+    (choice) => choice.cost === undefined || state.funds >= choice.cost,
+  )
+  return (affordable[0] ?? event.choices[0]).id
 }
 
 /**

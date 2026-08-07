@@ -6,9 +6,8 @@ import {
   groundMultiplier,
   groundName,
   groundUpgradeCostFor,
-  MANAGERS,
-  managerFundsRate,
 } from '@/core/shop/facility'
+import { managerFundsRate } from '@/core/staff/managers'
 import { formatFunds, monthlyFunds } from '@/core/shop/funds'
 import { SHOP_ITEMS } from '@/core/shop/itemDefs'
 import { EQUIPMENTS } from '@/core/shop/equipmentDefs'
@@ -26,13 +25,12 @@ export function ShopScreen() {
   const game = useGameStore((s) => s.game)
   const buyItem = useGameStore((s) => s.buyItem)
   const upgradeGround = useGameStore((s) => s.upgradeGround)
-  const hireManager = useGameStore((s) => s.hireManager)
   const buyEquipment = useGameStore((s) => s.buyEquipment)
   const [confirming, setConfirming] = useState<string | null>(null)
 
   if (!game) return null
 
-  const income = Math.round(monthlyFunds(game.reputation) * managerFundsRate(game.managerId))
+  const income = Math.round(monthlyFunds(game.reputation) * managerFundsRate(game.managers))
   const upkeep = monthlyUpkeep(game.players.length, game.groundLevel)
 
   const handleBuy = (itemId: string) => {
@@ -90,33 +88,6 @@ export function ShopScreen() {
             </span>
             <span className={affordable ? styles.price : `${styles.price} ${styles.tooExpensive}`}>
               {owned ? '—' : formatFunds(equipment.price)}
-            </span>
-          </button>
-        )
-      })}
-
-      <h2 className={styles.sectionTitle}>マネージャー（1人だけ雇えます）</h2>
-      {MANAGERS.map((manager) => {
-        const current = game.managerId === manager.id
-        const affordable = game.funds >= manager.hireCost
-
-        return (
-          <button
-            key={manager.id}
-            type="button"
-            className={current ? `${styles.item} ${styles.current}` : styles.item}
-            disabled={current || !affordable}
-            onClick={() => hireManager(manager.id)}
-          >
-            <span>
-              <span className={styles.name}>
-                {manager.name}
-                {current && <span className={styles.currentBadge}>在籍中</span>}
-              </span>
-              <span className={styles.description}>{manager.description}</span>
-            </span>
-            <span className={affordable ? styles.price : `${styles.price} ${styles.tooExpensive}`}>
-              {current ? '—' : formatFunds(manager.hireCost)}
             </span>
           </button>
         )

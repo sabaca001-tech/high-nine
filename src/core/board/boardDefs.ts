@@ -34,6 +34,8 @@ export const GOAL_INDEX = BOARD_LENGTH - 1
 export const EVENT_DAYS: { day: number; kind: 'tournament' | 'camp'; tournamentKind?: TournamentKind }[] = [
   { day: dayOf(7, 15), kind: 'tournament', tournamentKind: 'summerPref' },
   { day: dayOf(8, 12), kind: 'tournament', tournamentKind: 'nationals' },
+  // 夏の全国大会は8/12開幕で最大6回戦（中1日で8/22まで）。その後に置く
+  { day: dayOf(8, 25), kind: 'camp' },
   { day: dayOf(10, 15), kind: 'tournament', tournamentKind: 'autumnPref' },
   { day: dayOf(12, 26), kind: 'camp' },
   { day: dayOf(3, 10), kind: 'tournament', tournamentKind: 'springNationals' },
@@ -69,10 +71,15 @@ export const ROUND_GAP = 2
  * 練習マスを最頻にして成長が主軸であることを伝えつつ、
  * 特訓・OBのような「当たり」を低確率で混ぜて、どのマスに止めるかの読み合いを作る。
  *
+ * **個人イベント（イベントマス）は空きマスから取っている。**
+ * 何も起きない日を減らして、部員1人に目が向く日に置き換えた形。
+ * 年7回ほどで、月に1度は誰かの名前で足が止まる。
+ *
  * | マス | 年あたりの回数（146手） |
  * |---|---|
  * | 練習 | 61 |
- * | 何も無い | 41 |
+ * | 何も無い | 34 |
+ * | 個人イベント | 7.3 |
  * | 休養 | 7.3 |
  * | 青・赤・白・黄 | 各 5.8 |
  * | 練習試合 | 4.4 |
@@ -80,7 +87,8 @@ export const ROUND_GAP = 2
  */
 const CELL_WEIGHTS: { value: CellKind; weight: number }[] = [
   { value: 'practice', weight: 42 },
-  { value: 'blank', weight: 28 },
+  { value: 'blank', weight: 23 },
+  { value: 'event', weight: 5 },
   { value: 'rest', weight: 5 },
   { value: 'good', weight: 4 },
   { value: 'bad', weight: 4 },
@@ -121,7 +129,8 @@ export const ROUTES: Route[] = [
       { value: 'rest', weight: 6 },
       { value: 'good', weight: 3 },
       { value: 'bad', weight: 3 },
-      { value: 'blank', weight: 8 },
+      { value: 'event', weight: 4 },
+      { value: 'blank', weight: 4 },
     ],
   },
   {
@@ -134,8 +143,9 @@ export const ROUTES: Route[] = [
       { value: 'match', weight: 7 },
       { value: 'good', weight: 8 },
       { value: 'bad', weight: 12 },
+      { value: 'event', weight: 10 },
       { value: 'practice', weight: 35 },
-      { value: 'blank', weight: 24 },
+      { value: 'blank', weight: 14 },
     ],
   },
   {
@@ -146,7 +156,8 @@ export const ROUTES: Route[] = [
       { value: 'rest', weight: 25 },
       { value: 'practice', weight: 35 },
       { value: 'good', weight: 10 },
-      { value: 'blank', weight: 27 },
+      { value: 'event', weight: 4 },
+      { value: 'blank', weight: 23 },
       { value: 'bad', weight: 3 },
     ],
   },

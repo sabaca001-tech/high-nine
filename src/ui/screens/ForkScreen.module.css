@@ -113,6 +113,10 @@
   background: linear-gradient(160deg, #e0a878, var(--dirt));
   color: var(--text-main);
 }
+.event {
+  background: linear-gradient(160deg, #ffd9a8, #d96a1f);
+  color: #fff;
+}
 .blank {
   background: linear-gradient(160deg, #4a6a5c, var(--bg-raised));
   color: var(--text-dim);
