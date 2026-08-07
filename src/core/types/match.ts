@@ -211,6 +211,11 @@ export type PendingMatchSetup = {
   opponentSchoolId?: string
   opponentStrength: number
   decisive?: boolean
+  /**
+   * コールドゲームがあるか。**省略時はあり**（練習試合・地区大会）。
+   * 全国大会だけ false にする。
+   */
+  mercy?: boolean
   /** 練習試合で遠征する場合の行き先（表示用） */
   awayRegionName?: string
   /** 相手がどこの代表か（全国大会での表示用） */
@@ -234,6 +239,13 @@ export type MatchSetup = {
    * 10回以降はタイブレーク（無死一・二塁から開始）になる。
    */
   decisive?: boolean
+  /**
+   * コールドゲームがあるか。**省略時はあり。**
+   *
+   * 練習試合と地区大会にはあるが、**全国大会には無い**。
+   * 甲子園まで勝ち上がった相手に「5回10点差で打ち切り」は成立しない。
+   */
+  mercy?: boolean
   /** 自校の守備力への上乗せ（マネージャーなど） */
   defenseBonus?: number
 }

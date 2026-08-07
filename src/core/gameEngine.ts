@@ -693,6 +693,9 @@ function playTournamentMatch(state: GameState): EngineResult {
         ...(local || !rival ? {} : { opponentRegionName: findRegion(rival.regionId).name }),
         // トーナメントなので引き分けはあり得ない
         decisive: true,
+        // **コールドは地区大会だけ。** 甲子園まで来た相手に
+        // 「5回10点差で打ち切り」は成立しない
+        mercy: local,
         roundName: roundName(tournament.round, tournament.totalRounds),
       },
       phase: 'lineupCheck',
@@ -739,6 +742,7 @@ function startMatch(state: GameState): EngineResult {
     opponentStrength: setup.opponentStrength,
     kind: setup.kind,
     ...(setup.decisive ? { decisive: true } : {}),
+    ...(setup.mercy === false ? { mercy: false } : {}),
     defenseBonus: managerDefenseBonus(state.managers),
   })
 

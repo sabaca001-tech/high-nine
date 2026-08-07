@@ -55,10 +55,14 @@ export function mercyLeadAt(inning: number): number | null {
   return MERCY_RULES.find((rule) => inning >= rule.fromInning)?.lead ?? null
 }
 
-/** その時点でコールドゲームが成立しているか */
-function isMercy(inning: number, homeRuns: number, awayRuns: number): boolean {
+/**
+ * その時点でコールドゲームが成立しているか。
+ * **コールドの無い試合（全国大会）では常に false。**
+ */
+function isMercy(state: MatchState, inning: number): boolean {
+  if (!state.mercy) return false
   const lead = mercyLeadAt(inning)
-  return lead !== null && Math.abs(homeRuns - awayRuns) >= lead
+  return lead !== null && Math.abs(state.home.runs - state.away.runs) >= lead
 }
 
 /**
@@ -68,6 +72,8 @@ function isMercy(inning: number, homeRuns: number, awayRuns: number): boolean {
 export type MatchState = {
   kind: MatchKind
   decisive: boolean
+  /** コールドゲームがあるか。全国大会だけ false */
+  mercy: boolean
   /** 相手がライバル校ならその id。対戦成績を残すのに使う */
   opponentSchoolId: string | null
   /**
@@ -100,6 +106,8 @@ export function startMatchState(rng: Rng, setup: MatchSetup): MatchState {
   return {
     kind: setup.kind,
     decisive: setup.decisive === true,
+    // 省略時はコールドあり。無いのは全国大会だけ
+    mercy: setup.mercy !== false,
     opponentSchoolId: setup.opponentSchoolId ?? null,
     opponentStrength: setup.opponentStrength,
     // プレイヤーは常に後攻。サヨナラ勝ちが起きるようにする
@@ -176,7 +184,7 @@ export function stepHalfInning(rng: Rng, state: MatchState): MatchState {
     // **コールドが成立する点差で後攻がリードしている場合も同じ**
     // （5回表を終えて10点差なら、その裏を戦う意味が無い）
     const homeAhead = next.home.runs > next.away.runs
-    if (homeAhead && (inning >= REGULATION_INNINGS || isMercy(inning, next.home.runs, next.away.runs))) {
+    if (homeAhead && (inning >= REGULATION_INNINGS || isMercy(next, inning))) {
       return closeInning(next, maxInnings)
     }
 
@@ -208,7 +216,7 @@ function closeInning(state: MatchState, maxInnings: number): MatchState {
 
   const decided = state.inning >= REGULATION_INNINGS && state.home.runs !== state.away.runs
   const exhausted = state.inning >= maxInnings
-  const mercy = isMercy(state.inning, state.home.runs, state.away.runs)
+  const mercy = isMercy(state, state.inning)
 
   if (mercy) {
     state.events.push({

@@ -26,6 +26,12 @@ function play(seed: number, strength = 0): MatchResult {
   return simulateGame(createRng(seed * 31 + 7), setup)
 }
 
+/** コールドの無い試合（全国大会）として1試合行う */
+function playNoMercy(seed: number, strength = 0): MatchResult {
+  const { setup } = makeSetup(seed, strength)
+  return simulateGame(createRng(seed * 31 + 7), { ...setup, decisive: true, mercy: false })
+}
+
 describe('simulateGame', () => {
   it('同じシード・同じ入力なら完全に同じ結果になる', () => {
     const { setup } = makeSetup(1)
@@ -62,6 +68,22 @@ describe('simulateGame', () => {
     expect(mercyLeadAt(6)).toBe(10)
     expect(mercyLeadAt(7)).toBe(7)
     expect(mercyLeadAt(9)).toBe(7)
+  })
+
+  it('全国大会（mercy: false）ではコールドにならない', () => {
+    // 甲子園まで来た相手に「5回10点差で打ち切り」は成立しない
+    let bigLeads = 0
+
+    for (let seed = 0; seed < 120; seed++) {
+      const result = playNoMercy(seed, -28)
+      const lead = Math.abs(result.finalScore.player - result.finalScore.opponent)
+      if (lead >= 10) bigLeads += 1
+      // 何点離れても9回（以上）まで行う
+      expect(result.innings.length).toBeGreaterThanOrEqual(9)
+    }
+
+    // 10点差の試合が実際に起きているうえで、9回まで行われている
+    expect(bigLeads).toBeGreaterThan(3)
   })
 
   it('規定に達したら必ず打ち切られる', () => {

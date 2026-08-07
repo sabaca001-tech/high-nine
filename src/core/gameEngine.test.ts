@@ -711,6 +711,23 @@ describe('大会', () => {
     expect(next).toBe(inTournament)
   })
 
+  it('地区大会はコールドあり、全国大会はコールドなし', () => {
+    // 甲子園まで来た相手に「5回10点差で打ち切り」は成立しない
+    const summer = untilTournament(startedGame({ seed: 8401 }))
+    expect(summer.tournament!.kind).toBe('summerPref')
+
+    const pref = applyCommand(summer, { type: 'playTournamentMatch' }).state
+    expect(pref.pendingSetup!.mercy).toBe(true)
+
+    // 同じ場面で大会だけ全国に差し替える
+    const asNationals: GameState = {
+      ...summer,
+      tournament: { ...summer.tournament!, kind: 'nationals' },
+    }
+    const national = applyCommand(asNationals, { type: 'playTournamentMatch' }).state
+    expect(national.pendingSetup!.mercy).toBe(false)
+  })
+
   it('試合をすると勝敗が大会に反映される', () => {
     const inTournament = untilTournament(startedGame({ seed: 84 }))
 

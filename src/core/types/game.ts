@@ -67,8 +67,10 @@ import type { PendingPlayerEvent } from '@/core/event/playerEvents'
  *            個人イベントのマスとフェーズ（pendingEvent）を追加。
  * v29 → v30: 練習結果の報告フェーズ（pendingGrowth）を追加。
  *            マスの効果が始まる前に、その日の成長を必ず見せる。
+ * v30 → v31: MatchState に mercy（コールドゲームの有無）を追加。
+ *            全国大会だけコールドが無い。
  */
-export const SAVE_VERSION = 30
+export const SAVE_VERSION = 31
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12

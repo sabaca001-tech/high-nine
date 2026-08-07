@@ -135,6 +135,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 30) {
     data = migrateV29ToV30(data)
   }
+  if (version < 31) {
+    data = migrateV30ToV31(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -769,6 +772,18 @@ function migrateV28ToV29(raw: Record<string, unknown>): Record<string, unknown> 
  */
 function migrateV29ToV30(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, version: 30, pendingGrowth: null }
+}
+
+/**
+ * v30 → v31
+ *  - MatchState に mercy（コールドゲームの有無）を追加
+ *
+ * 中断中の試合にだけ関係する。全国大会の途中だった場合でも
+ * コールドあり扱いになるが、10点差がついていなければ影響しない。
+ */
+function migrateV30ToV31(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!isRecord(raw.matchState)) return { ...raw, version: 31 }
+  return { ...raw, version: 31, matchState: { ...raw.matchState, mercy: true } }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */
