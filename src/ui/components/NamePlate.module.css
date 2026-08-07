@@ -5,7 +5,11 @@
 .plate {
   display: flex;
   align-items: center;
-  gap: var(--sp-1);
+  /*
+   * **隙間は詰める。** 375px の端末では1行に使える幅が210px しかなく、
+   * 4px の隙間が6か所で24px（名前1文字ぶん以上）を食っていた
+   */
+  gap: 3px;
   /* 指でつまめる高さを確保する */
   min-height: 34px;
   padding: 0 var(--sp-2);
@@ -38,8 +42,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 指で確実に掴める幅を確保する */
-  width: 22px;
+  /* 指で確実に掴める幅を確保する（高さは行いっぱいなので当たりは十分ある） */
+  width: 20px;
   align-self: stretch;
   margin-left: calc(var(--sp-2) * -1);
   touch-action: none;
@@ -70,13 +74,18 @@
 
 .lead {
   flex: 0 0 auto;
-  min-width: 1.6em;
+  /* 打順は1桁。1.6em も取ると名前の幅を削るだけ */
+  min-width: 1.1em;
   text-align: center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .name {
+  /*
+   * **行の主役。** 余った幅は全部ここに渡す。
+   * 周りの要素を詰めてでも、選手名が「島田 幸…」と切れないようにする
+   */
   flex: 1 1 auto;
   min-width: 0;
   font-weight: 700;
@@ -87,17 +96,25 @@
 
 .grade {
   flex: 0 0 auto;
-  font-size: 10px;
+  font-size: 9px;
   opacity: 0.75;
+  white-space: nowrap;
 }
 
-/* 総合力。ランクの色で塗って、数字と等級を同時に読めるようにする */
+/*
+ * 総合力。ランクの色で塗って、数字と等級を同時に読めるようにする。
+ *
+ * **囲みは要る。** プレートの地色は明るく、ランクの色（緑・水色・黄）を
+ * そのまま乗せると数字が地に溶けて読めなかった。
+ * ただし座布団は最小限にする。左右の余白を4pxずつ取っていた頃は、
+ * それだけで選手名が1文字ぶん切れていた。
+ */
 .rating {
   flex: 0 0 auto;
-  min-width: 2.2em;
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.42);
+  min-width: 1.5em;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.5);
   color: var(--rank-color);
   font-size: 11px;
   font-weight: 800;

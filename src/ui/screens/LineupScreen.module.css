@@ -98,7 +98,12 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 118px;
+  /*
+   * 右の能力パネルは**必要最小限の幅**にする。
+   * 375px の端末では118px が3割を占め、そのぶん一覧の行が詰まって
+   * 選手名が読めなくなっていた
+   */
+  grid-template-columns: 1fr 96px;
   gap: var(--sp-2);
 }
 
@@ -157,7 +162,7 @@
 /* 守備位置のボタン。プレートの中に置く */
 .positionButton {
   flex: 0 0 auto;
-  min-width: 34px;
+  min-width: 30px;
   min-height: 26px;
   border-radius: 5px;
   background: rgba(0, 0, 0, 0.32);
@@ -168,7 +173,7 @@
 
 .aptitude {
   flex: 0 0 auto;
-  min-width: 1.2em;
+  min-width: 1em;
   text-align: center;
   font-size: var(--fs-sm);
   font-weight: 800;
