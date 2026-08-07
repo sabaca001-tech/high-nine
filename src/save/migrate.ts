@@ -132,6 +132,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 29) {
     data = migrateV28ToV29(data)
   }
+  if (version < 30) {
+    data = migrateV29ToV30(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -756,6 +759,16 @@ function migrateV28ToV29(raw: Record<string, unknown>): Record<string, unknown> 
 
   const { managerId: _managerId, ...rest } = raw
   return { ...rest, version: 29, managers, pendingEvent: null }
+}
+
+/**
+ * v29 → v30
+ *  - 練習結果の報告フェーズ（pendingGrowth）を追加
+ *
+ * 途中のセーブは報告待ちではありえないので null で足すだけでよい。
+ */
+function migrateV29ToV30(raw: Record<string, unknown>): Record<string, unknown> {
+  return { ...raw, version: 30, pendingGrowth: null }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

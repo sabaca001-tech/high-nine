@@ -65,8 +65,10 @@ import type { PendingPlayerEvent } from '@/core/event/playerEvents'
  * v27 → v28: Player に fatigue（投手の疲労）を追加。連投でパフォーマンスが落ちる。
  * v28 → v29: マネージャーを購入制から入部制に変更（managerId → managers）。
  *            個人イベントのマスとフェーズ（pendingEvent）を追加。
+ * v29 → v30: 練習結果の報告フェーズ（pendingGrowth）を追加。
+ *            マスの効果が始まる前に、その日の成長を必ず見せる。
  */
-export const SAVE_VERSION = 29
+export const SAVE_VERSION = 30
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
@@ -80,6 +82,7 @@ export type Phase =
   | 'newSeason' // 卒業と新入生加入の報告
   | 'tournament' // 大会の進行中（次の試合を待っている）
   | 'camp' // 合宿の方針選択
+  | 'growthReport' // その日の成長の報告（マスの効果が始まる前に挟む）
   | 'playerEvent' // 部員1人に起きた出来事の選択
   | 'fork' // ルート分岐の選択
 
@@ -194,6 +197,14 @@ export type GameState = {
    * 定義そのものは持たず id だけを持つ（セーブに関数を入れないため）。
    */
   pendingEvent: PendingPlayerEvent | null
+  /**
+   * 表示待ちの成長の報告。無ければ null。
+   *
+   * **マスの効果が画面を奪う前に、その日の成長を見せるための足止め。**
+   * 試合マスに止まると、練習の結果を見る前に試合が始まってしまっていた。
+   * `nextPhase` は報告を閉じたあとに進むフェーズ。
+   */
+  pendingGrowth: PendingGrowth | null
   /** 学校の評判 0〜100。勝つほど上がり、新入生の質と人数を決める */
   reputation: number
   /** OB名鑑。卒業していった選手の記録（新しい順） */
@@ -203,6 +214,14 @@ export type GameState = {
 
   /** 画面に表示するログ（古いものから順。一定件数で切り捨てる） */
   log: LogEntry[]
+}
+
+/** 表示待ちの成長の報告 */
+export type PendingGrowth = {
+  /** その日に動いた能力。伸びも下がりも含む */
+  changes: import('./player').AbilityChange[]
+  /** 報告を閉じたあとに進むフェーズ */
+  nextPhase: Phase
 }
 
 /** ログの最大保持件数 */
@@ -254,6 +273,8 @@ export type GameCommand =
   | { type: 'chooseCampPlan'; planId: string }
   /** 個人イベントで選択肢を選ぶ */
   | { type: 'choosePlayerEventChoice'; choiceId: string }
+  /** その日の成長の報告を閉じて、止まったマスの効果へ進む */
+  | { type: 'closeGrowthReport' }
   /** ショップでアイテムを買う（買った瞬間に効果が出る） */
   | { type: 'buyItem'; itemId: string }
   /** 選手ごとの練習方針を決める（コンバートもここで指示する） */

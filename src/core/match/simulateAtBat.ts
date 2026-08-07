@@ -8,7 +8,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import { effectOf } from '@/core/player/personality'
-import type { Motivation, Player } from '@/core/types/player'
+import type { Motivation, PitchingAbilities, Player } from '@/core/types/player'
 import { velocityScore } from '@/core/types/player'
 import type { PlayResult } from '@/core/types/match'
 
@@ -68,6 +68,21 @@ const VELOCITY_WEIGHT = 0.7
  */
 const STUFF_BASELINE = 13
 
+/**
+ * 球威。球速と変化球から決まる「打ちにくさ」。
+ *
+ * **打席の判定と投手の値踏みで同じ式を使う。**
+ * 別々に持っていた頃は、`pitcherValue`（継投・先発の選定）に球速が入っておらず、
+ * 147km/hの投手が制球のいい142km/hの投手にマウンドを譲ってベンチに座っていた。
+ * 「試合で強い投手」と「自動編成が選ぶ投手」が食い違ってはいけない。
+ */
+export function stuffScore(pitching: PitchingAbilities): number {
+  return (
+    velocityScore(pitching.velocity) * VELOCITY_WEIGHT +
+    pitching.breaking * (1 - VELOCITY_WEIGHT)
+  )
+}
+
 function has(player: Player, skillId: string): boolean {
   return player.skills.includes(skillId)
 }
@@ -116,9 +131,7 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
 
   // 投手能力を持たない選手が登板した場合は極端に弱くする
   let stuff = pitching
-    ? (velocityScore(pitching.velocity) * VELOCITY_WEIGHT +
-        pitching.breaking * (1 - VELOCITY_WEIGHT) -
-        STUFF_BASELINE) *
+    ? (stuffScore(pitching) - STUFF_BASELINE) *
       pitcherBoost
     : 20
   let control = pitching ? pitching.control * pitcherBoost : 20

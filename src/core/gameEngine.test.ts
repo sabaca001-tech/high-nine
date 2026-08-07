@@ -55,6 +55,23 @@ import { scoutTripCost } from './shop/travel'
 import { findRegion } from './types/region'
 import { DEFAULT_UNIFORM } from './team/uniforms'
 
+/**
+ * カードを1枚使い、成長の報告が出たら閉じるところまで進める。
+ *
+ * 報告は**マスの効果の手前**に挟まる（試合マスで練習の結果を見る前に
+ * 試合が始まってしまうのを防ぐため）。
+ * マスの結果やその先のフェーズを調べるテストはこれを使う。
+ */
+function stepCard(state: GameState, cardId?: string): GameState {
+  const next = applyCommand(state, {
+    type: 'selectCard',
+    cardId: cardId ?? state.hand[0].id,
+  }).state
+  return next.phase === 'growthReport'
+    ? applyCommand(next, { type: 'closeGrowthReport' }).state
+    : next
+}
+
 describe('createInitialState', () => {
   it('1年目4月・新入生の入部から始まる', () => {
     const state = createInitialState({ seed: 1 })
@@ -268,7 +285,7 @@ describe('日単位の移動', () => {
     let next = state
     // 4/29 から 6月に入るまで（33日ぶん）。5枚ずつなので7手あれば足りる
     for (let i = 0; i < 8; i++) {
-      next = applyCommand(next, { type: 'selectCard', cardId: next.hand[0].id }).state
+      next = stepCard(next)
     }
 
     expect(next.month).toBe(6)
@@ -287,7 +304,7 @@ describe('日単位の移動', () => {
       hand: base.hand.map((card) => ({ ...card, number: 5 as const })),
     }
 
-    const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    const next = stepCard(state)
 
     expect(next.boardPosition).toBe(summerCell)
     expect(next.phase).toBe('tournament')
@@ -418,17 +435,11 @@ describe('練習効率バフ', () => {
       boardPosition: 0,
     }
 
-    const afterBoost = applyCommand(state, {
-      type: 'selectCard',
-      cardId: state.hand[0].id,
-    }).state
+    const afterBoost = stepCard(state)
     expect(afterBoost.practiceBoost).not.toBeNull()
     const remaining = afterBoost.practiceBoost!.remaining
 
-    const afterPractice = applyCommand(afterBoost, {
-      type: 'selectCard',
-      cardId: afterBoost.hand[0].id,
-    }).state
+    const afterPractice = stepCard(afterBoost)
 
     // 残り1回だった場合は消えるので、どちらかを満たしていればよい
     if (remaining === 1) {
@@ -1185,7 +1196,7 @@ describe('試合前のスタメン確認', () => {
       boardPosition: 0,
     }
 
-    const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    const next = stepCard(state)
 
     expect(next.phase).toBe('lineupCheck')
     expect(next.pendingSetup).not.toBeNull()
@@ -1204,10 +1215,7 @@ describe('試合前のスタメン確認', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    const checking = applyCommand(before, {
-      type: 'selectCard',
-      cardId: before.hand[0].id,
-    }).state
+    const checking = stepCard(before)
 
     // 1番と2番を入れ替えてから始める
     const slots = [...checking.lineup.slots]
@@ -1231,7 +1239,7 @@ describe('試合前のスタメン確認', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    const checking = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    const checking = stepCard(state)
     const playing = runMatch(checking)
 
     expect(playing.pendingMatch!.opponentName).toBe(checking.pendingSetup!.opponentName)
@@ -1463,7 +1471,7 @@ describe('練習以外のカード', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const, kind })),
       boardPosition: 0,
     }
-    return applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    return stepCard(state)
   }
 
   it('ミーティングで全員のやる気が上がる', () => {
@@ -1689,7 +1697,7 @@ describe('怪我と離脱', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    return applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    return stepCard(state)
   }
 
   it('赤マスで怪我が起きることがある', () => {
@@ -1788,7 +1796,7 @@ describe('怪我と離脱', () => {
           kind: 'batting' as PracticeKind,
         })),
       }
-      return applyCommand(at, { type: 'selectCard', cardId: at.hand[0].id }).state
+      return stepCard(at)
     }
 
     let state: GameState = {
@@ -1817,7 +1825,7 @@ describe('投手の疲労', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    const stopped = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    const stopped = stepCard(state)
     return applyCommand(runMatch(stopped), { type: 'finishMatch' }).state
   }
 
@@ -1881,6 +1889,79 @@ describe('投手の疲労', () => {
     const next = applyCommand(state, { type: 'autoLineup' }).state
     const starterId = next.lineup.slots.find((slot) => slot.position === 'P')?.playerId
     expect(starterId).not.toBe(ace.id)
+  })
+})
+
+describe('成長の報告', () => {
+  /** 指定した種類のマスへ、練習カードで止まる */
+  function stopOn(kind: 'blank' | 'match' | 'fork', seed: number): GameState {
+    const base = startedGame({ seed })
+    const state: GameState = {
+      ...base,
+      board: base.board.map((_cell, index) =>
+        index === 3 ? { index, kind } : { index, kind: 'blank' as const },
+      ),
+      hand: base.hand.map((card) => ({ ...card, number: 3 as const, kind: 'batting' as const })),
+      boardPosition: 0,
+    }
+    return applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+  }
+
+  it('カードを使うと、まず成長の報告になる', () => {
+    const next = stopOn('blank', 900)
+    expect(next.phase).toBe('growthReport')
+    expect(next.pendingGrowth).not.toBeNull()
+    expect(next.pendingGrowth!.changes.length).toBeGreaterThan(0)
+  })
+
+  it('報告を閉じるまでカードを選べない', () => {
+    const next = stopOn('blank', 901)
+    expect(applyCommand(next, { type: 'selectCard', cardId: next.hand[0].id }).state).toBe(next)
+  })
+
+  it('閉じると練習フェーズへ戻る', () => {
+    const next = applyCommand(stopOn('blank', 902), { type: 'closeGrowthReport' }).state
+    expect(next.phase).toBe('cardSelect')
+    expect(next.pendingGrowth).toBeNull()
+  })
+
+  it('試合マスでも、試合が始まる前に報告が挟まる', () => {
+    // これが無いと、練習の結果を見る前に試合の画面へ飛んでしまう
+    const next = stopOn('match', 903)
+    expect(next.phase).toBe('growthReport')
+    expect(next.pendingGrowth!.nextPhase).toBe('lineupCheck')
+    // 試合の準備そのものはもう出来ている（閉じればすぐ確認画面）
+    expect(next.pendingSetup).not.toBeNull()
+
+    const closed = applyCommand(next, { type: 'closeGrowthReport' }).state
+    expect(closed.phase).toBe('lineupCheck')
+  })
+
+  it('分岐マスでも、道を選ぶ前に報告が挟まる', () => {
+    const next = stopOn('fork', 904)
+    expect(next.phase).toBe('growthReport')
+    expect(applyCommand(next, { type: 'closeGrowthReport' }).state.phase).toBe('fork')
+  })
+
+  it('伸びた選手がいなければ報告を挟まない', () => {
+    // 能力を伸ばさないカード（休養）なら足止めしない
+    const base = startedGame({ seed: 905 })
+    const state: GameState = {
+      ...base,
+      board: base.board.map((_cell, index) => ({ index, kind: 'blank' as const })),
+      hand: base.hand.map((card) => ({ ...card, number: 1 as const, kind: 'rest' as const })),
+      boardPosition: 0,
+      // 月をまたぐと急成長が起きることがあるので、月の途中に置く
+      players: base.players.map((p) => ({ ...p, condition: 50 })),
+    }
+    const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    expect(next.phase).toBe('cardSelect')
+    expect(next.pendingGrowth).toBeNull()
+  })
+
+  it('報告待ちのままセーブできる形を保つ', () => {
+    const next = stopOn('match', 906)
+    expect(JSON.parse(JSON.stringify(next))).toEqual(next)
   })
 })
 
@@ -1966,7 +2047,7 @@ describe('ルート分岐', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    return applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    return stepCard(state)
   }
 
   it('分岐マスに止まると選択フェーズになる', () => {

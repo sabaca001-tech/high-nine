@@ -80,6 +80,10 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
         planId: chooseCampPlan(state),
       }).state
 
+    case 'growthReport':
+      // 自動プレイでは成長の報告をその場で閉じる
+      return applyCommand(state, { type: 'closeGrowthReport' }).state
+
     case 'playerEvent':
       return applyCommand(state, {
         type: 'choosePlayerEventChoice',

@@ -131,6 +131,7 @@ import type { AbilityChange, Player } from '@/core/types/player'
 import type { GameEvent, LogEntry } from '@/core/types/event'
 import type { EngineResult, GameCommand, GameState, Month, PracticeBoost } from '@/core/types/game'
 import { GRADUATES_LIMIT, LOG_LIMIT, SAVE_VERSION } from '@/core/types/game'
+import type { PendingGrowth } from '@/core/types/game'
 import type { Lineup } from '@/core/types/lineup'
 import type { BoardCell, CellKind } from '@/core/types/board'
 import { applyReputation, handSizeFor, REPUTATION_INITIAL } from '@/core/types/season'
@@ -217,6 +218,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     groundLevel: 1,
     managers: [],
     pendingEvent: null,
+    pendingGrowth: null,
     equipment: [],
     pendingFork: false,
     reputation: REPUTATION_INITIAL,
@@ -298,6 +300,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return chooseCampPlan(state, command.planId)
     case 'choosePlayerEventChoice':
       return choosePlayerEventChoice(state, command.choiceId)
+    case 'closeGrowthReport':
+      return closeGrowthReport(state)
     case 'buyItem':
       return buyItem(state, command.itemId)
     case 'setTrainingFocus':
@@ -1292,6 +1296,24 @@ function finishMatch(state: GameState): EngineResult {
 }
 
 /**
+ * その日の成長の報告を閉じて、止まったマスの効果へ進む。
+ *
+ * 効果そのものは `selectCard` の時点ですでに解決してある。
+ * ここでやるのは**フェーズを先送りしていたぶんを進めること**だけ。
+ * 先に解決しておかないと、報告を閉じるまで乱数の続きが決まらず、
+ * 中断してセーブしたときに再開できなくなる。
+ */
+function closeGrowthReport(state: GameState): EngineResult {
+  const pending = state.pendingGrowth
+  if (state.phase !== 'growthReport' || !pending) return { state, events: [] }
+
+  return {
+    state: { ...state, pendingGrowth: null, phase: pending.nextPhase },
+    events: [],
+  }
+}
+
+/**
  * カード1枚ぶんの練習を全部員に適用する。
  *
  * **成長の土台はここ。** 止まったマスは倍率（`cellGrowthBonus`）で効くだけで、
@@ -1537,6 +1559,15 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     phase = 'cardSelect'
   }
 
+  // ── その日の成長の報告 ──
+  // **マスの効果が画面を奪う前に、必ず一度見せる。**
+  // 試合マスに止まると練習の結果を見る前に試合が始まってしまっていた。
+  // 効果はもう解決済みで、ここでは進むフェーズを先送りするだけ
+  const grown = events.flatMap((event) => (event.type === 'ability' ? event.changes : []))
+  const pendingGrowth: PendingGrowth | null =
+    grown.length > 0 ? { changes: grown, nextPhase: phase } : null
+  if (pendingGrowth) phase = 'growthReport'
+
   const { log, serial: nextSerial } = appendLog(state.log, events, serial)
 
   return {
@@ -1555,6 +1586,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       pendingSetup: outcome.matchSetup ?? null,
       pendingFork: outcome.fork === true,
       pendingEvent: outcome.playerEvent ?? null,
+      pendingGrowth,
       tournament,
       // 遠征費などマスで発生した収支。部費は0を下回らせない
       funds: clamp(monthly.funds + (outcome.fundsDelta ?? 0), 0, FUNDS_MAX),

@@ -13,6 +13,7 @@ import type { Player, Position } from '@/core/types/player'
 import type { BattingLine, PitchingLine } from '@/core/types/match'
 import { emptyBattingLine, emptyPitchingLine, isHit, outsOf } from '@/core/types/match'
 import type { PlayResult } from '@/core/types/match'
+import { stuffScore } from './simulateAtBat'
 
 export type MatchTeam = {
   name: string
@@ -169,11 +170,21 @@ export function swapIn(team: MatchTeam, slotIndex: number, incoming: Player): vo
   refreshDefense(team)
 }
 
-/** 投手能力の目安。継投の順番を決めるのに使う */
+/**
+ * 投手としての値踏み。先発の選定と継投の順番に使う。
+ *
+ * **球威（球速＋変化球）を主に見る。** 以前は制球・スタミナ・変化球だけで測っていて
+ * 球速が1ミリも入っていなかったので、147km/hのエースが制球のいい142km/hの投手に
+ * マウンドを譲り、野手能力も高いばかりに別のポジションやベンチへ回っていた。
+ * 打席の判定（`simulateAtBat`）が球速を7割の比重で見ているのに、
+ * 選ぶ側がそれを見ていなければ食い違うのは当たり前だった。
+ *
+ * 球威の式は `stuffScore` を共有する。**片方だけ触らないこと。**
+ */
 export function pitcherValue(player: Player): number {
   const p = player.pitching
   if (!p) return 0
-  return p.control * 0.35 + p.stamina * 0.3 + p.breaking * 0.35
+  return stuffScore(p) * 0.45 + p.control * 0.3 + p.stamina * 0.25
 }
 
 /** 打撃力の目安。代打を出すかの判断に使う */

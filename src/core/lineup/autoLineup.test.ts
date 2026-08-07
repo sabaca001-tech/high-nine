@@ -7,6 +7,7 @@ import { ALL_POSITIONS, createAptitudes, defenseScore, isPlayable } from './apti
 import { overallRating } from '@/core/player/rating'
 import { AUTO_LINEUP_PLANS, autoLineup, repairLineup, starterOf, validateLineup } from './autoLineup'
 import { battingScore, onBaseScore, runningScore, sluggingScore } from './battingTraits'
+import { pitcherValue } from '@/core/match/teamState'
 
 describe('createAptitudes', () => {
   it('メインポジションは必ずS', () => {
@@ -73,6 +74,31 @@ describe('autoLineup', () => {
       const starter = roster.find((p) => p.id === starterOf(lineup))
       expect(starter?.isPitcher).toBe(true)
     }
+  })
+
+  it('いちばん良い投手がマウンドに立つ', () => {
+    // **球速を見ずに投手を選んでいた頃は、147km/hのエースが
+    // 制球のいい142km/hの投手にマウンドを譲ってベンチに座っていた。**
+    // 打席の判定が球速を重く見ているのに、選ぶ側が見ていなければ食い違う
+    for (let seed = 0; seed < 40; seed++) {
+      const roster = createInitialRoster(createRng(seed))
+      const pitchers = roster.filter((p) => p.pitching)
+      if (pitchers.length < 2) continue
+
+      const lineup = autoLineup(roster)
+      const best = [...pitchers].sort((a, b) => pitcherValue(b) - pitcherValue(a))[0]
+      expect(starterOf(lineup)).toBe(best.id)
+    }
+  })
+
+  it('投手の値踏みは球速を見ている', () => {
+    const roster = createInitialRoster(createRng(9))
+    const base = roster.find((p) => p.pitching)!
+    const fast: Player = {
+      ...base,
+      pitching: { ...base.pitching!, velocity: base.pitching!.velocity + 10 },
+    }
+    expect(pitcherValue(fast)).toBeGreaterThan(pitcherValue(base))
   })
 
   it('9番はスタメンで打力がいちばん低い選手', () => {
