@@ -14,6 +14,15 @@
   color: var(--pos-text);
   font-size: var(--fs-sm);
   user-select: none;
+  /*
+   * **素早い2連打をダブルタップズームに取られないようにする。**
+   * iOS は viewport の `user-scalable=no` を無視するので、
+   * 指定が無いと「同じ行をもう一度タップして選択」が拾われないことがある。
+   *
+   * `none` ではなく `manipulation` を使う。`none` にすると
+   * この行の上で一覧がスクロールできなくなる（つまみの注意書きと同じ理由）。
+   */
+  touch-action: manipulation;
 }
 
 /*
