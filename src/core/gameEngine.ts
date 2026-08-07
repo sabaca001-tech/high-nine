@@ -1970,6 +1970,8 @@ function advanceYear(state: GameState): EngineResult {
     year,
     serial,
     alumni: state.graduates,
+    // スカウトで投手を獲れていれば、そのぶん新入生の投手枠を減らす
+    scoutedPitchers: scouted.joined.filter((player) => player.isPitcher).length,
   })
 
   const players = [...change.players, ...scouted.joined]

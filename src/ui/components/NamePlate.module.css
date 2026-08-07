@@ -18,6 +18,8 @@
   color: var(--pos-text);
   font-size: var(--fs-sm);
   user-select: none;
+  /* 長押ししたときに iOS の吹き出しが出ないようにする */
+  -webkit-touch-callout: none;
   /*
    * **素早い2連打をダブルタップズームに取られないようにする。**
    * iOS は viewport の `user-scalable=no` を無視するので、

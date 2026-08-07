@@ -304,10 +304,28 @@ describe('打順の組み方', () => {
     }
   })
 
-  it('投手は8番か9番に入る', () => {
-    // 打力だけで決めると、ミートの高い投手が2番に入ることがあった
+  it('投手も打力どおりの打順に入る', () => {
+    // **8番固定をやめた。** 打てる投手を下位に沈めておく理由は無い。
+    // 打順は打力で決まるので、投手だけを特別扱いしない
     const pitcherOrder = lineup.slots.findIndex((slot) => slot.position === 'P') + 1
-    expect(pitcherOrder).toBeGreaterThanOrEqual(8)
+    const pitcher = at(pitcherOrder)
+
+    // 投手より打力が低い選手が上位にいない（＝打力の並びが守られている）
+    for (let order = 1; order < pitcherOrder; order++) {
+      expect(battingScore(at(order))).toBeGreaterThanOrEqual(battingScore(pitcher) - 0.001)
+    }
+  })
+
+  it('打てる投手なら上位打線に入ることもある', () => {
+    // 投手の打力を全員より高くすれば、下位に固定されず上がってくる
+    const strong = roster.map((player) =>
+      player.pitching
+        ? { ...player, batting: { ...player.batting, meet: 99, power: 99 } }
+        : player,
+    )
+    const built = autoLineup(strong)
+    const order = built.slots.findIndex((slot) => slot.position === 'P') + 1
+    expect(order).toBeLessThanOrEqual(5)
   })
 
   it('3番と4番に最も優秀な打者が入る', () => {

@@ -347,12 +347,15 @@ function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
 
   if (isGarbageTime(team, ctx)) {
     // 大差では**若い投手**を優先する。経験を積ませるのが目的なので、
-    // いちばん良い2番手ではなく下級生から出す
-    const youngster = availableRelievers(team, 'youth').find(
-      (player) => player.grade < current.grade,
-    )
-    if (youngster && !rng.chance(0.4)) {
-      changePitcher(team, youngster, ctx, '経験を積ませる')
+    // いちばん良い2番手ではなく下級生から出す。
+    //
+    // **下級生がいなければ、それでも降ろす。** 先発が最年少のときに
+    // 「若い投手がいない」で完投させていたが、
+    // 勝敗が決した試合で主戦を消耗させない、という目的は学年と関係ない
+    const relievers = availableRelievers(team, 'youth')
+    const reliever = relievers.find((player) => player.grade < current.grade) ?? relievers[0]
+    if (reliever && !rng.chance(0.4)) {
+      changePitcher(team, reliever, ctx, '経験を積ませる')
       return
     }
   }
@@ -488,8 +491,12 @@ function maybePinchHit(
  * 大差の判定を始める回。**リードしているときは遅らせる。**
  * 勝っている試合で早々に主力を下げると、そのまま追いつかれかねない。
  * 負けている試合は失うものが無いので早めに切り替える。
+ *
+ * リード側を7回から6回に早めたのは、**コールドゲームを入れたから**。
+ * 7回終了・7点差で試合が打ち切られるので、7回から動き始めると
+ * 控えに投げさせる回が1つも残らなかった。
  */
-const GARBAGE_FROM_INNING_AHEAD = 7
+const GARBAGE_FROM_INNING_AHEAD = 6
 const GARBAGE_FROM_INNING_BEHIND = 5
 
 /** これだけ開いていれば勝敗はほぼ決している */
@@ -499,12 +506,19 @@ const GARBAGE_DIFF = 7
 const GARBAGE_MISPLACEMENT_MAX = 1.0
 
 /**
- * 勝敗がほぼ決した場面か。
- * 野手の入れ替えと投手交代で**同じ基準**を使う。
+ * 勝敗がほぼ決した場面か。**`team` から見た点差**で判定する。
+ *
+ * 野手の入れ替えと投手交代で同じ基準を使う。
  * 片方だけ緩いと「打線は控えなのにエースが投げ続けている」ことになる。
+ *
+ * **相手は `ctx` から引く。** 以前は決め打ちで `ctx.defenseTeam` と比べていて、
+ * 守備側（＝投手交代の判断）を渡したときに自分自身と引き算していた。
+ * 点差が常に0になるので、**大差での投手交代は一度も起きていなかった**。
+ * 打線だけ控えに代わり、エースは何点差でも投げ切っていた。
  */
 export function isGarbageTime(team: MatchTeam, ctx: HalfContext): boolean {
-  const diff = team.runs - ctx.defenseTeam.runs
+  const opponent = team === ctx.offense ? ctx.defenseTeam : ctx.offense
+  const diff = team.runs - opponent.runs
   if (Math.abs(diff) < GARBAGE_DIFF) return false
 
   const from = diff > 0 ? GARBAGE_FROM_INNING_AHEAD : GARBAGE_FROM_INNING_BEHIND

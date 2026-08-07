@@ -37,6 +37,31 @@ const MAX_INNINGS_DECISIVE = 25
 const TIEBREAK_FROM = 10
 
 /**
+ * コールドゲームの規定。**その回を終えた時点**の点差で成立する。
+ *
+ * 地方大会の一般的な規定に合わせて「5回10点差・7回7点差」。
+ * これが無いと、力の差がはっきりついた試合でも9回まで投げ切ることになり、
+ * 投手の疲労だけが積み上がっていた。
+ *
+ * 回の大きい順に並べる（7回以降は7点差で成立し、10点差でも当然成立する）。
+ */
+const MERCY_RULES: { fromInning: number; lead: number }[] = [
+  { fromInning: 7, lead: 7 },
+  { fromInning: 5, lead: 10 },
+]
+
+/** その回を終えた時点でコールドが成立する点差。無ければ null */
+export function mercyLeadAt(inning: number): number | null {
+  return MERCY_RULES.find((rule) => inning >= rule.fromInning)?.lead ?? null
+}
+
+/** その時点でコールドゲームが成立しているか */
+function isMercy(inning: number, homeRuns: number, awayRuns: number): boolean {
+  const lead = mercyLeadAt(inning)
+  return lead !== null && Math.abs(homeRuns - awayRuns) >= lead
+}
+
+/**
  * 進行中の試合。**JSON にそのまま変換できる形だけを持つ**
  * （回の切れ目でセーブデータに入るため）。
  */
@@ -147,8 +172,11 @@ export function stepHalfInning(rng: Rng, state: MatchState): MatchState {
       autoSubstitute: true,
     })
 
-    // 9回以降、後攻がリードしていれば裏の攻撃は行わない
-    if (inning >= REGULATION_INNINGS && next.home.runs > next.away.runs) {
+    // 9回以降、後攻がリードしていれば裏の攻撃は行わない。
+    // **コールドが成立する点差で後攻がリードしている場合も同じ**
+    // （5回表を終えて10点差なら、その裏を戦う意味が無い）
+    const homeAhead = next.home.runs > next.away.runs
+    if (homeAhead && (inning >= REGULATION_INNINGS || isMercy(inning, next.home.runs, next.away.runs))) {
       return closeInning(next, maxInnings)
     }
 
@@ -180,8 +208,19 @@ function closeInning(state: MatchState, maxInnings: number): MatchState {
 
   const decided = state.inning >= REGULATION_INNINGS && state.home.runs !== state.away.runs
   const exhausted = state.inning >= maxInnings
+  const mercy = isMercy(state.inning, state.home.runs, state.away.runs)
 
-  if (decided || exhausted) {
+  if (mercy) {
+    state.events.push({
+      id: `event-cold-${state.inning}`,
+      order: state.serial++,
+      inning: state.inning,
+      half: state.half,
+      text: `${state.inning}回コールドゲーム`,
+    })
+  }
+
+  if (decided || exhausted || mercy) {
     state.outcome =
       state.home.runs > state.away.runs
         ? 'win'

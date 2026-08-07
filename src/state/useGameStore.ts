@@ -32,6 +32,8 @@ type GameStore = {
   screen: Screen
   /** 選手詳細で表示中の選手 */
   selectedPlayerId: string | null
+  /** 選手詳細を閉じたときに戻る画面。開いた場所へ返すために覚えておく */
+  playerReturnTo: Screen
   /** 直近のコマンドで発生したイベント（結果パネルの表示に使う） */
   lastEvents: GameEvent[]
   /** セーブデータの有無。タイトル画面の「続きから」の出し分けに使う */
@@ -80,13 +82,14 @@ type GameStore = {
   deleteSave: (slot?: storage.SlotId) => void
 
   setScreen: (screen: Screen) => void
-  showPlayer: (playerId: string) => void
+  showPlayer: (playerId: string, from?: Screen) => void
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
   game: null,
   screen: 'title',
   selectedPlayerId: null,
+  playerReturnTo: 'players',
   lastEvents: [],
   hasSave: storage.hasAnySave(),
   slot: storage.DEFAULT_SLOT,
@@ -271,7 +274,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setScreen: (screen) => set({ screen }),
 
-  showPlayer: (playerId) => set({ selectedPlayerId: playerId, screen: 'playerDetail' }),
+  showPlayer: (playerId, from = 'players') =>
+    set({ selectedPlayerId: playerId, playerReturnTo: from, screen: 'playerDetail' }),
 }))
 
 /** コマンドを適用して保存する共通処理 */

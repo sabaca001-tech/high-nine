@@ -5,7 +5,7 @@ import { overallRating } from '@/core/player/rating'
 import type { Grade } from '@/core/types/player'
 import { advanceSeason, recruitCount, talentFromReputation } from './graduation'
 
-function run(seed: number, reputation = 20) {
+function run(seed: number, reputation = 20, scoutedPitchers = 0) {
   const players = createInitialRoster(createRng(seed))
   return {
     players,
@@ -14,6 +14,7 @@ function run(seed: number, reputation = 20) {
       reputation,
       year: 2,
       serial: 100,
+      scoutedPitchers,
     }),
   }
 }
@@ -109,6 +110,25 @@ describe('advanceSeason', () => {
       const { change } = run(seed)
       expect(change.players.filter((p) => p.isPitcher).length).toBeGreaterThanOrEqual(2)
     }
+  })
+
+  it('毎年かならず投手が2人入部する', () => {
+    // **投手が引退した年に新入生が全員野手**という引きが続くと、
+    // 秋の新チームで継投が組めず立て直せなかった
+    for (let seed = 0; seed < 40; seed++) {
+      const { change } = run(seed)
+      expect(change.newcomers.filter((p) => p.isPitcher).length).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  it('スカウトで獲れた投手はその年の枠に数える', () => {
+    // スカウトで2人獲れていれば、新入生を投手で埋める必要は無い
+    let forcedAll = true
+    for (let seed = 0; seed < 40; seed++) {
+      const { change } = run(seed, undefined, 2)
+      if (change.newcomers.filter((p) => p.isPitcher).length < 2) forcedAll = false
+    }
+    expect(forcedAll).toBe(false)
   })
 
   it('評判が高いと新入生の平均能力が高い', () => {

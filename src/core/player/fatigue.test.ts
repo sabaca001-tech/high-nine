@@ -29,8 +29,14 @@ describe('fatigueOf', () => {
 })
 
 describe('fatigueAfterOuts', () => {
-  it('完投（27アウト）で60前後たまる', () => {
-    expect(fatigueAfterOuts(0, 27)).toBe(60)
+  it('完投（27アウト）で48たまる', () => {
+    expect(fatigueAfterOuts(0, 27)).toBe(48)
+  })
+
+  it('完投しても中1日で半分は抜ける', () => {
+    // 連投の代償は残しつつ、エースが常に本調子でないままにはしない
+    const afterComplete = fatigueAfterOuts(0, 27)
+    expect(recoveredFatigue(afterComplete, 2)).toBeLessThanOrEqual(afterComplete / 2)
   })
 
   it('投げるほど溜まる', () => {

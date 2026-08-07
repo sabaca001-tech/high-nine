@@ -2,6 +2,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from
 import { toRank, overallRating } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { plateGradient, rankColorOf } from '@/ui/theme/playerColors'
+import { useLongPress } from './useLongPress'
 import styles from './NamePlate.module.css'
 
 /**
@@ -26,6 +27,8 @@ export function NamePlate({
   preview = false,
   dragging = false,
   onClick,
+  /** 長押ししたとき。渡すと長押しで詳細を開けるようになる */
+  onLongPress,
   /** つまみを押したとき。渡すとドラッグ用のつまみが出る */
   onHandlePointerDown,
   ...rest
@@ -39,6 +42,7 @@ export function NamePlate({
   preview?: boolean
   dragging?: boolean
   onClick?: () => void
+  onLongPress?: () => void
   onHandlePointerDown?: (event: ReactPointerEvent) => void
 } & Record<string, unknown>) {
   const rating = overallRating(player)
@@ -49,18 +53,29 @@ export function NamePlate({
     '--rank-color': rankColorOf(rank),
   } as CSSProperties
 
+  // 長押しを渡されたときだけ、タップと長押しを使い分ける
+  const press = useLongPress({
+    onLongPress: onLongPress ?? (() => {}),
+    onClick: onClick ?? (() => {}),
+  })
+  const pressProps = onLongPress ? press : { onClick }
+
   const classNames = [styles.plate]
   if (selected) classNames.push(styles.selected)
   else if (preview) classNames.push(styles.preview)
   if (dragging) classNames.push(styles.dragging)
 
   return (
-    <div className={classNames.join(' ')} style={style} onClick={onClick} {...rest}>
+    <div className={classNames.join(' ')} style={style} {...pressProps} {...rest}>
       {onHandlePointerDown && (
         <span
           className={styles.handle}
           aria-label="つまんで移動"
-          onPointerDown={onHandlePointerDown}
+          onPointerDown={(event) => {
+            // つまみからのドラッグは長押し判定に混ぜない
+            event.stopPropagation()
+            onHandlePointerDown(event)
+          }}
           onClick={(event) => event.stopPropagation()}
         >
           ⠿

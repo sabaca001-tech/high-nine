@@ -50,7 +50,13 @@ function Screen() {
   // 試合中は他の画面に移動できないようにする。
   // 観戦を中断したまま別画面へ行くと、結果が未反映のまま取り残されるため
   // 試合前はスタメン確認から。ここを抜けるまで試合はシミュレートされない
-  if (game.phase === 'lineupCheck' && game.pendingSetup) return <PreMatchScreen />
+  //
+  // **選手の詳細だけは通す。** スタメンを決める場面でこそ
+  // 「この選手はどうだったか」を見たくなる。
+  // 戻ると `screen` が playerDetail から外れるので、ここへ戻ってくる
+  if (game.phase === 'lineupCheck' && game.pendingSetup && screen !== 'playerDetail') {
+    return <PreMatchScreen />
+  }
 
   // 試合は半回ずつ進む。進行中（matchState）でも決着後（pendingMatch）でも観戦画面
   if (game.phase === 'match' && (game.matchState || game.pendingMatch)) return <MatchScreen />

@@ -5,7 +5,7 @@ import { createInitialRoster } from '@/core/player/createPlayer'
 import type { Player } from '@/core/types/player'
 import type { MatchResult, MatchSetup } from '@/core/types/match'
 import { isHit, outsOf } from '@/core/types/match'
-import { simulateGame } from './simulateGame'
+import { mercyLeadAt, simulateGame } from './simulateGame'
 
 function makeSetup(seed: number, strength = 0): { setup: MatchSetup; players: Player[] } {
   const players = createInitialRoster(createRng(seed))
@@ -39,11 +39,48 @@ describe('simulateGame', () => {
     expect(JSON.parse(JSON.stringify(result))).toEqual(result)
   })
 
-  it('9回以上行われ、延長は12回まで', () => {
+  it('9回以上行われ、延長は12回まで（コールドを除く）', () => {
     for (let seed = 0; seed < 40; seed++) {
       const result = play(seed)
+      const lead = Math.abs(result.finalScore.player - result.finalScore.opponent)
+      const cold = mercyLeadAt(result.innings.length)
+
+      if (cold !== null && lead >= cold && result.innings.length < 9) {
+        // コールドゲーム。5回10点差・7回7点差で打ち切られる
+        expect(result.innings.length).toBeGreaterThanOrEqual(5)
+        continue
+      }
+
       expect(result.innings.length).toBeGreaterThanOrEqual(9)
       expect(result.innings.length).toBeLessThanOrEqual(12)
+    }
+  })
+
+  it('コールドの規定は5回10点差・7回7点差', () => {
+    expect(mercyLeadAt(4)).toBeNull()
+    expect(mercyLeadAt(5)).toBe(10)
+    expect(mercyLeadAt(6)).toBe(10)
+    expect(mercyLeadAt(7)).toBe(7)
+    expect(mercyLeadAt(9)).toBe(7)
+  })
+
+  it('規定に達したら必ず打ち切られる', () => {
+    // 「10点差なのに6回まで続いた」ようなことが起きていないか
+    for (let seed = 0; seed < 120; seed++) {
+      const result = play(seed, -28)
+      let player = 0
+      let opponent = 0
+
+      result.innings.forEach((line, index) => {
+        const inning = index + 1
+        opponent += line.opponent
+        player += line.player
+        const lead = mercyLeadAt(inning)
+        // 途中の回で規定を満たしたなら、そこが最終回になっているはず
+        if (lead !== null && Math.abs(player - opponent) >= lead) {
+          expect(inning).toBe(result.innings.length)
+        }
+      })
     }
   })
 
@@ -408,6 +445,9 @@ describe('大差の試合', () => {
     for (let seed = 1; seed < 80; seed++) {
       const result = play(seed, LOPSIDED)
       if (result.finalScore.player - result.finalScore.opponent < 7) continue
+      // **コールドで打ち切られた試合は数えない。**
+      // 5回で終わるなら、そもそも継投を挟む回が残っていない
+      if (result.innings.length < 7) continue
 
       blowouts += 1
       if (result.pitchingLines.length > 1) changed += 1
@@ -416,6 +456,24 @@ describe('大差の試合', () => {
     expect(blowouts).toBeGreaterThan(3)
     // 大差の試合の多くで2人以上が投げている
     expect(changed / blowouts).toBeGreaterThan(0.5)
+  })
+
+  it('大差では先発が降ろされる（守備側の点差で判定できている）', () => {
+    // **isGarbageTime に守備側を渡すと点差が常に0になっていた。**
+    // 打線だけ控えに代わり、エースは何点差でも投げ切っていた
+    let reached = 0
+    let pulled = 0
+
+    for (let seed = 1; seed < 120; seed++) {
+      const result = play(seed, LOPSIDED)
+      if (result.finalScore.player - result.finalScore.opponent < 7) continue
+      if (result.innings.length < 7) continue
+      reached += 1
+      if (result.pitchingLines.length > 1) pulled += 1
+    }
+
+    expect(reached).toBeGreaterThan(5)
+    expect(pulled / reached).toBeGreaterThan(0.6)
   })
 
   it('大差では下級生の投手に経験が回る', () => {

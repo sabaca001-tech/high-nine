@@ -44,6 +44,7 @@ export function LineupEditor() {
   const setLineup = useGameStore((s) => s.setLineup)
   const autoLineup = useGameStore((s) => s.autoLineup)
   const setSquad = useGameStore((s) => s.setSquad)
+  const showPlayer = useGameStore((s) => s.showPlayer)
 
   /**
    * タップは3段階で回す。
@@ -76,10 +77,9 @@ export function LineupEditor() {
       const fromIndex = starterIds.indexOf(item.id)
 
       if (fromIndex >= 0) {
-        // スタメン同士なら打順を入れ替える
-        const swapped = slots[fromIndex].playerId
-        slots[fromIndex] = { ...slots[fromIndex], playerId: slots[index].playerId }
-        slots[index] = { ...slots[index], playerId: swapped }
+        // スタメン同士なら**打順だけ**を入れ替える。
+        // 守備位置は選手についていくので、枠ごと丸ごと入れ替える
+        ;[slots[fromIndex], slots[index]] = [slots[index], slots[fromIndex]]
         setLineup({ slots })
         return
       }
@@ -136,13 +136,17 @@ export function LineupEditor() {
     const zoneA = zoneOf(aId)
     const zoneB = zoneOf(bId)
 
-    // ── スタメン同士。打順を入れ替える ──
+    // ── スタメン同士。**打順だけ**を入れ替える ──
+    //
+    // **守備位置は選手についていく。** playerId だけを差し替えていた頃は、
+    // 打順を入れ替えたつもりが守備位置まで交換されていて、
+    // 二塁手が三塁へ動くという意図しない編成になっていた。
+    // 枠（打順）ごと入れ替えれば、各自が自分の守備位置を持ったまま並び替わる。
     if (zoneA === ZONE_STARTER && zoneB === ZONE_STARTER) {
       const slots = [...game.lineup.slots]
       const i = starterIds.indexOf(aId)
       const j = starterIds.indexOf(bId)
-      slots[i] = { ...slots[i], playerId: bId }
-      slots[j] = { ...slots[j], playerId: aId }
+      ;[slots[i], slots[j]] = [slots[j], slots[i]]
       setLineup({ slots })
       return
     }
@@ -235,6 +239,9 @@ export function LineupEditor() {
       setArmedId(null)
       setPreviewId(null)
     },
+    // **長押しで能力詳細へ。** タップは編成に使い切っているので、
+    // 「この選手をじっくり見たい」の入口を長押しに分ける
+    onLongPress: () => showPlayer(id, 'lineup'),
     selected: armedId === id,
     preview: previewId === id,
     dragging: drag.dragging?.id === id,
@@ -308,7 +315,7 @@ export function LineupEditor() {
           </div>
         ) : (
           <div className={`${styles.picked} ${styles.previewBar}`}>
-            タップで能力表示 → もう一度タップで選択 → 相手をタップで入れ替え
+            タップで能力表示／もう一度で選択／長押しで詳細
           </div>
         )}
 
@@ -471,6 +478,8 @@ function AbilityPanel({ player }: { player: Player }) {
         {rank}
       </p>
 
+      <PlayablePositions player={player} />
+
       <Row label="状態" value={MOTIVATION_LABELS[player.motivation]} />
       <Row label="体力" value={`${player.condition}`} />
 
@@ -494,6 +503,35 @@ function AbilityPanel({ player }: { player: Player }) {
       <Row label={ABILITY_LABELS.arm} value={toRank(player.batting.arm)} />
       <Row label={ABILITY_LABELS.fielding} value={toRank(player.batting.fielding)} />
       <Row label={ABILITY_LABELS.catching} value={toRank(player.batting.catching)} />
+    </div>
+  )
+}
+
+/**
+ * 守れる守備位置。
+ *
+ * **どこを守れるかが分からないと入れ替えの判断ができない。**
+ * 能力だけ見て動かすと、適性の無い位置に置いて失策が増えていた。
+ * 本職を先頭に、守れる位置（C以上）だけを適性つきで並べる。
+ */
+function PlayablePositions({ player }: { player: Player }) {
+  const playable = ALL_POSITIONS.filter(
+    (position) => position !== player.position && isPlayable(player.aptitudes[position]),
+  )
+
+  return (
+    <div className={styles.aptRow}>
+      <span className={`${styles.aptChip} ${styles.aptChipMain}`}>
+        {player.position}
+        <span className={styles.aptChipRank}>{player.aptitudes[player.position]}</span>
+      </span>
+      {playable.map((position) => (
+        <span key={position} className={styles.aptChip}>
+          {position}
+          <span className={styles.aptChipRank}>{player.aptitudes[position]}</span>
+        </span>
+      ))}
+      {playable.length === 0 && <span className={styles.aptNone}>他は守れない</span>}
     </div>
   )
 }

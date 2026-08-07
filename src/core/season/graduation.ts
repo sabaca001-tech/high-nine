@@ -15,8 +15,18 @@ import { REPUTATION_INITIAL } from '@/core/types/season'
 /** 部員数の目安。評判が高いほど多くの入部希望者が来る */
 const BASE_ROSTER_SIZE = 24
 
-/** 部として最低限そろえる投手の数。これを切ったときだけ投手を確約する */
+/** 部として最低限そろえる投手の数。これを切ったときは必ず投手を入れる */
 const MIN_PITCHERS = 2
+
+/**
+ * **その年に入部する投手の下限。スカウトで獲れた投手も数に入れる。**
+ *
+ * 部全体で2人という下限だけだったので、投手が引退した年に
+ * 「新入生が全員野手」という引きを続けて食らうと立て直せなかった。
+ * 3年生が夏で引退することを考えると、毎年2人は入れておかないと
+ * 秋の新チームで継投が組めない。
+ */
+const MIN_PITCHER_RECRUITS = 2
 
 /** 1年で入る新入生の下限・上限。強豪校ならベンチ入り争いが起きる規模になる */
 const MIN_RECRUITS = 4
@@ -58,6 +68,8 @@ export function recruitFreshmen(
     reputation: number
     year: number
     serial: number
+    /** スカウトで獲れた投手の人数。今年の入部ぶんとして数える */
+    scoutedPitchers?: number
   },
 ): {
   newcomers: Player[]
@@ -65,6 +77,7 @@ export function recruitFreshmen(
   serial: number
 } {
   const { players, reputation } = params
+  const scoutedPitchers = params.scoutedPitchers ?? 0
 
   const count = recruitCount(reputation, players.length)
   const baseTalent = talentFromReputation(reputation)
@@ -87,12 +100,17 @@ export function recruitFreshmen(
       id,
       grade: 1,
       enrolledAt: { year: params.year, month: 4 },
-      // 投手が2人を切ったときだけ確約する。
-      // 3人にしていた頃は毎年投手ばかり入ってきた
-      isPitcher:
-        pitchersLeft + newcomers.filter((p) => p.isPitcher).length < MIN_PITCHERS
-          ? true
-          : undefined,
+      // **投手は必ず確保する。** 2つの下限のどちらかを満たしていなければ
+      // 投手として作る（満たしていれば普通に抽選する）。
+      //  - 部全体で MIN_PITCHERS 人
+      //  - その年の入部で MIN_PITCHER_RECRUITS 人（スカウトぶんを含む）
+      isPitcher: needsPitcher(
+        pitchersLeft,
+        newcomers.filter((p) => p.isPitcher).length,
+        scoutedPitchers,
+      )
+        ? true
+        : undefined,
       talentBonus: baseTalent + rng.int(-4, 4) + (isRecommended ? 14 : 0),
       // 在校生と新入生の両方と同姓同名にならないようにする
       takenNames: [...players, ...newcomers].map((player) => player.name),
@@ -103,6 +121,16 @@ export function recruitFreshmen(
   }
 
   return { newcomers, recommendedIds, serial }
+}
+
+/** その1人を投手にしないと下限を満たせないか */
+function needsPitcher(
+  onRoster: number,
+  recruitedSoFar: number,
+  scoutedPitchers: number,
+): boolean {
+  const incoming = recruitedSoFar + scoutedPitchers
+  return onRoster + incoming < MIN_PITCHERS || incoming < MIN_PITCHER_RECRUITS
 }
 
 export type SeasonChange = {
@@ -134,6 +162,8 @@ export function advanceSeason(
     serial: number
     /** OB名鑑。卒業後の進路を1年ぶん進めるために渡す */
     alumni?: GraduateRecord[]
+    /** スカウトで獲れた投手の人数。今年の入部ぶんとして数える */
+    scoutedPitchers?: number
   },
 ): SeasonChange {
   const { players, reputation, year, alumni = [] } = params
@@ -172,6 +202,7 @@ export function advanceSeason(
     reputation,
     year,
     serial: params.serial,
+    scoutedPitchers: params.scoutedPitchers ?? 0,
   })
   const { newcomers, recommendedIds } = recruited
   const serial = recruited.serial

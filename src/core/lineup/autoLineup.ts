@@ -159,6 +159,10 @@ export function autoLineup(players: Player[], plan: AutoLineupPlan = 'balanced')
  * | 7 | 長打 |
  * | 8 | 残り |
  * | 9 | **打力がいちばん低い選手** |
+ *
+ * **投手も同じ物差しで並べる。** 8番に固定していた頃は、
+ * 打てる投手をわざわざ下位に沈めていた。
+ * 打てない投手なら9番（打力最下位）で自然に拾われる。
  */
 function battingOrder(slots: LineupSlot[], players: Player[]): LineupSlot[] {
   const byId = new Map(players.map((player) => [player.id, player]))
@@ -214,11 +218,9 @@ function battingOrder(slots: LineupSlot[], players: Player[]): LineupSlot[] {
   const worst = remaining.reduce((a, b) => (bat(b) < bat(a) ? b : a))
   place(9, worst)
 
-  // **投手は下位に固定する。** 打力で選ぶと、ミートの高い投手が
-  // 2番に入ることがあった（実際に入った）。
-  // 9番が投手でなければ8番に置く
-  const pitcher = remaining.find((slot) => slot.position === 'P')
-  if (pitcher) place(8, pitcher)
+  // **投手も打力どおりに並べる。** 以前は8番に固定していたが、
+  // 打てる投手を下位に沈めておく理由は無い。
+  // 打てない投手なら、そもそも9番（打力最下位）で拾われる。
 
   // **3番と4番は2人まとめて取る。**
   // どちらも「チームで最も優秀な打者」の枠なので、まず打力上位2人を確保し、

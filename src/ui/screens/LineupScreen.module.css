@@ -253,6 +253,45 @@
   margin: 2px 0 var(--sp-2);
 }
 
+/*
+ * 守れる守備位置。**本職を先頭に、守れる位置だけ**を並べる。
+ * 9つ全部出すと幅96pxでは読めないので、C以上に絞ってある。
+ */
+.aptRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: var(--sp-2);
+}
+
+.aptChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* 本職は目立たせる。ここが基準になる */
+.aptChipMain {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.aptChipRank {
+  font-weight: 800;
+  font-size: 10px;
+}
+
+.aptNone {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
 .panelRow {
   display: flex;
   justify-content: space-between;

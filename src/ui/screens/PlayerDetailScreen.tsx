@@ -59,6 +59,8 @@ export function PlayerDetailScreen() {
   const game = useGameStore((s) => s.game)
   const selectedPlayerId = useGameStore((s) => s.selectedPlayerId)
   const setScreen = useGameStore((s) => s.setScreen)
+  // 開いた場所へ返す。部員一覧から開いたら一覧へ、スタメンから開いたらスタメンへ
+  const returnTo = useGameStore((s) => s.playerReturnTo)
   const [tab, setTab] = useState<Tab>('ability')
 
   const player = game?.players.find((p) => p.id === selectedPlayerId)
@@ -76,8 +78,8 @@ export function PlayerDetailScreen() {
 
   return (
     <AppLayout title="選手データ" scrollable>
-      <button type="button" className={styles.back} onClick={() => setScreen('players')}>
-        ← 部員一覧へ
+      <button type="button" className={styles.back} onClick={() => setScreen(returnTo)}>
+        ← {returnTo === 'lineup' ? 'スタメンへ' : '部員一覧へ'}
       </button>
 
       <div className={styles.profile} style={profileStyle}>
