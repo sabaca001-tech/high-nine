@@ -9,6 +9,7 @@ import { createRng, createSeed } from '@/core/rng/random'
 import type { Rng, RngState } from '@/core/rng/random'
 import {
   applyRoute,
+  cellGrowthBonus,
   clearTournamentCells,
   placeSeasonTournaments,
   placeTournamentCells,
@@ -27,7 +28,7 @@ import { drawHand, replaceBrokenCards, replaceCard } from '@/core/card/drawCards
 import { autoLineup, repairLineup, validateLineup } from '@/core/lineup/autoLineup'
 import { createInitialRoster, createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
 import { recruitFreshmen } from '@/core/season/graduation'
-import { applyCardCost, clamp } from '@/core/player/growth'
+import { applyCardCost, applyPractice, clamp } from '@/core/player/growth'
 import { addBatting, addPitching } from '@/core/player/careerStats'
 import { applyMatchGrowth } from '@/core/player/matchGrowth'
 import { fatigueAfterOuts, fatigueOf, recoveredFatigue } from '@/core/player/fatigue'
@@ -124,14 +125,14 @@ import {
 import { applyTournamentGrowth } from '@/core/tournament/tournamentGrowth'
 import { findSkill } from '@/core/skill/skillDefs'
 import { PRACTICE_LABELS } from '@/core/types/card'
-import type { PracticeKind } from '@/core/types/card'
+import type { PracticeCard, PracticeKind } from '@/core/types/card'
 import { ABILITY_LABELS, HISTORY_LIMIT, isAvailable, snapshotOf } from '@/core/types/player'
 import type { AbilityChange, Player } from '@/core/types/player'
 import type { GameEvent, LogEntry } from '@/core/types/event'
 import type { EngineResult, GameCommand, GameState, Month, PracticeBoost } from '@/core/types/game'
 import { GRADUATES_LIMIT, LOG_LIMIT, SAVE_VERSION } from '@/core/types/game'
 import type { Lineup } from '@/core/types/lineup'
-import type { BoardCell } from '@/core/types/board'
+import type { BoardCell, CellKind } from '@/core/types/board'
 import { applyReputation, handSizeFor, REPUTATION_INITIAL } from '@/core/types/season'
 import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
 import { DEFAULT_UNIFORM, normalizeUniform } from '@/core/team/uniforms'
@@ -1291,6 +1292,74 @@ function finishMatch(state: GameState): EngineResult {
 }
 
 /**
+ * カード1枚ぶんの練習を全部員に適用する。
+ *
+ * **成長の土台はここ。** 止まったマスは倍率（`cellGrowthBonus`）で効くだけで、
+ * 練習マスを踏めなくても進んだ日数ぶんは必ず伸びる。
+ * 練習効率バフ（黄マス・合宿の余韻）もここで消費する。
+ */
+function applyCardTraining(
+  state: GameState,
+  rng: Rng,
+  params: {
+    players: Player[]
+    card: PracticeCard
+    /** 進んだ日数。成長量はこれに比例する */
+    steps: number
+    cellKind: CellKind
+    firstSquad: Set<string>
+  },
+): { players: Player[]; events: GameEvent[]; boostConsumed: boolean } {
+  const { players, card, steps, cellKind, firstSquad } = params
+  const def = PRACTICE_DEFS[card.kind]
+
+  // 能力を伸ばさないカード（休養・治療・ミーティングなど）では何も起きない
+  if (def.gains.length === 0 || steps <= 0) {
+    return { players, events: [], boostConsumed: false }
+  }
+
+  const boost = state.practiceBoost
+  const cellBonus = cellGrowthBonus(cellKind)
+
+  const { players: updated, changes, pitchNews } = applyPractice(rng, players, def, {
+    steps,
+    isRare: card.isRare,
+    multiplier:
+      (boost?.multiplier ?? 1) *
+      cellBonus *
+      // グラウンド整備とマネージャーは常時かかる恒久的な倍率
+      groundMultiplier(state.groundLevel) *
+      managerGrowthBonus(state.managers),
+    // ベンチ外は指導が行き届かないぶん伸びが鈍い
+    perPlayerMultiplier: (player) => squadMultiplierOf(player.id, firstSquad),
+  })
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: card.isRare
+        ? `${def.label}（キラ）で猛練習した！（${steps}日）`
+        : `${def.label}に取り組んだ（${steps}日）`,
+      tone: card.isRare ? 'good' : 'normal',
+    },
+  ]
+  if (boost) {
+    events.push({
+      type: 'message',
+      text: `練習効率アップ！ 効果が${boost.multiplier}倍になった`,
+      tone: 'good',
+    })
+  }
+  if (changes.length > 0) events.push({ type: 'ability', changes })
+  // 球種を覚えた・変化量が上がったことを知らせる
+  for (const text of pitchNews ?? []) {
+    events.push({ type: 'message', text, tone: 'good' })
+  }
+
+  return { players: updated, events, boostConsumed: boost !== null }
+}
+
+/**
  * ベンチ入りを差し替える。
  * 在籍していない選手や重複は落とし、定員に足りなければ繰り上げる。
  */
@@ -1355,11 +1424,15 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     })
   }
 
+  // 進んだ日数。成長も消耗もこれに比例する
+  const steps = to - from
+
   // 止まったマスに関係なく、カードを使った時点で体力を消耗する
   let players = applyCardCost(
     rng,
     state.players,
     PRACTICE_DEFS[card.kind],
+    steps,
     managerConditionCost(state.managers),
   )
 
@@ -1392,15 +1465,23 @@ function selectCard(state: GameState, cardId: string): EngineResult {
 
   const firstSquad = firstSquadSet(state.squad)
 
+  // ── カードによる成長 ──
+  // **止まったマスに関係なく、進んだ日数ぶん必ず伸びる。**
+  // マスは倍率で効くだけ。以前は練習マス限定だったので、
+  // カードの数字が移動距離の意味しか持っていなかった
+  const training = applyCardTraining(state, rng, {
+    players,
+    card,
+    steps,
+    cellKind: cell.kind,
+    firstSquad,
+  })
+  players = training.players
+  events.push(...training.events)
+
   const outcome = resolveCell(rng, cell, card, {
     players,
     lineup: state.lineup,
-    boost: state.practiceBoost,
-    // ベンチ外は指導が行き届かないぶん伸びが鈍い
-    perPlayerMultiplier: (player) => squadMultiplierOf(player.id, firstSquad),
-    // グラウンド整備とマネージャーは常時かかる恒久的な倍率
-    facilityMultiplier:
-      groundMultiplier(state.groundLevel) * managerGrowthBonus(state.managers),
     defenseBonus: managerDefenseBonus(state.managers),
     // 練習試合が他県への遠征になることがあるので、所在地と部費を渡す
     region: findRegion(state.regionId),
@@ -1410,7 +1491,9 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   })
   events.push(...outcome.events)
 
-  const practiceBoost = nextBoost(state.practiceBoost, outcome.boost, outcome.boostConsumed)
+  // バフは**毎手消費する**。練習マス限定で消費していた頃と違い、
+  // 練習そのものが毎手起きるようになったため
+  const practiceBoost = nextBoost(state.practiceBoost, outcome.boost, training.boostConsumed)
 
   // 使ったカードを補充する。評判が上がっていれば枠ごと増える
   const handSize = handSizeFor(monthly.reputation)

@@ -81,3 +81,26 @@
   font-size: 10px;
   opacity: 0.75;
 }
+
+/* 総合力。ランクの色で塗って、数字と等級を同時に読めるようにする */
+.rating {
+  flex: 0 0 auto;
+  min-width: 2.2em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.42);
+  color: var(--rank-color);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/*
+ * 能力を見ているだけのプレート（1回タップ）。
+ * **入れ替え待ち（`.selected`）とはっきり差をつける。**
+ * 同じ強さで光らせると「次にタップしたら入れ替わる」のかどうかが読めない
+ */
+.preview {
+  border-color: rgba(255, 255, 255, 0.85);
+}

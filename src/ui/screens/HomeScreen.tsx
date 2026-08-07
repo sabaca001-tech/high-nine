@@ -84,7 +84,7 @@ export function HomeScreen() {
         </div>
       ) : (
         <>
-          <p className={styles.handHint}>カードを選ぶ（数字ぶん進む）</p>
+          <p className={styles.handHint}>カードを選ぶ（数字＝進む日数。その日数ぶん練習する）</p>
           <div className={styles.hand}>
             {game.hand.map((card) => (
               <PracticeCardView key={card.id} card={card} onSelect={handleSelect} />

@@ -9,7 +9,10 @@ type Props = {
   onSelect: (cardId: string) => void
 }
 
-/** 手札の1枚。数字（進むマス数）・アイコン・練習名を表示する */
+/**
+ * 手札の1枚。数字（進む日数）・アイコン・練習名を表示する。
+ * **数字は移動距離であると同時に練習量**でもある（大きいほど伸びるが消耗する）。
+ */
 export function PracticeCardView({ card, disabled = false, onSelect }: Props) {
   const classNames = [styles.card, styles[card.kind]]
   if (card.isRare) classNames.push(styles.rare)

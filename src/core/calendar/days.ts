@@ -12,7 +12,7 @@
  * カードの数字は1〜5のまま（読みやすさを優先した結果）なので、
  * 1年の手数は約49手 → 約146手に増える。
  * **増えたぶんは1手あたりの効果を小さくして吸収している**
- * （`PRACTICE_GROWTH_SCALE` / `CARD_COST_SCALE`、docs/balance.md）。
+ * （`CARD_GROWTH_SCALE` / `CARD_COST_SCALE`、docs/balance.md）。
  *
  * 閏年は扱わない。1年は常に365日で、4月1日から始まる。
  */

@@ -19,13 +19,17 @@
 }
 
 /*
- * 入れ替える相手を待っている状態。
- * 色だけでは「次のタップで入れ替わる」ことが伝わらないので言葉でも出す。
+ * 状態を出す帯。入れ替え待ちは色だけでは伝わらないので言葉でも出す。
+ *
+ * **3つの状態すべてで同じ高さを保つ。**
+ * 出たり消えたりすると一覧が上下にずれ、
+ * 「同じ選手をもう一度タップ」が隣の行に当たってしまう
  */
 .picked {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  min-height: 30px;
   gap: var(--sp-2);
   margin-bottom: var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
@@ -40,6 +44,17 @@
   font-weight: 800;
 }
 
+/*
+ * 能力を見ているだけの状態の帯。
+ * **入れ替え待ちの帯と同じ色にしない。** 同じ見た目だと
+ * 「いま次のタップで入れ替わるのか」が読めない
+ */
+.previewBar {
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-weight: 600;
+}
+
 .pickedCancel {
   margin-left: auto;
   min-height: 28px;
@@ -51,14 +66,9 @@
   font-weight: 800;
 }
 
-.hint {
-  flex: 1 1 auto;
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-  margin: 0;
-}
-
 .autoButton {
+  /* 一覧の上に単独で置くので右寄せにする */
+  margin-left: auto;
   flex: 0 0 auto;
   min-height: var(--tap-min);
   padding: 0 var(--sp-3);

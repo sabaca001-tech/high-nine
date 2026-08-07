@@ -487,6 +487,64 @@ describe('マスの種類', () => {
     }
   })
 
+  /** 指定したマスに止まるまで進めて、伸びた合計を返す */
+  function growthOnCell(kind: 'practice' | 'blank' | 'rest', steps: 1 | 3 | 5, seed: number) {
+    const base = startedGame({ seed })
+    const state: GameState = {
+      ...base,
+      board: base.board.map((_cell, index) =>
+        index === steps ? { index, kind } : { index, kind: 'blank' as const },
+      ),
+      hand: base.hand.map((card) => ({ ...card, number: steps, kind: 'batting' as const })),
+      boardPosition: 0,
+    }
+    const { state: next } = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id })
+
+    const before = new Map(base.players.map((p) => [p.id, p.batting.meet + p.batting.power]))
+    return next.players.reduce(
+      (total, p) => total + (p.batting.meet + p.batting.power - (before.get(p.id) ?? 0)),
+      0,
+    )
+  }
+
+  it('練習マス以外に止まっても能力は伸びる', () => {
+    // 以前は練習マスに止まらないと1ミリも伸びなかった。
+    // いまはカードが成長の土台なので、何も無いマスでも伸びる
+    let total = 0
+    for (let seed = 300; seed < 340; seed++) total += growthOnCell('blank', 5, seed)
+    expect(total).toBeGreaterThan(0)
+  })
+
+  it('同じマスなら、数字が大きいカードのほうが伸びる', () => {
+    let small = 0
+    let large = 0
+    for (let seed = 400; seed < 440; seed++) {
+      small += growthOnCell('blank', 1, seed)
+      large += growthOnCell('blank', 5, seed)
+    }
+    expect(large).toBeGreaterThan(small * 2)
+  })
+
+  it('同じ数字なら、練習マスに止まったほうが伸びる', () => {
+    let blank = 0
+    let practice = 0
+    for (let seed = 500; seed < 560; seed++) {
+      blank += growthOnCell('blank', 5, seed)
+      practice += growthOnCell('practice', 5, seed)
+    }
+    expect(practice).toBeGreaterThan(blank)
+  })
+
+  it('休養マスはほとんど伸びない代わりに体力が戻る', () => {
+    let rest = 0
+    let blank = 0
+    for (let seed = 600; seed < 660; seed++) {
+      rest += growthOnCell('rest', 5, seed)
+      blank += growthOnCell('blank', 5, seed)
+    }
+    expect(rest).toBeLessThan(blank)
+  })
+
   it('特訓マスで特殊能力が習得されることがある', () => {
     let acquired = false
 

@@ -45,35 +45,40 @@ export function armFromVelocity(velocity: number): number {
 const VELOCITY_GAIN_RATE = 0.45
 
 /**
- * 練習1回あたりの倍率。
+ * **1日（1マス）ぶんの練習の倍率。**
  *
- * 盤面を1マス1日に戻したことで、1年の練習マスが約13回から約61回に増えた
- * （手数49→146、練習マスの重みも組み直した結果）。
- * カード定義の `amount` は「1回の練習でこれくらい」という読みやすい値のまま残し、
- * **増えた回数ぶんをここで割り戻す**。カードの数字を全部書き換えるより、
- * 盤面の刻みを変えたときにここ1か所を直すほうが追いやすい。
+ * 成長はカードの数字＝進んだ日数に比例する。
+ * 5日ぶん進んだカードは1日ぶんのカードの5倍伸びる代わりに、5倍消耗する。
  *
- * 計算上は 13.4 / 61 ≒ 0.22。そこから実測で調整している。
+ * **練習マスに止まらないと1ミリも伸びない、という作りをやめた。**
+ * 以前は練習マスに止まったときだけ `amount` がまるごと入っていたので、
+ * 「カードで何を選ぶか」より「練習マスを踏めるか」で成長が決まり、
+ * カードの数字は移動距離にしか意味が無かった。
+ * いまは**カードが成長の土台**で、止まったマスはそれを増減させる補助
+ * （`CELL_GROWTH_BONUS`）に回っている。
+ *
+ * カード定義の `amount` は「しっかり練習した1日でこれくらい」という
+ * 読みやすい値のまま残し、実際の刻みぶんをここで割り戻す。
+ *
+ * 1年の日数は365で固定なので、**土台の総量は打ち方によらず一定**。
+ * プレイヤーが動かせるのは「どのマスに止めるか」と練習効率バフの使い方になる。
+ *
  * **入学時の能力（`GRADE_BASE`）を上げたぶん、ここを下げてある。**
  * 「低いところから大きく伸ばす」より「良い素材を採って仕上げる」ゲームにしたい。
- *
- * 学年差を縮めたときも合わせて下げる。3年間の伸びが
- * `GRADE_BASE[3] - GRADE_BASE[1]`（＝14）とおおよそ釣り合っていないと、
- * 3年生になった選手が初期3年生を大きく追い越してしまう。
+ * 3年間の伸びが `GRADE_BASE[3] - GRADE_BASE[1]`（＝14）とおおよそ
+ * 釣り合っていないと、3年生になった選手が初期3年生を大きく追い越してしまう。
  * 変えたら必ず seasonBalance.test.ts を回すこと。
  */
-export const PRACTICE_GROWTH_SCALE = 0.11
+export const CARD_GROWTH_SCALE = 0.0142
 
 /**
- * カード1枚あたりの体力・信頼度の倍率。
+ * 1日ぶんの体力・信頼度の倍率。
  *
- * こちらは「止まったマスに関係なく毎手かかる」ので、
- * 練習マスの回数ではなく**手数そのもの**（49→146手）で割り戻す。
- * 計算上は 1/3 ≒ 0.33 だが、それだと無戦略プレイの体力が50台に居座り、
- * 体力補正（70未満で0.85倍）が常時かかる状態になったので 0.30 に緩めてある。
- * 成長の倍率とは別の値になるのが正しい。
+ * 成長と同じく**進んだ日数に比例する**。ここを日数に比例させないと、
+ * 大きい数字のカードが「伸びは5倍・消耗は同じ」で一方的に強くなる。
+ * 1年365日ぶんで、以前（1手あたり 0.3 × 約127手）と同じ総量になるよう置いた。
  */
-export const CARD_COST_SCALE = 0.3
+export const CARD_COST_SCALE = 0.104
 
 /** やる気による成長倍率 */
 const MOTIVATION_MULTIPLIER: Record<Motivation, number> = {
@@ -145,8 +150,12 @@ export type PracticeOutcome = {
   pitchNews?: string[]
 }
 
-/** 変化球練習で持ち球に変化が起きる確率 */
-const PITCH_IMPROVE_CHANCE = 0.35
+/**
+ * 変化球練習で持ち球に変化が起きる確率。**1日あたり**。
+ * 練習マス限定だった頃の 0.35/回 と年間の回数が釣り合う値にしてある。
+ * 日数に比例させないと、毎手判定になったぶん1年で全球種を覚えてしまう。
+ */
+const PITCH_IMPROVE_CHANCE_PER_STEP = 0.05
 
 /**
  * 自主練の基本上昇量。
@@ -155,23 +164,40 @@ const PITCH_IMPROVE_CHANCE = 0.35
  */
 const SELF_TRAINING_AMOUNT = 2.5
 
+export type PracticeOptions = {
+  /**
+   * 進んだ日数（カードの数字）。**成長量はここに比例する。**
+   * 大会や合宿で手前に止められた場合は、実際に進んだぶんだけが入る。
+   */
+  steps: number
+  /** キラ（レア）のカードか */
+  isRare?: boolean
+  /**
+   * 止まったマス・練習効率バフ・グラウンド・マネージャーによる倍率をまとめたもの。
+   * 呼び出し側で掛け合わせて渡す。
+   */
+  multiplier?: number
+  /** 選手ごとの倍率（ベンチ入り/ベンチ外など）。省略時は全員1倍 */
+  perPlayerMultiplier?: (player: Player) => number
+}
+
 /**
- * 練習による能力上昇を部員全員に適用する。
+ * カードを1枚使ったことによる能力上昇を部員全員に適用する。
+ *
+ * **止まったマスに関係なく、カードを選んだ時点で必ず伸びる。**
+ * マスは倍率で効くだけ（`CELL_GROWTH_BONUS`）。
  * 体力・信頼度の増減はここでは扱わない（applyCardCost が担当）。
  */
 export function applyPractice(
   rng: Rng,
   players: Player[],
   def: PracticeDef,
-  isRare: boolean,
-  /** 黄マスなどで得た練習効率バフの倍率 */
-  boostMultiplier = 1,
-  /** 選手ごとの倍率（ベンチ入り/ベンチ外など）。省略時は全員1倍 */
-  perPlayerMultiplier?: (player: Player) => number,
+  options: PracticeOptions,
 ): PracticeOutcome {
+  const { steps, isRare = false, multiplier: cellMultiplier = 1, perPlayerMultiplier } = options
   const changes: AbilityChange[] = []
   const pitchNews: string[] = []
-  const multiplier = (isRare ? RARE_MULTIPLIER : 1) * boostMultiplier
+  const multiplier = (isRare ? RARE_MULTIPLIER : 1) * cellMultiplier * steps
   // 変化球の練習なら、能力値だけでなく持ち球も動く
   const isBreakingPractice = def.gains.some((gain) => gain.key === 'breaking')
 
@@ -214,7 +240,8 @@ export function applyPractice(
     }
 
     // 持ち球の習得・変化量アップ
-    if (isBreakingPractice && current.pitching && rng.chance(PITCH_IMPROVE_CHANCE)) {
+    const pitchChance = Math.min(0.5, PITCH_IMPROVE_CHANCE_PER_STEP * steps)
+    if (isBreakingPractice && current.pitching && rng.chance(pitchChance)) {
       const result = improvePitches(rng, current.pitching.pitches, current.pitching.breaking)
       current = { ...current, pitching: { ...current.pitching, pitches: result.pitches } }
 
@@ -239,11 +266,16 @@ export function applyPractice(
  * 重要: これは「どのマスに止まったか」に関係なく、カードを選んだ時点で必ず適用する。
  * 練習マス以外に止まっても部活動自体は行っているため。
  * （マスに止まった時だけ消耗させると体力が常に満タンになり、休養カードが無意味になる）
+ *
+ * **成長と同じく進んだ日数に比例する。** 5日ぶん進めば5日ぶん疲れる。
+ * 休養カードなら5日ぶん回復する。
  */
 export function applyCardCost(
   rng: Rng,
   players: Player[],
   def: PracticeDef,
+  /** 進んだ日数（カードの数字） */
+  steps: number,
   /** マネージャーによる体力消費の倍率 */
   conditionCostRate = 1,
 ): Player[] {
@@ -261,12 +293,13 @@ export function applyCardCost(
       rng,
       def.conditionDelta *
         CARD_COST_SCALE *
+        steps *
         (def.conditionDelta < 0 ? effect.conditionCost * conditionCostRate : 1),
     )
 
     const trust = roundRandom(
       rng,
-      def.trustDelta * CARD_COST_SCALE * (def.trustDelta > 0 ? effect.trustGain : 1),
+      def.trustDelta * CARD_COST_SCALE * steps * (def.trustDelta > 0 ? effect.trustGain : 1),
     )
 
     return {
@@ -328,7 +361,7 @@ function calcGrowth(
   const raw =
     gain.amount *
     (isVelocity ? VELOCITY_GAIN_RATE : 1) *
-    PRACTICE_GROWTH_SCALE *
+    CARD_GROWTH_SCALE *
     // 得意な能力は伸び、苦手な能力はほとんど動かない。
     // ここが無いと、他の補正が丸めで潰れて全員が同じ「+1」になる
     aptitudeMultiplier(player, gain.key) *

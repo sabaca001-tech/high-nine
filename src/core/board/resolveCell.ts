@@ -2,7 +2,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
-import { applyPractice, clamp, raiseAbility } from '@/core/player/growth'
+import { clamp, raiseAbility } from '@/core/player/growth'
 import { overallRating } from '@/core/player/rating'
 import { pickOpponentName } from '@/core/match/opponent'
 import { attemptTraining, removeRedSkill } from '@/core/skill/grantSkill'
@@ -47,13 +47,8 @@ export type CellOutcome = {
 export type CellContext = {
   players: Player[]
   lineup: Lineup
-  boost: PracticeBoost | null
-  /** グラウンド整備・マネージャーによる恒久的な成長倍率 */
-  facilityMultiplier?: number
   /** 試合での守備力の上乗せ */
   defenseBonus?: number
-  /** 選手ごとの練習倍率（ベンチ入り/ベンチ外） */
-  perPlayerMultiplier?: (player: Player) => number
   /** 学校の所在地。練習試合の遠征先を決めるのに使う */
   region?: Region
   /** 現在の部費。遠征費を払えるかの判定に使う */
@@ -82,12 +77,11 @@ export function resolveCell(
   card: PracticeCard,
   context: CellContext,
 ): CellOutcome {
-  const { players, boost } = context
-  const facility = context.facilityMultiplier ?? 1
+  const { players } = context
 
   switch (cell.kind) {
     case 'practice':
-      return resolvePractice(rng, players, card, boost, facility, context.perPlayerMultiplier)
+      return resolvePractice(players, card)
     case 'good':
       return resolveGoodEvent(rng, players)
     case 'bad':
@@ -128,51 +122,27 @@ export function resolveCell(
 }
 
 /**
- * 練習マス: 選んだカードの練習内容で全員が成長する。
- * 練習効率バフはここでのみ消費する（黄マス→練習マスと繋げると大きく伸びる）。
+ * 練習マス: 練習に打ち込めた日。
+ *
+ * **ここで成長させるのはやめた。** 能力が伸びる土台はカードのほうにあり
+ * （`applyPractice` を gameEngine が毎手呼ぶ）、
+ * このマスは倍率を上乗せする補助でしかない（`CELL_GROWTH_BONUS`）。
+ * 以前のように練習マス限定で伸ばしていると、
+ * 「練習マスを踏めたか」だけで育成が決まり、カードの数字が移動距離の意味しか持たなかった。
  */
-function resolvePractice(
-  rng: Rng,
-  players: Player[],
-  card: PracticeCard,
-  boost: PracticeBoost | null,
-  facilityMultiplier: number,
-  perPlayerMultiplier?: (player: Player) => number,
-): CellOutcome {
+function resolvePractice(players: Player[], card: PracticeCard): CellOutcome {
   const def = PRACTICE_DEFS[card.kind]
-  const multiplier = (boost?.multiplier ?? 1) * facilityMultiplier
-  const { players: updated, changes, pitchNews } = applyPractice(
-    rng,
+
+  return {
     players,
-    def,
-    card.isRare,
-    multiplier,
-    perPlayerMultiplier,
-  )
-
-  const events: GameEvent[] = []
-  if (boost) {
-    events.push({
-      type: 'message',
-      text: `練習効率アップ！ ${def.label}の効果が${boost.multiplier}倍になった`,
-      tone: 'good',
-    })
-  } else {
-    events.push({
-      type: 'message',
-      text: card.isRare ? `${def.label}（キラ）で猛練習した！` : `${def.label}に取り組んだ`,
-      tone: card.isRare ? 'good' : 'normal',
-    })
+    events: [
+      {
+        type: 'message',
+        text: `${def.label}にじっくり打ち込めた`,
+        tone: 'good',
+      },
+    ],
   }
-  if (changes.length > 0) {
-    events.push({ type: 'ability', changes })
-  }
-  // 球種を覚えた・変化量が上がったことを知らせる
-  for (const text of pitchNews ?? []) {
-    events.push({ type: 'message', text, tone: 'good' })
-  }
-
-  return { players: updated, events, boostConsumed: boost !== null }
 }
 
 /** 黄マス: 練習効率アップ */

@@ -101,6 +101,31 @@ const CELL_WEIGHTS: { value: CellKind; weight: number }[] = [
 ]
 
 /**
+ * 止まったマスによる成長の補正。
+ *
+ * **能力が伸びる土台はカードのほう**（`CARD_GROWTH_SCALE`）で、
+ * ここはその増減にすぎない。以前は練習マスに止まったときだけ
+ * 成長が発生していたので、カードの数字が移動距離の意味しか持たず、
+ * 「練習マスを踏めたか」だけで育成が決まっていた。
+ *
+ * 練習マスは1.8倍。**踏めれば嬉しいが、踏めなくても伸びる**という重みにする。
+ * 休養マスはほとんど伸びない代わりに体力が大きく戻る。
+ *
+ * 書いていないマスは1.0倍（そのマス自身の効果だけが起きる）。
+ */
+export const CELL_GROWTH_BONUS: Partial<Record<CellKind, number>> = {
+  practice: 1.8,
+  good: 1.2,
+  bad: 0.7,
+  rest: 0.4,
+}
+
+/** そのマスに止まったときの成長倍率 */
+export function cellGrowthBonus(kind: CellKind): number {
+  return CELL_GROWTH_BONUS[kind] ?? 1
+}
+
+/**
  * ルート分岐で選べる道筋。
  * 分岐マスから先のマスを、選んだ方針で作り直す。
  */

@@ -23,6 +23,7 @@ export function NamePlate({
   /** 右端に足す内容 */
   trailing,
   selected = false,
+  preview = false,
   dragging = false,
   onClick,
   /** つまみを押したとき。渡すとドラッグ用のつまみが出る */
@@ -32,12 +33,16 @@ export function NamePlate({
   player: Player
   lead?: ReactNode
   trailing?: ReactNode
+  /** 入れ替え待ち（2回タップ）。次にタップした相手と入れ替わる */
   selected?: boolean
+  /** 能力を見ているだけ（1回タップ） */
+  preview?: boolean
   dragging?: boolean
   onClick?: () => void
   onHandlePointerDown?: (event: ReactPointerEvent) => void
 } & Record<string, unknown>) {
-  const rank = toRank(overallRating(player))
+  const rating = overallRating(player)
+  const rank = toRank(rating)
 
   const style = {
     background: plateGradient(player),
@@ -46,6 +51,7 @@ export function NamePlate({
 
   const classNames = [styles.plate]
   if (selected) classNames.push(styles.selected)
+  else if (preview) classNames.push(styles.preview)
   if (dragging) classNames.push(styles.dragging)
 
   return (
@@ -62,6 +68,12 @@ export function NamePlate({
       )}
       {lead !== undefined && <span className={styles.lead}>{lead}</span>}
       <span className={styles.name}>{player.name}</span>
+      {/*
+        総合力は**名前のすぐ横**に出す。
+        誰と誰を入れ替えるかは結局この数字で決めるので、
+        1人ずつタップして能力を開かないと比べられないのでは編成にならない
+      */}
+      <span className={styles.rating}>{rating}</span>
       <span className={styles.grade}>{player.grade}年</span>
       {trailing}
     </div>

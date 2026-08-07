@@ -18,6 +18,7 @@ import {
   GOAL_INDEX,
   placeSeasonTournaments,
   placeTournamentCells,
+  cellGrowthBonus,
   ROUND_GAP,
 } from './boardDefs'
 
@@ -173,6 +174,16 @@ describe('大会の日程', () => {
     expect(cells).toHaveLength(5)
     expect(cells.at(-1)!.index).toBeLessThan(GOAL_INDEX)
     expect(monthOfDay(dayOfTournament('springNationals'))).toBe(3)
+  })
+
+  it('練習マスの成長補正がいちばん高く、休養マスがいちばん低い', () => {
+    // 能力が伸びる土台はカードのほう。ここはあくまで増減の補助
+    expect(cellGrowthBonus('practice')).toBeGreaterThan(1)
+    expect(cellGrowthBonus('rest')).toBeLessThan(1)
+    expect(cellGrowthBonus('practice')).toBeGreaterThan(cellGrowthBonus('good'))
+    // 書いていないマスは等倍
+    expect(cellGrowthBonus('blank')).toBe(1)
+    expect(cellGrowthBonus('training')).toBe(1)
   })
 
   it('合宿は夏（8月）と冬（12月）の2回ある', () => {

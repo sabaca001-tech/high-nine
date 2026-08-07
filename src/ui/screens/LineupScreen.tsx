@@ -45,7 +45,19 @@ export function LineupEditor() {
   const autoLineup = useGameStore((s) => s.autoLineup)
   const setSquad = useGameStore((s) => s.setSquad)
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  /**
+   * タップは3段階で回す。
+   *
+   * 1回目 … 能力を見るだけ（`previewId`）
+   * 2回目 … 入れ替え待ち（`armedId`）。ここで初めて編成が動く状態になる
+   * 3回目 … 選択解除
+   *
+   * **1回のタップでいきなり入れ替え待ちにしない。**
+   * 能力を確かめたいだけで触った選手が武装状態になり、
+   * 次に別の選手を見ようとタップした瞬間に入れ替わってしまっていた。
+   */
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const [armedId, setArmedId] = useState<string | null>(null)
   const [positionFor, setPositionFor] = useState<number | null>(null)
   /** おまかせの方針を選ぶ一覧を出しているか */
   const [showPlans, setShowPlans] = useState(false)
@@ -180,7 +192,8 @@ export function LineupEditor() {
   const out = players.filter((player) => !squadSet.has(player.id)).map((player) => player.id)
 
   const problems = validateLineup(lineup, players)
-  const selected = selectedId ? byId.get(selectedId) : undefined
+  const previewed = previewId ? byId.get(previewId) : undefined
+  const armed = armedId ? byId.get(armedId) : undefined
 
   const assignPosition = (index: number, position: Position) => {
     const slots = [...lineup.slots]
@@ -200,21 +213,37 @@ export function LineupEditor() {
     onHandlePointerDown: (event: ReactPointerEvent) =>
       drag.handlePointerDown({ id, from: zone }, event),
     onClick: () => {
-      if (selectedId === null) {
-        setSelectedId(id)
+      // 入れ替え待ちの選手がいて、別の選手を触った → 入れ替える
+      if (armedId !== null && armedId !== id) {
+        swapPlayers(armedId, id)
+        setArmedId(null)
+        setPreviewId(null)
         return
       }
-      // 同じ選手をもう一度タップしたら選択を解く
-      if (selectedId === id) {
-        setSelectedId(null)
+      // 別の選手 → 能力を見るだけ
+      if (previewId !== id) {
+        setPreviewId(id)
+        setArmedId(null)
         return
       }
-      swapPlayers(selectedId, id)
-      setSelectedId(null)
+      // 同じ選手の2回目 → 入れ替え待ちにする
+      if (armedId !== id) {
+        setArmedId(id)
+        return
+      }
+      // 3回目 → 解除
+      setArmedId(null)
+      setPreviewId(null)
     },
-    selected: selectedId === id,
+    selected: armedId === id,
+    preview: previewId === id,
     dragging: drag.dragging?.id === id,
   })
+
+  const clearSelection = () => {
+    setArmedId(null)
+    setPreviewId(null)
+  }
 
   return (
     <>
@@ -225,7 +254,6 @@ export function LineupEditor() {
         onPointerCancel={drag.handlePointerUp}
       >
         <div className={styles.toolbar}>
-          <p className={styles.hint}>タップで選択 → もう1人タップで入れ替え（⠿ で移動）</p>
           <button
             type="button"
             className={styles.autoButton}
@@ -259,17 +287,28 @@ export function LineupEditor() {
           選択中であることを言葉でも出す。
           色だけだと「次にタップしたら入れ替わる」ことが伝わらない
         */}
-        {selected && (
+        {/*
+          **帯は常に出しておく。** 状態によって出したり消したりしていたら、
+          帯が現れたぶん一覧が下へずれて、
+          「同じ選手をもう一度タップ」したつもりが隣の行に当たっていた。
+          高さを変えないことがそのまま操作の正確さになる
+        */}
+        {armed ? (
           <div className={styles.picked}>
-            <span className={styles.pickedName}>{selected.name}</span>
+            <span className={styles.pickedName}>{armed.name}</span>
             を入れ替える相手をタップ
-            <button
-              type="button"
-              className={styles.pickedCancel}
-              onClick={() => setSelectedId(null)}
-            >
+            <button type="button" className={styles.pickedCancel} onClick={clearSelection}>
               やめる
             </button>
+          </div>
+        ) : previewed ? (
+          <div className={`${styles.picked} ${styles.previewBar}`}>
+            <span className={styles.pickedName}>{previewed.name}</span>
+            をもう一度タップすると入れ替えられます
+          </div>
+        ) : (
+          <div className={`${styles.picked} ${styles.previewBar}`}>
+            タップで能力表示 → もう一度タップで選択 → 相手をタップで入れ替え
           </div>
         )}
 
@@ -359,8 +398,8 @@ export function LineupEditor() {
 
           {/* 選んだ選手の能力を右側に固定表示する */}
           <aside className={styles.detail}>
-            {selected ? (
-              <AbilityPanel player={selected} />
+            {previewed ? (
+              <AbilityPanel player={previewed} />
             ) : (
               <p className={styles.empty}>選手をタップすると能力が出ます</p>
             )}

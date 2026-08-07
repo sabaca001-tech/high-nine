@@ -6,6 +6,14 @@ import { applyCardCost, applyPractice } from './growth'
 import { effectOf, PERSONALITY_EFFECTS } from './personality'
 import { emptyCareerStats } from './careerStats'
 
+/**
+ * テストで使う「進んだ日数」。
+ * 成長も消耗も日数に比例するので、ここを変えると期待値も動く。
+ * カードは1〜5なので、その真ん中を代表値にする。
+ */
+const TEST_STEPS = 3
+
+
 const ALL: Personality[] = [
   'ど根性',
   'クール',
@@ -62,7 +70,7 @@ function totalGrowth(player: Player, seed = 1234): number {
   const rng = createRng(seed)
   let total = 0
   for (let i = 0; i < 300; i++) {
-    const { changes } = applyPractice(rng, [player], PRACTICE_DEFS.batting, false)
+    const { changes } = applyPractice(rng, [player], PRACTICE_DEFS.batting, { steps: TEST_STEPS })
     total += changes.reduce((sum, c) => sum + (c.after - c.before), 0)
   }
   return total
@@ -125,7 +133,7 @@ describe('体力消費と信頼度への影響', () => {
     let total = 0
     for (let i = 0; i < trials; i++) {
       const player = makePlayer({ personality, condition: startCondition })
-      total += applyCardCost(rng, [player], def)[0][pick]
+      total += applyCardCost(rng, [player], def, TEST_STEPS)[0][pick]
     }
     return total / trials
   }

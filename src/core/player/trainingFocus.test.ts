@@ -17,6 +17,14 @@ import {
   withFocus,
 } from './trainingFocus'
 
+/**
+ * テストで使う「進んだ日数」。
+ * 成長も消耗も日数に比例するので、ここを変えると期待値も動く。
+ * カードは1〜5なので、その真ん中を代表値にする。
+ */
+const TEST_STEPS = 3
+
+
 function makePlayer(overrides: Partial<Player> = {}): Player {
   return {
     id: 'test',
@@ -77,7 +85,7 @@ describe('練習への反映', () => {
     const rng = createRng(seed)
     let total = 0
     for (let i = 0; i < 300; i++) {
-      const { changes } = applyPractice(rng, [player], PRACTICE_DEFS.batting, false)
+      const { changes } = applyPractice(rng, [player], PRACTICE_DEFS.batting, { steps: TEST_STEPS })
       total += changes
         .filter((change) => change.key === key)
         .reduce((sum, change) => sum + (change.after - change.before), 0)
@@ -99,7 +107,7 @@ describe('練習への反映', () => {
     // 走塁練習ではミートもパワーも伸びないが、方針にしていれば伸びる
     const rng = createRng(77)
     const player = makePlayer({ focus: { type: 'ability', key: 'meet' } })
-    const { players } = applyPractice(rng, [player], PRACTICE_DEFS.running, false)
+    const { players } = applyPractice(rng, [player], PRACTICE_DEFS.running, { steps: TEST_STEPS })
 
     expect(players[0].batting.meet).toBeGreaterThanOrEqual(player.batting.meet)
   })

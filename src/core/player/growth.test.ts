@@ -14,6 +14,15 @@ import { emptyCareerStats } from './careerStats'
 import { VELOCITY_MAX } from '@/core/types/player'
 import { createGrowthAptitude, createInitialRoster } from './createPlayer'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
+import type { AbilityChange } from '@/core/types/player'
+
+/**
+ * テストで使う「進んだ日数」。
+ * 成長も消耗も日数に比例するので、ここを変えると期待値も動く。
+ * カードは1〜5なので、その真ん中を代表値にする。
+ */
+const TEST_STEPS = 3
+
 
 /** テスト用の選手を作る（乱数を使わず値を固定する） */
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -126,7 +135,7 @@ describe('applyCardCost', () => {
     let condition = 0
     let trust = 0
     for (let i = 0; i < trials; i++) {
-      const after = applyCardCost(rng, [makePlayer(overrides)], def)[0]
+      const after = applyCardCost(rng, [makePlayer(overrides)], def, TEST_STEPS)[0]
       condition += after.condition
       trust += after.trust
     }
@@ -134,17 +143,17 @@ describe('applyCardCost', () => {
   }
 
   it('練習すると体力が減る', () => {
-    const expected = 100 + PRACTICE_DEFS.batting.conditionDelta * CARD_COST_SCALE
+    const expected = 100 + PRACTICE_DEFS.batting.conditionDelta * CARD_COST_SCALE * TEST_STEPS
     expect(averageAfter(PRACTICE_DEFS.batting).condition).toBeCloseTo(expected, 0)
   })
 
   it('休養カードで体力が回復する', () => {
-    const expected = 50 + PRACTICE_DEFS.rest.conditionDelta * CARD_COST_SCALE
+    const expected = 50 + PRACTICE_DEFS.rest.conditionDelta * CARD_COST_SCALE * TEST_STEPS
     expect(averageAfter(PRACTICE_DEFS.rest, { condition: 50 }).condition).toBeCloseTo(expected, 0)
   })
 
   it('メンタル強化で信頼度が上がる', () => {
-    const expected = 50 + PRACTICE_DEFS.mental.trustDelta * CARD_COST_SCALE
+    const expected = 50 + PRACTICE_DEFS.mental.trustDelta * CARD_COST_SCALE * TEST_STEPS
     expect(averageAfter(PRACTICE_DEFS.mental).trust).toBeCloseTo(expected, 0)
   })
 
@@ -153,6 +162,7 @@ describe('applyCardCost', () => {
       createRng(1),
       [makePlayer({ trust: 100, condition: 5 })],
       PRACTICE_DEFS.stamina,
+      TEST_STEPS,
     )
     expect(players[0].trust).toBeLessThanOrEqual(100)
     expect(players[0].trust).toBeGreaterThanOrEqual(0)
@@ -161,8 +171,53 @@ describe('applyCardCost', () => {
 
   it('元の配列を変更しない', () => {
     const player = makePlayer()
-    applyCardCost(createRng(1), [player], PRACTICE_DEFS.batting)
+    applyCardCost(createRng(1), [player], PRACTICE_DEFS.batting, TEST_STEPS)
     expect(player.condition).toBe(100)
+  })
+})
+
+describe('カードの数字（進んだ日数）', () => {
+  /** steps 日ぶんの練習を1回行い、伸びた合計を返す */
+  function growthOf(steps: number, seed: number): number {
+    const rng = createRng(seed)
+    let total = 0
+    for (let i = 0; i < 200; i++) {
+      const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.batting, { steps })
+      total += changes.reduce((sum, c) => sum + (c.after - c.before), 0)
+    }
+    return total
+  }
+
+  it('数字が大きいほど大きく伸びる', () => {
+    expect(growthOf(5, 71)).toBeGreaterThan(growthOf(1, 71) * 3)
+  })
+
+  it('伸びはおおよそ日数に比例する', () => {
+    const one = growthOf(1, 72)
+    const five = growthOf(5, 72)
+    // 確率の丸めがあるので幅を見る。3〜7倍に収まっていれば比例している
+    expect(five).toBeGreaterThan(one * 3)
+    expect(five).toBeLessThan(one * 7)
+  })
+
+  it('数字が大きいほど大きく消耗する', () => {
+    const conditionAfter = (steps: number) => {
+      const rng = createRng(73)
+      let total = 0
+      for (let i = 0; i < 200; i++) {
+        total += applyCardCost(rng, [makePlayer()], PRACTICE_DEFS.batting, steps)[0].condition
+      }
+      return total / 200
+    }
+    // 5日ぶん進めば5日ぶん疲れる。ここが比例していないと大きい数字が一方的に強い
+    expect(100 - conditionAfter(5)).toBeGreaterThan((100 - conditionAfter(1)) * 3)
+  })
+
+  it('0日なら何も起きない', () => {
+    const { changes } = applyPractice(createRng(74), [makePlayer()], PRACTICE_DEFS.batting, {
+      steps: 0,
+    })
+    expect(changes).toHaveLength(0)
   })
 })
 
@@ -175,7 +230,7 @@ describe('applyPractice', () => {
     const keys = new Set<string>()
 
     for (let i = 0; i < 10; i++) {
-      const result = applyPractice(rng, [player], PRACTICE_DEFS.batting, false)
+      const result = applyPractice(rng, [player], PRACTICE_DEFS.batting, { steps: TEST_STEPS })
       player = result.players[0]
       for (const change of result.changes) keys.add(change.key)
     }
@@ -187,28 +242,35 @@ describe('applyPractice', () => {
 
   it('体力・信頼度には手を触れない（applyCardCost の担当）', () => {
     const rng = createRng(1)
-    const { players } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.batting, false)
+    const { players } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.batting, { steps: TEST_STEPS })
     expect(players[0].condition).toBe(100)
     expect(players[0].trust).toBe(50)
   })
 
   it('休養では能力が伸びない', () => {
     const rng = createRng(1)
-    const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.rest, false)
+    const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.rest, { steps: TEST_STEPS })
     expect(changes).toHaveLength(0)
   })
 
   it('投球練習は投手だけが伸びる', () => {
+    // 1日ぶんの伸びは1に満たないので、確率で切り上がるまで何度か回す
     const rng = createRng(1)
-    const { players, changes } = applyPractice(
-      rng,
-      [makePlayer(), makePitcher()],
-      PRACTICE_DEFS.pitching,
-      false,
-    )
+    let batter = makePlayer()
+    let pitcher = makePitcher()
+    const changes: AbilityChange[] = []
 
-    expect(players[0].batting).toEqual(makePlayer().batting) // 野手は変化なし
-    expect(players[1].pitching!.control).toBeGreaterThan(40)
+    for (let i = 0; i < 20; i++) {
+      const result = applyPractice(rng, [batter, pitcher], PRACTICE_DEFS.pitching, {
+        steps: TEST_STEPS,
+      })
+      batter = result.players[0]
+      pitcher = result.players[1]
+      changes.push(...result.changes)
+    }
+
+    expect(batter.batting).toEqual(makePlayer().batting) // 野手は変化なし
+    expect(pitcher.pitching!.control).toBeGreaterThan(40)
     expect(changes.every((c) => c.playerId === 'pitcher')).toBe(true)
   })
 
@@ -221,7 +283,7 @@ describe('applyPractice', () => {
           rng,
           [makePlayer({ motivation })],
           PRACTICE_DEFS.batting,
-          false,
+          { steps: TEST_STEPS },
         )
         total += changes.reduce((sum, c) => sum + (c.after - c.before), 0)
       }
@@ -240,7 +302,7 @@ describe('applyPractice', () => {
           rng,
           [makePlayer({ grade })],
           PRACTICE_DEFS.batting,
-          false,
+          { steps: TEST_STEPS },
         )
         total += changes.reduce((sum, c) => sum + (c.after - c.before), 0)
       }
@@ -258,7 +320,7 @@ describe('applyPractice', () => {
           rng,
           [makePlayer({ condition })],
           PRACTICE_DEFS.batting,
-          false,
+          { steps: TEST_STEPS },
         )
         total += changes.reduce((sum, c) => sum + (c.after - c.before), 0)
       }
@@ -272,7 +334,7 @@ describe('applyPractice', () => {
       const rng = createRng(77)
       let total = 0
       for (let i = 0; i < 300; i++) {
-        const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.batting, isRare)
+        const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.batting, { steps: TEST_STEPS, isRare })
         total += changes.reduce((sum, c) => sum + (c.after - c.before), 0)
       }
       return total
@@ -286,7 +348,7 @@ describe('applyPractice', () => {
       let total = 0
       for (let i = 0; i < 400; i++) {
         const player = makePlayer({ batting: { ...makePlayer().batting, meet } })
-        const { changes } = applyPractice(rng, [player], PRACTICE_DEFS.batting, false)
+        const { changes } = applyPractice(rng, [player], PRACTICE_DEFS.batting, { steps: TEST_STEPS })
         total += changes
           .filter((c) => c.key === 'meet')
           .reduce((sum, c) => sum + (c.after - c.before), 0)
@@ -304,7 +366,7 @@ describe('伸びやすさの個人差', () => {
     const rng = createRng(seed)
     let player = makePlayer({ growthAptitude: { meet: aptitude } })
     for (let i = 0; i < repeat; i++) {
-      player = applyPractice(rng, [player], PRACTICE_DEFS.batting, false).players[0]
+      player = applyPractice(rng, [player], PRACTICE_DEFS.batting, { steps: TEST_STEPS }).players[0]
     }
     return player.batting.meet - 40
   }
@@ -320,29 +382,38 @@ describe('伸びやすさの個人差', () => {
       rng,
       [{ ...makePlayer(), growthAptitude: {} }],
       PRACTICE_DEFS.batting,
-      false,
+      { steps: TEST_STEPS },
     )
     expect(withNone.changes.length).toBeGreaterThanOrEqual(0)
   })
 
-  it('1回の練習でも選手ごとに差が出る', () => {
+  it('得意な選手のほうが目に見えて多く伸びる', () => {
     // 得意と苦手を並べて何度も練習させ、伸び方が割れることを確かめる。
-    // ここが割れないと、画面には全員「+1」しか出てこない
+    // ここが割れないと、画面には全員「+1」しか出てこない。
+    //
+    // **1回の練習で差が出ることは求めない。** 1日ぶんの伸びは1に満たないので、
+    // 1回ごとに見れば「伸びた／伸びない」の二択にしかならない。
+    // 差が出るのは「どれだけの頻度で名前が挙がるか」のほう
     const rng = createRng(41)
     const strong = makePlayer({ id: 'strong', growthAptitude: { meet: 1.6 } })
     const weak = makePlayer({ id: 'weak', growthAptitude: { meet: 0.5 } })
 
-    let differed = 0
-    for (let i = 0; i < 80; i++) {
-      const { changes } = applyPractice(rng, [strong, weak], PRACTICE_DEFS.batting, false)
+    let strongTotal = 0
+    let weakTotal = 0
+    for (let i = 0; i < 200; i++) {
+      const { changes } = applyPractice(rng, [strong, weak], PRACTICE_DEFS.batting, {
+        steps: TEST_STEPS,
+      })
       const gain = (id: string) =>
         changes
           .filter((c) => c.playerId === id && c.key === 'meet')
           .reduce((sum, c) => sum + (c.after - c.before), 0)
-      if (gain('strong') !== gain('weak')) differed += 1
+      strongTotal += gain('strong')
+      weakTotal += gain('weak')
     }
 
-    expect(differed).toBeGreaterThan(40)
+    // 得意（1.6倍）と苦手（0.5倍）なので、2倍以上の差がついていないとおかしい
+    expect(strongTotal).toBeGreaterThan(weakTotal * 2)
   })
 })
 
@@ -394,7 +465,7 @@ describe('球速の成長', () => {
     const rng = createRng(seed)
     let player = makePitcher({ grade: 1 })
     for (let i = 0; i < times; i++) {
-      player = applyPractice(rng, [player], PRACTICE_DEFS[kind], false).players[0]
+      player = applyPractice(rng, [player], PRACTICE_DEFS[kind], { steps: TEST_STEPS }).players[0]
     }
     return player
   }
@@ -416,7 +487,7 @@ describe('球速の成長', () => {
 
   it('野手の球速は動かない（そもそも持たない）', () => {
     const rng = createRng(3)
-    const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.pitching, false)
+    const { changes } = applyPractice(rng, [makePlayer()], PRACTICE_DEFS.pitching, { steps: TEST_STEPS })
     expect(changes.every((c) => c.key !== 'velocity')).toBe(true)
   })
 })
@@ -441,7 +512,7 @@ describe('投手の肩力は球速に比例する', () => {
 
   it('投手は遠投で肩力が直接は伸びない（球速経由で上がる）', () => {
     const rng = createRng(7)
-    const { changes } = applyPractice(rng, [makePitcher()], PRACTICE_DEFS.shoulder, false)
+    const { changes } = applyPractice(rng, [makePitcher()], PRACTICE_DEFS.shoulder, { steps: TEST_STEPS })
     expect(changes.every((c) => c.key !== 'arm')).toBe(true)
   })
 
@@ -449,7 +520,7 @@ describe('投手の肩力は球速に比例する', () => {
     const rng = createRng(7)
     let player = makePlayer()
     for (let i = 0; i < 20; i++) {
-      player = applyPractice(rng, [player], PRACTICE_DEFS.shoulder, false).players[0]
+      player = applyPractice(rng, [player], PRACTICE_DEFS.shoulder, { steps: TEST_STEPS }).players[0]
     }
     expect(player.batting.arm).toBeGreaterThan(40)
   })
