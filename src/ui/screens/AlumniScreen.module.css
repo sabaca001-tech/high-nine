@@ -146,3 +146,36 @@
   text-align: center;
   margin: var(--sp-5) 0;
 }
+
+/*
+ * 獲得タイトル。**同じタイトルは回数でまとめる。**
+ * 「首位打者×3」と読めないと通算の重みが伝わらない。
+ */
+.titles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: var(--sp-2) 0;
+}
+
+.title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  background: linear-gradient(160deg, #ffe6a8, var(--accent));
+  color: #3a2a05;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.titleCount {
+  font-size: 10px;
+}
+
+/* タイトルを獲った年の印 */
+.titleMark {
+  margin-left: 2px;
+  color: var(--accent);
+}

@@ -61,6 +61,12 @@ export type ProSeason = {
     rbi: number
     /** 打率（小数第3位まで） */
     average: number
+    /** 二塁打 */
+    doubles: number
+    /** 盗塁 */
+    steals: number
+    /** 四球 */
+    walks: number
   } | null
   /** 投手成績。野手なら null */
   pitching: {
@@ -69,7 +75,16 @@ export type ProSeason = {
     strikeouts: number
     /** 防御率 */
     era: number
+    /** 投球回 */
+    innings: number
+    /** セーブ */
+    saves: number
   } | null
+  /**
+   * そのシーズンに獲ったタイトル。無ければ空。
+   * リーグ全体を回してはいないので、**絶対的な水準**で判定している。
+   */
+  titles: string[]
 }
 
 /** 卒業生1人ぶんの記録。OB名鑑に載る */

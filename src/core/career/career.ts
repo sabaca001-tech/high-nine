@@ -40,7 +40,18 @@ const CORPORATE_TEAMS = ['大和重工', '中央銀行', '第一製鉄', '日本
  * 総合82は無戦略プレイでは10年に一度も届かない水準で、
  * 育て切った主軸だけが指名される。
  */
-const PRO_THRESHOLD = 82
+const PRO_THRESHOLD = 86
+
+/**
+ * 水準に届いた選手が実際に指名される確率。
+ *
+ * **届けば必ずプロ、をやめた。** 評判が上がって良い新入生が来るようになると、
+ * 主軸が毎年のように水準へ届き、OB名鑑がプロだらけになる。
+ * 実際の高校野球でも、注目された選手全員が指名されるわけではない。
+ * 抜けて上（`PRO_SURE`）まで行けばほぼ確実に指名される。
+ */
+const DRAFT_CHANCE_MIN = 0.35
+const PRO_SURE = 95
 const COLLEGE_THRESHOLD = 62
 const CORPORATE_THRESHOLD = 46
 
@@ -95,7 +106,14 @@ export function decidePath(
   const bonus = Math.round((reputation - 20) * 0.05)
   const score = rating + bonus + u18Bonus + rng.int(-4, 4)
 
-  if (score >= PRO_THRESHOLD) return 'pro'
+  if (score >= PRO_THRESHOLD) {
+    // 水準に届いても指名は確約されない。抜けて上ならほぼ確実
+    const room = (score - PRO_THRESHOLD) / Math.max(1, PRO_SURE - PRO_THRESHOLD)
+    const chance = DRAFT_CHANCE_MIN + (1 - DRAFT_CHANCE_MIN) * Math.min(1, room)
+    if (rng.chance(chance)) return 'pro'
+    // 指名されなかった選手は大学・社会人へ進む
+    return score >= COLLEGE_THRESHOLD ? 'college' : 'corporate'
+  }
   if (score >= COLLEGE_THRESHOLD) return 'college'
   if (score >= CORPORATE_THRESHOLD) return 'corporate'
   return 'none'
@@ -231,7 +249,8 @@ function advanceCollege(rng: Rng, alumnus: Alumnus): CareerUpdate {
   }
 
   // 卒業。大学での到達点で進路が決まる
-  if (ability >= PRO_THRESHOLD - 4) {
+  // 大学経由でも指名は確約されない
+  if (ability >= PRO_THRESHOLD - 4 && rng.chance(0.55)) {
     const team = rng.pick(PRO_TEAMS)
     // 大学経由でも、プロに入る時点で物差しが変わるのは同じ
     const pro = toProAbility(rng, ability)
@@ -372,15 +391,24 @@ export function simulateProSeason(rng: Rng, alumnus: Alumnus, year: number): Pro
   const ability = alumnus.ability
   // 実力が低いと一軍に定着できない。
   // プロの物差し（20〜60）に合わせた範囲で、20なら0・65で1になる
-  const playRate = clamp01((ability - 20) / 45)
+  const playRate = clamp01((ability - REPLACEMENT_LEVEL) / (ELITE_LEVEL - REPLACEMENT_LEVEL))
 
   if (alumnus.isPitcher) {
-    const games = clampRange(Math.round((12 + playRate * 20) * (0.8 + rng.float() * 0.4)), 1, 70)
-    const wins = Math.max(0, Math.round(playRate * 14 * (0.5 + rng.float())))
-    const losses = Math.max(0, Math.round((1 - playRate) * 12 * (0.4 + rng.float())))
-    const strikeouts = Math.round(games * (2 + playRate * 5) * (0.7 + rng.float() * 0.6))
-    const era = round2(clampRange(5.8 - playRate * 4 + (rng.float() - 0.5) * 1.6, 0.9, 9.9))
+    const games = clampRange(Math.round((6 + playRate * 24) * (0.8 + rng.float() * 0.4)), 1, 60)
+    const innings = Math.max(1, Math.round(games * (2.2 + playRate * 4.5)))
+    // **勝敗は登板数と投球回から決める。**
+    // 別々に振っていた頃は「6登板で11敗」という成立しない成績が出ていた
+    const decisions = clampRange(Math.round(innings / 6.5), 0, games)
+    const winShare = 0.22 + playRate * 0.45
+    const wins = Math.round(decisions * winShare * (0.7 + rng.float() * 0.6))
+    const losses = Math.max(0, decisions - wins)
+    const saves = playRate > 0.5 && rng.chance(0.15) ? Math.round(playRate * 30 * rng.float()) : 0
+    const strikeouts = Math.round(innings * (0.5 + playRate * 0.6) * (0.8 + rng.float() * 0.4))
+    const era = round2(
+      clampRange(6.8 - playRate * 4.6 + (rng.float() - 0.5) * 1.6, 1.2, 9.9),
+    )
 
+    const pitching = { wins, losses, strikeouts, era, innings, saves }
     return {
       year,
       team: alumnus.team ?? '無所属',
@@ -388,30 +416,90 @@ export function simulateProSeason(rng: Rng, alumnus: Alumnus, year: number): Pro
       ability,
       games,
       batting: null,
-      pitching: { wins, losses, strikeouts, era },
+      pitching,
+      titles: pitcherTitles(pitching),
     }
   }
 
   const games = clampRange(
-    Math.round((22 + playRate * 104) * (0.8 + rng.float() * 0.4)),
+    Math.round((12 + playRate * 118) * (0.8 + rng.float() * 0.4)),
     1,
     SEASON_GAMES,
   )
-  const atBats = Math.max(1, Math.round(games * (1.4 + playRate * 2.2)))
-  const average = clampRange(0.19 + playRate * 0.13 + (rng.float() - 0.5) * 0.05, 0.12, 0.38)
+  const atBats = Math.max(1, Math.round(games * (1.2 + playRate * 2.4)))
+  const average = clampRange(0.17 + playRate * 0.16 + (rng.float() - 0.5) * 0.05, 0.09, 0.38)
   const hits = Math.round(atBats * average)
-  const homeruns = Math.round(atBats * (0.005 + playRate * 0.05) * (0.5 + rng.float()))
+  const homeruns = Math.round(atBats * (0.002 + playRate * 0.055) * (0.5 + rng.float()))
+  const doubles = Math.round(hits * (0.14 + rng.float() * 0.08))
+  const steals = Math.round(playRate * 24 * rng.float() * rng.float())
+  const walks = Math.round(atBats * (0.05 + playRate * 0.06))
   const rbi = Math.round(hits * 0.42 + homeruns * 1.7)
 
+  const batting = { atBats, hits, homeruns, rbi, average: round3(average), doubles, steals, walks }
   return {
     year,
     team: alumnus.team ?? '無所属',
     overseas,
     ability,
     games,
-    batting: { atBats, hits, homeruns, rbi, average: round3(average) },
+    batting,
     pitching: null,
+    titles: batterTitles(batting, games),
   }
+}
+
+/**
+ * プロの物差し。
+ *
+ * **高校の総合をそのまま持ち込んだら一流**、という水準に合わせる。
+ * 高校で総合85まで育て切った選手が、能力を落とさずにプロへ入れたなら
+ * 打率3割・規定打席という成績になる。
+ * 実際は入団時に半分になる（`PRO_SCALE`）ので、
+ * ほとんどの選手は控え（30試合・打率2割）から始まる。
+ *
+ * 以前は `(ability - 20) / 45` で、**半分になった実力（42前後）でも
+ * 73試合・打率.254**という主力の成績が出ていた。
+ * 「プロで通用するか」という段階が数字の上で消えていた。
+ */
+const REPLACEMENT_LEVEL = 38
+const ELITE_LEVEL = 88
+
+/**
+ * タイトル。
+ *
+ * リーグ全体を回してはいないので、**絶対的な水準**で判定する。
+ * 「その年のリーグで一番」を厳密に決めるにはNPB全体を持つ必要があり、
+ * 卒業生の記録のためだけに抱えるには重すぎる。
+ */
+function batterTitles(
+  batting: { average: number; homeruns: number; rbi: number; steals: number },
+  games: number,
+): string[] {
+  const titles: string[] = []
+  // 規定打席に届いていない選手はタイトル争いに乗らない
+  if (games < 100) return titles
+
+  if (batting.average >= 0.33) titles.push('首位打者')
+  if (batting.homeruns >= 35) titles.push('本塁打王')
+  if (batting.rbi >= 95) titles.push('打点王')
+  if (batting.steals >= 35) titles.push('盗塁王')
+  return titles
+}
+
+function pitcherTitles(pitching: {
+  wins: number
+  era: number
+  strikeouts: number
+  innings: number
+  saves: number
+}): string[] {
+  const titles: string[] = []
+
+  if (pitching.wins >= 15) titles.push('最多勝')
+  if (pitching.innings >= 140 && pitching.era <= 2.3) titles.push('最優秀防御率')
+  if (pitching.strikeouts >= 170) titles.push('最多奪三振')
+  if (pitching.saves >= 30) titles.push('最多セーブ')
+  return titles
 }
 
 function clamp(value: number): number {

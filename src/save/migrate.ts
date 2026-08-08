@@ -144,6 +144,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 33) {
     data = migrateV32ToV33(data)
   }
+  if (version < 34) {
+    data = migrateV33ToV34(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -829,6 +832,36 @@ function seedFromId(id: string): number {
     hash = Math.imul(hash, 16777619)
   }
   return (hash >>> 0) || 1
+}
+
+/**
+ * v33 → v34
+ *  - ProSeason に細かい成績と獲得タイトルを追加
+ *
+ * 過去のシーズンは記録が無いので0で埋める。
+ * 遡って作ると、実際に残した成績と区別が付かなくなる。
+ */
+function migrateV33ToV34(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.graduates)) return { ...raw, version: 34 }
+
+  const graduates = raw.graduates.map((value) => {
+    if (!isRecord(value) || !Array.isArray(value.proSeasons)) return value
+
+    const proSeasons = value.proSeasons.map((season) => {
+      if (!isRecord(season)) return season
+      const batting = isRecord(season.batting)
+        ? { doubles: 0, steals: 0, walks: 0, ...season.batting }
+        : season.batting
+      const pitching = isRecord(season.pitching)
+        ? { innings: 0, saves: 0, ...season.pitching }
+        : season.pitching
+      return { ...season, batting, pitching, titles: season.titles ?? [] }
+    })
+
+    return { ...value, proSeasons }
+  })
+
+  return { ...raw, version: 34, graduates }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

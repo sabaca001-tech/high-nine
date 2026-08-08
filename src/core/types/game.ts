@@ -73,8 +73,10 @@ import type { FriendlyOffer } from '@/core/match/friendlyOffers'
  * v31 → v32: 練習試合の相手を選べるようにした（pendingOffers）。
  * v32 → v33: 他校が部員名簿を持つようになった（RivalSchool.rosterSeed）。
  *            Player に origin（入部の経路）を追加。
+ * v33 → v34: ProSeason に細かい成績（二塁打・盗塁・四球・投球回・セーブ）と
+ *            titles（獲得タイトル）を追加。
  */
-export const SAVE_VERSION = 33
+export const SAVE_VERSION = 34
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12

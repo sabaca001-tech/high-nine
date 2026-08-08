@@ -50,9 +50,11 @@ describe('decidePath', () => {
       }
       return pro / 200
     }
-    // 直接プロに行けるのは高校生としてかなり上位（しきい値76前後）
-    expect(rate(95)).toBeGreaterThan(rate(78))
-    expect(rate(78)).toBeGreaterThan(rate(70))
+    // 直接プロに行けるのは高校生としてかなり上位（しきい値86）。
+    // **水準に届いても指名は確約されない**ので、86前後では半々になる
+    expect(rate(95)).toBeGreaterThan(rate(88))
+    expect(rate(88)).toBeGreaterThan(rate(82))
+    expect(rate(78)).toBe(0)
   })
 
   it('低い能力ではプロにならない', () => {
@@ -256,8 +258,9 @@ describe('careerTotals', () => {
           overseas: false,
           ability: 40,
           games: 100,
-          batting: { atBats: 400, hits: 120, homeruns: 20, rbi: 70, average: 0.3 },
+          batting: { atBats: 400, hits: 120, homeruns: 20, rbi: 70, average: 0.3, doubles: 5, steals: 2, walks: 10 },
           pitching: null,
+      titles: [],
         },
         {
           year: 5,
@@ -265,8 +268,9 @@ describe('careerTotals', () => {
           overseas: false,
           ability: 42,
           games: 120,
-          batting: { atBats: 500, hits: 130, homeruns: 25, rbi: 80, average: 0.26 },
+          batting: { atBats: 500, hits: 130, homeruns: 25, rbi: 80, average: 0.26, doubles: 5, steals: 2, walks: 10 },
           pitching: null,
+      titles: [],
         },
       ],
     }
@@ -425,8 +429,9 @@ describe('OB名鑑の対象', () => {
           overseas: false,
           ability: 40,
           games: 100,
-          batting: { atBats: 300, hits: 80, homeruns: 10, rbi: 40, average: 0.267 },
+          batting: { atBats: 300, hits: 80, homeruns: 10, rbi: 40, average: 0.267, doubles: 5, steals: 2, walks: 10 },
           pitching: null,
+      titles: [],
         },
       ],
     }

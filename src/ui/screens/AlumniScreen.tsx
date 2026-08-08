@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { Alumnus, CareerStatus } from '@/core/types/career'
+import type { Alumnus, CareerStatus, ProSeason } from '@/core/types/career'
 import { CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
 import { AbilityChart } from '@/ui/components/AbilityChart'
 import { useGameStore } from '@/state/useGameStore'
@@ -127,6 +127,8 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
             )}
           </div>
 
+          <TitleList seasons={alumnus.proSeasons} />
+
           <button type="button" className={styles.toggle} onClick={() => setOpen(!open)}>
             {open ? '年度別成績を閉じる' : '年度別成績を見る'}
           </button>
@@ -175,9 +177,11 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
             <th>年</th>
             <th>球団</th>
             <th>登板</th>
+            <th>回</th>
             <th>勝</th>
             <th>敗</th>
-            <th>奪三振</th>
+            <th>S</th>
+            <th>奪三</th>
             <th>防御率</th>
           </tr>
         ) : (
@@ -187,8 +191,11 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
             <th>試合</th>
             <th>打数</th>
             <th>安打</th>
+            <th>二</th>
             <th>本</th>
             <th>点</th>
+            <th>盗</th>
+            <th>四球</th>
             <th>打率</th>
           </tr>
         )}
@@ -196,13 +203,19 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
       <tbody>
         {alumnus.proSeasons.map((season) => (
           <tr key={season.year} className={season.overseas ? styles.overseas : undefined}>
-            <td>{season.year}</td>
+            <td>
+              {season.year}
+              {/* タイトルを獲った年が一目で分かるようにする */}
+              {season.titles.length > 0 && <span className={styles.titleMark}>★</span>}
+            </td>
             <td>{season.team}</td>
             <td>{season.games}</td>
             {season.pitching ? (
               <>
+                <td>{season.pitching.innings}</td>
                 <td>{season.pitching.wins}</td>
                 <td>{season.pitching.losses}</td>
+                <td>{season.pitching.saves}</td>
                 <td>{season.pitching.strikeouts}</td>
                 <td>{season.pitching.era.toFixed(2)}</td>
               </>
@@ -210,8 +223,11 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
               <>
                 <td>{season.batting.atBats}</td>
                 <td>{season.batting.hits}</td>
+                <td>{season.batting.doubles}</td>
                 <td>{season.batting.homeruns}</td>
                 <td>{season.batting.rbi}</td>
+                <td>{season.batting.steals}</td>
+                <td>{season.batting.walks}</td>
                 <td>{formatAverage(season.batting.average)}</td>
               </>
             ) : null}
@@ -219,6 +235,31 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
         ))}
       </tbody>
     </table>
+  )
+}
+
+/**
+ * 獲得タイトル。**同じタイトルは回数でまとめる。**
+ * 「首位打者3回」のように読めないと、通算の重みが伝わらない。
+ */
+function TitleList({ seasons }: { seasons: ProSeason[] }) {
+  const counts = new Map<string, number>()
+  for (const season of seasons) {
+    for (const title of season.titles) counts.set(title, (counts.get(title) ?? 0) + 1)
+  }
+  if (counts.size === 0) return null
+
+  return (
+    <div className={styles.titles}>
+      {[...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([title, count]) => (
+          <span key={title} className={styles.title}>
+            {title}
+            {count > 1 && <span className={styles.titleCount}>×{count}</span>}
+          </span>
+        ))}
+    </div>
   )
 }
 
