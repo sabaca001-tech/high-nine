@@ -15,6 +15,7 @@ import {
 } from './autoLineup'
 import { battingScore, onBaseScore, runningScore, sluggingScore } from './battingTraits'
 import { pitcherValue } from '@/core/match/teamState'
+import { YOUTH_TIEBREAK } from '@/core/player/squad'
 
 describe('createAptitudes', () => {
   it('メインポジションは必ずS', () => {
@@ -112,8 +113,10 @@ describe('autoLineup', () => {
       const starter = roster.find((p) => p.id === starterOf(lineup))!
       const best = [...pitchers].sort((a, b) => pitcherValue(b) - pitcherValue(a))[0]
 
-      // 3学年ぶんの下駄（1.5 × 2）を超えて劣る投手は先発にならない
-      expect(pitcherValue(best) - pitcherValue(starter)).toBeLessThanOrEqual(3.001)
+      // 3学年ぶんの下駄（YOUTH_TIEBREAK × 2）を超えて劣る投手は先発にならない
+      expect(pitcherValue(best) - pitcherValue(starter)).toBeLessThanOrEqual(
+        YOUTH_TIEBREAK * 2 + 0.001,
+      )
     }
   })
 

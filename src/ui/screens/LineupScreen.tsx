@@ -5,6 +5,12 @@ import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import { overallRating, toRank, trajectoryStars } from '@/core/player/rating'
 import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
+import { skillsOf } from '@/core/skill/skillEffects'
+import {
+  SKILL_SITUATION_LABELS,
+  SKILL_TARGET_LABELS,
+  SKILL_TARGET_UNIT,
+} from '@/core/types/skill'
 import type { Player, Position } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -492,8 +498,56 @@ function AbilityPanel({ player }: { player: Player }) {
       <Row label={ABILITY_LABELS.arm} value={toRank(player.batting.arm)} />
       <Row label={ABILITY_LABELS.fielding} value={toRank(player.batting.fielding)} />
       <Row label={ABILITY_LABELS.catching} value={toRank(player.batting.catching)} />
+
+      <SkillList player={player} />
     </div>
   )
+}
+
+/**
+ * 持っている特殊能力と、その補正。
+ *
+ * **能力値の下に出す。** 一覧から選手を選ぶ場面でこそ
+ * 「この選手は何ができるのか」を知りたいのに、
+ * 詳細画面まで開かないと分からなかった。
+ *
+ * 補正は定義（`skillDefs` の `effects`）から引くので、
+ * ここに書いてある数字がそのまま試合の判定に効く。
+ */
+function SkillList({ player }: { player: Player }) {
+  const skills = skillsOf(player)
+  if (skills.length === 0) return null
+
+  return (
+    <div className={styles.skills}>
+      {skills.map((skill) => (
+        <div key={skill.id} className={`${styles.skill} ${SKILL_RANK_CLASS[skill.rank]}`}>
+          <span className={styles.skillName}>{skill.name}</span>
+          {(skill.effects ?? []).map((effect, index) => (
+            <span key={index} className={styles.skillEffect}>
+              {SKILL_SITUATION_LABELS[effect.when ?? 'always'] && (
+                <span className={styles.skillWhen}>
+                  {SKILL_SITUATION_LABELS[effect.when ?? 'always']}
+                </span>
+              )}
+              {SKILL_TARGET_LABELS[effect.target]}
+              <span className={effect.amount > 0 ? styles.skillUp : styles.skillDown}>
+                {effect.amount > 0 ? '+' : ''}
+                {effect.amount}
+                {SKILL_TARGET_UNIT[effect.target] === 'percent' ? '%' : ''}
+              </span>
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const SKILL_RANK_CLASS: Record<string, string> = {
+  gold: styles.skillGold,
+  blue: styles.skillBlue,
+  red: styles.skillRed,
 }
 
 /**

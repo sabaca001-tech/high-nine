@@ -10,11 +10,8 @@
  */
 
 import { effectOf } from '@/core/player/personality'
+import { skillBonus } from '@/core/skill/skillEffects'
 import type { Player } from '@/core/types/player'
-
-function has(player: Player, skillId: string): boolean {
-  return player.skills.includes(skillId)
-}
 
 /**
  * 出塁力。**四球を選べるかを含む。**
@@ -23,10 +20,10 @@ function has(player: Player, skillId: string): boolean {
  * `simulateAtBat` の `eye` と同じ材料（ミート・性格・選球眼の特殊能力）を使う。
  */
 export function onBaseScore(player: Player): number {
-  let score = player.batting.meet + effectOf(player.personality).eye * 1.5
-  if (has(player, 'contact-eye')) score += 14
-  if (has(player, 'chase-swing')) score -= 14
-  return score
+  // 特殊能力の補正は定義から引く（判定と同じ表を使う）
+  return (
+    player.batting.meet + effectOf(player.personality).eye * 1.5 + skillBonus(player, 'eye') * 0.8
+  )
 }
 
 /**
@@ -34,9 +31,10 @@ export function onBaseScore(player: Player): number {
  * 同じパワーでも弾道が高いほうがスタンドまで運べる（`simulateAtBat` と同じ考え方）。
  */
 export function sluggingScore(player: Player): number {
-  let score = player.batting.power * (1 + (player.batting.trajectory - 2) * 0.12)
-  if (has(player, 'power-hitter')) score += 8
-  return score
+  return (
+    player.batting.power * (1 + (player.batting.trajectory - 2) * 0.12) +
+    skillBonus(player, 'power')
+  )
 }
 
 /**
@@ -44,11 +42,12 @@ export function sluggingScore(player: Player): number {
  * 5番のように「詰まった場面が回ってくる打順」で見る。
  */
 export function clutchScore(player: Player): number {
-  let score = effectOf(player.personality).clutch * 2
-  if (has(player, 'clutch-hitter')) score += 18
-  if (has(player, 'walk-off')) score += 12
-  if (has(player, 'cold-bat')) score -= 18
-  return score
+  return (
+    effectOf(player.personality).clutch * 2 +
+    // 走者を置いた場面と終盤の劣勢、どちらの強さも見る
+    skillBonus(player, 'meet', ['risp', 'lateBehind']) +
+    skillBonus(player, 'power', ['risp', 'lateBehind'])
+  )
 }
 
 /**
@@ -61,7 +60,10 @@ export function battingScore(player: Player): number {
 
 /** 走力。盗塁の成功率が上がる特殊能力も見る */
 export function runningScore(player: Player): number {
-  let score = player.batting.speed
-  if (has(player, 'fast-start')) score += 8
-  return score
+  return (
+    player.batting.speed +
+    skillBonus(player, 'stealSuccess') +
+    skillBonus(player, 'stealRate') +
+    skillBonus(player, 'advance')
+  )
 }

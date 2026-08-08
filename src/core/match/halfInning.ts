@@ -33,6 +33,7 @@ import {
   recordSteal,
   swapIn,
 } from './teamState'
+import { skillBonus } from '@/core/skill/skillEffects'
 
 /** 塁上の走者。埋まっていなければ null */
 export type Bases = [string | null, string | null, string | null]
@@ -177,15 +178,27 @@ function maybeSteal(
   const speed = runner.batting.speed
   if (speed < STEAL_MIN_SPEED) return { bases, outs: 0 }
 
-  // 走力60で約10%、走力95で約28%の打席で仕掛ける
-  const attemptRate = Math.min(0.35, (speed - 40) / 200)
+  // 走力60で約10%、走力95で約28%の打席で仕掛ける。
+  // 「積極走塁」を持っていれば仕掛ける回数が増える
+  const attemptRate = Math.min(
+    0.5,
+    (speed - 40) / 200 + skillBonus(runner, 'stealRate') / 100,
+  )
   if (!rng.chance(attemptRate)) return { bases, outs: 0 }
 
   const catcher = fielderAt(ctx.defenseTeam, 'C')
-  const catcherArm = catcher
-    ? catcher.batting.arm * 0.6 + catcher.batting.catching * 0.4
-    : 40
-  const successRate = clamp(0.62 + (speed - catcherArm) / 260, 0.35, 0.92)
+  const pitcher = findPlayer(ctx.defenseTeam, ctx.defenseTeam.pitcherId)
+  // 捕手の肩に、捕手の「ブロック」と投手の「クイック」が乗る
+  const catcherArm =
+    (catcher ? catcher.batting.arm * 0.6 + catcher.batting.catching * 0.4 : 40) +
+    (catcher ? skillBonus(catcher, 'catcherArm') : 0) +
+    (pitcher ? skillBonus(pitcher, 'catcherArm') : 0)
+
+  const successRate = clamp(
+    0.62 + (speed - catcherArm) / 260 + skillBonus(runner, 'stealSuccess') / 100,
+    0.2,
+    0.95,
+  )
 
   const order = ctx.nextOrder()
   if (rng.chance(successRate)) {
@@ -200,7 +213,6 @@ function maybeSteal(
     return { bases: [null, runnerId, bases[2]], outs: 0 }
   }
 
-  const pitcher = findPlayer(ctx.defenseTeam, ctx.defenseTeam.pitcherId)
   if (pitcher) recordExtraOut(ctx.defenseTeam, pitcher)
   ctx.events.push({
     id: `event-${order}`,
@@ -225,7 +237,9 @@ export function advanceRunners(
   const count = bases.filter((id) => id !== null).length
   let runs = 0
 
-  const fast = batter.batting.speed >= 60
+  // 「積極走塁」で次の塁を狙いやすく、「走塁下手」で狙えなくなる。
+  // 走力60を境にしていたところへ、特殊能力ぶんを足し引きする
+  const fast = batter.batting.speed + skillBonus(batter, 'advance') >= 60
 
   switch (result) {
     case 'homerun': {
@@ -319,10 +333,15 @@ export function staminaCapacity(stamina: number): number {
  * 連投した投手は同じスタミナでも早く崩れ、さらに1人目の打者から少し球威が落ちる。
  */
 export function staminaFactor(pitcher: Player, faced: number): number {
-  const stamina = pitcher.pitching ? effectiveStamina(pitcher) : 20
+  // 「鉄腕」「省エネ投法」でスタミナが底上げされ、「スタミナ切れ」で減る
+  const stamina = pitcher.pitching
+    ? effectiveStamina(pitcher) + skillBonus(pitcher, 'stamina')
+    : 20
   const over = Math.max(0, faced - staminaCapacity(stamina))
   // 鉄腕はバテにくい
-  const rate = pitcher.skills.includes('ace-heart') ? 0.018 : 0.03
+  // 崩れにくい投手ほど、突然の失点で降ろされにくい。
+  // 「走者ありで球威が上がる」特殊能力を持っているかで見る
+  const rate = skillBonus(pitcher, 'stuff', ['runner']) > 0 ? 0.018 : 0.03
   // 下限0.5。球威も制球も半減するので、続投すれば確実に失点が増える
   const worn = Math.max(0.5, 1 - Math.min(0.5, over * rate))
   return worn * fatiguePenalty(pitcher)

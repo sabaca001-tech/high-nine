@@ -11,6 +11,8 @@ import { effectOf } from '@/core/player/personality'
 import type { Motivation, PitchingAbilities, Player } from '@/core/types/player'
 import { velocityScore } from '@/core/types/player'
 import type { PlayResult } from '@/core/types/match'
+import { skillBonus } from '@/core/skill/skillEffects'
+import type { SkillSituation } from '@/core/types/skill'
 
 export type AtBatContext = {
   batter: Player
@@ -69,6 +71,12 @@ const VELOCITY_WEIGHT = 0.7
 const STUFF_BASELINE = 13
 
 /**
+ * 「消耗している」とみなすスタミナ係数。
+ * これを下回ると `tired` の特殊能力（尻上がりなど）が効き始める。
+ */
+const TIRED_FACTOR = 0.85
+
+/**
  * 球威。球速と変化球から決まる「打ちにくさ」。
  *
  * **打席の判定と投手の値踏みで同じ式を使う。**
@@ -81,10 +89,6 @@ export function stuffScore(pitching: PitchingAbilities): number {
     velocityScore(pitching.velocity) * VELOCITY_WEIGHT +
     pitching.breaking * (1 - VELOCITY_WEIGHT)
   )
-}
-
-function has(player: Player, skillId: string): boolean {
-  return player.skills.includes(skillId)
 }
 
 export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
@@ -108,21 +112,16 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
     power += batterPersonality.clutch
   }
 
-  if (has(batter, 'contact-eye')) eye += 18
-  if (has(batter, 'chase-swing')) eye -= 18
-  if (has(batter, 'power-hitter')) power += 8
-  if (risp && has(batter, 'clutch-hitter')) {
-    contact += 12
-    power += 12
-  }
-  if (risp && has(batter, 'cold-bat')) {
-    contact -= 12
-    power -= 12
-  }
-  if (lateAndBehind && has(batter, 'walk-off')) {
-    contact += 12
-    power += 12
-  }
+  // **特殊能力の補正は定義から引く。**
+  // ここに数値を直書きしていた頃は、説明だけあって試合では何も起きない
+  // 特殊能力が混ざっていた（守備範囲拡大・レーザービームなど）
+  const batterSituations: SkillSituation[] = []
+  if (risp) batterSituations.push('risp')
+  if (lateAndBehind) batterSituations.push('lateBehind')
+
+  contact += skillBonus(batter, 'meet', batterSituations)
+  power += skillBonus(batter, 'power', batterSituations)
+  eye += skillBonus(batter, 'eye', batterSituations)
 
   // ── 投手 ──────────────────────────────
   const pitching = pitcher.pitching
@@ -139,24 +138,22 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   let groundBias = 0
 
   if (pitching) {
-    if (has(pitcher, 'strikeout-king')) strikeoutBonus += 0.06
-    if (has(pitcher, 'ground-ball')) groundBias += 0.15
-    if (has(pitcher, 'wild-pitch')) control -= 8
-    if (anyRunner) {
-      if (has(pitcher, 'pinch-strong')) {
-        stuff += 10
-        control += 10
-      }
-      if (has(pitcher, 'ace-heart')) {
-        stuff += 8
-        control += 8
-      }
-      if (has(pitcher, 'pinch-weak')) {
-        stuff -= 10
-        control -= 10
-      }
-    }
+    const pitcherSituations: SkillSituation[] = []
+    if (anyRunner) pitcherSituations.push('runner')
+    // スタミナが落ちてきたら「消耗時」の補正が効く
+    if (ctx.pitcherStaminaFactor < TIRED_FACTOR) pitcherSituations.push('tired')
+
+    stuff += skillBonus(pitcher, 'stuff', pitcherSituations)
+    control += skillBonus(pitcher, 'control', pitcherSituations)
+    // 率への補正は百分率で書いてあるので、判定に使う小数へ直す
+    strikeoutBonus += skillBonus(pitcher, 'strikeout', pitcherSituations) / 100
+    groundBias += skillBonus(pitcher, 'groundBall', pitcherSituations) / 100
   }
+
+  // 被本塁打の補正。1.0が標準で、一発病なら上がり、重い球なら下がる
+  const longballRate = pitching
+    ? Math.max(0.2, 1 + skillBonus(pitcher, 'longball', anyRunner ? ['runner'] : []) / 100)
+    : 1
 
   // ── 四球 ──────────────────────────────
   const walkRate = clamp(0.085 + (eye - control) / 700, 0.02, 0.28)
@@ -168,7 +165,8 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
 
   // ── 打球が飛んだ場合 ──────────────────
   // 適性を無視した起用は、まず失策として返ってくる。
-  // 遊撃にG適性を置くと 1.0*5 = 5 → +2.5% で失策がほぼ倍になる
+  // 遊撃にG適性を置くと 1.0*5 = 5 → +2.5% で失策がほぼ倍になる。
+  // 守備の特殊能力（守備範囲拡大・エラー癖など）はチーム全体の守備力に乗せてある
   const errorRate = clamp(
     0.028 - (defense - 50) / 1600 + ctx.misplacement * 0.005,
     0.004,
@@ -186,7 +184,7 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   )
 
   if (rng.chance(hitRate)) {
-    return hitType(rng, batter, power)
+    return hitType(rng, batter, power, longballRate)
   }
 
   return outType(rng, batter, bases, outs, groundBias)
@@ -205,9 +203,15 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
  *   パワー80・弾道3 … 安打の13%
  *   パワー95・弾道4 … 安打の19%
  */
-function hitType(rng: Rng, batter: Player, power: number): PlayResult {
+function hitType(
+  rng: Rng,
+  batter: Player,
+  power: number,
+  /** 被本塁打の倍率。1.0が標準（投手の特殊能力で増減する） */
+  longballRate = 1,
+): PlayResult {
   const homerunShare = clamp(
-    0.03 + (power - 45) / 500 + (batter.batting.trajectory - 2) * 0.03,
+    (0.03 + (power - 45) / 500 + (batter.batting.trajectory - 2) * 0.03) * longballRate,
     0.004,
     0.35,
   )

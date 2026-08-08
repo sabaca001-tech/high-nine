@@ -14,6 +14,7 @@ import type { BattingLine, PitchingLine } from '@/core/types/match'
 import { emptyBattingLine, emptyPitchingLine, isHit, outsOf } from '@/core/types/match'
 import type { PlayResult } from '@/core/types/match'
 import { stuffScore } from './simulateAtBat'
+import { skillBonus } from '@/core/skill/skillEffects'
 
 export type MatchTeam = {
   name: string
@@ -100,7 +101,9 @@ export function teamDefense(players: Player[], lineup: Lineup): number {
     if (slot.position === 'P') continue
     const player = players.find((p) => p.id === slot.playerId)
     const w = POSITION_WEIGHT[slot.position]
-    total += (player ? defenseScore(player, slot.position) : 40) * w
+    // 守備の特殊能力（守備範囲拡大・堅実・エラー癖）はここで効く
+    const score = player ? defenseScore(player, slot.position) + skillBonus(player, 'defense') : 40
+    total += score * w
     weight += w
   }
 
