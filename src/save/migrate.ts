@@ -141,6 +141,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 32) {
     data = migrateV31ToV32(data)
   }
+  if (version < 33) {
+    data = migrateV32ToV33(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -797,6 +800,35 @@ function migrateV30ToV31(raw: Record<string, unknown>): Record<string, unknown> 
  */
 function migrateV31ToV32(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, version: 32, pendingOffers: null }
+}
+
+/**
+ * v32 → v33
+ *  - RivalSchool に rosterSeed（部員名簿を作るための種）を追加
+ *
+ * 種が無いと名簿を作れないので、**学校idから決まる値**を入れる。
+ * 乱数で振ると読み込むたびに顔ぶれが変わってしまう。
+ * `Player.origin` は省略時が一般入部なので、足す必要は無い。
+ */
+function migrateV32ToV33(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.rivals)) return { ...raw, version: 33 }
+
+  const rivals = raw.rivals.map((value) => {
+    if (!isRecord(value) || typeof value.rosterSeed === 'number') return value
+    return { ...value, rosterSeed: seedFromId(String(value.id ?? '')) }
+  })
+
+  return { ...raw, version: 33, rivals }
+}
+
+/** 文字列から安定した種を作る */
+function seedFromId(id: string): number {
+  let hash = 2166136261
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) || 1
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

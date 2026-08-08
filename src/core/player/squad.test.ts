@@ -5,6 +5,7 @@ import { overallRating } from './rating'
 import {
   autoSquad,
   FIRST_SQUAD_SIZE,
+  MIN_SQUAD_PITCHERS,
   squadPriority,
   firstSquadSet,
   repairSquad,
@@ -19,14 +20,31 @@ describe('autoSquad', () => {
     expect(autoSquad(players)).toHaveLength(FIRST_SQUAD_SIZE)
   })
 
-  it('優先度の高い順に選ぶ（総合＋学年の下駄）', () => {
+  it('投手枠を確保したあとは優先度の高い順に選ぶ', () => {
     const squad = autoSquad(players)
     const byId = new Map(players.map((player) => [player.id, player]))
-    const scores = squad.map((id) => squadPriority(byId.get(id)!))
+
+    // 先頭の投手枠（最大3人）を除いた残りが優先度順になっている
+    const rest = squad.slice(MIN_SQUAD_PITCHERS)
+    const scores = rest.map((id) => squadPriority(byId.get(id)!))
 
     for (let i = 1; i < scores.length; i++) {
       expect(scores[i]).toBeLessThanOrEqual(scores[i - 1])
     }
+  })
+
+  it('投手が必ず3人ベンチ入りする', () => {
+    // 先発1人では大会を戦えないし、大差の試合で控えに投げさせる余地も無い
+    const byId = new Map(players.map((player) => [player.id, player]))
+    const pitchers = autoSquad(players).filter((id) => byId.get(id)!.isPitcher)
+    expect(pitchers.length).toBeGreaterThanOrEqual(MIN_SQUAD_PITCHERS)
+  })
+
+  it('投手が3人に満たない部でも壊れない', () => {
+    const few = players.filter((p) => !p.isPitcher).slice(0, 12)
+    const squad = autoSquad(few)
+    expect(squad.length).toBe(Math.min(few.length, FIRST_SQUAD_SIZE))
+    expect(new Set(squad).size).toBe(squad.length)
   })
 
   it('同じ総合なら下級生を残す', () => {

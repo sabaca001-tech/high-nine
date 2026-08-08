@@ -4,6 +4,7 @@ import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
+import { OpponentRoster } from '@/ui/components/OpponentRoster'
 import { LineupEditor } from './LineupScreen'
 import styles from './PreMatchScreen.module.css'
 
@@ -75,6 +76,12 @@ export function PreMatchScreen() {
           )}
         </p>
       )}
+
+      {/*
+        相手のスタメン。誰を警戒すべきかが分かると、
+        こちらの編成（誰を投げさせるか・どこを固めるか）に判断が生まれる
+      */}
+      {school && <OpponentRoster school={school} year={game.year} />}
 
       {/*
         先発予定の投手が疲れていないか。連戦の最中は、

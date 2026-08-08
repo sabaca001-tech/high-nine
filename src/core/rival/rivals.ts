@@ -29,6 +29,15 @@ export type RivalPlayer = {
   isPitcher: boolean
   /** 総合 1〜99 */
   rating: number
+  /**
+   * 入学した年。**省略時は学年を据え置く**（古いセーブ用）。
+   * これがあると、学年が上がって3年を過ぎたら名簿から外れる。
+   */
+  enrolledYear?: number
+  /** 触れ込みの特殊能力。スカウトで見ていた選手はこれを持って進学する */
+  skillId?: string
+  /** **こちらがスカウトで追いかけていた選手か。** 表示で分かるようにする */
+  scouted?: boolean
 }
 
 export type RivalSchool = {
@@ -46,6 +55,12 @@ export type RivalSchool = {
   trend: number
   /** 注目選手。U18の選考とスカウトの進学先に使う */
   stars: RivalPlayer[]
+  /**
+   * 部員名簿を作るための種。**選手そのものは保存しない。**
+   * 30校×15人を抱えるとセーブが膨らむので、
+   * 同じ種から毎回同じ部員を作り直す（`rivalRoster`）。
+   */
+  rosterSeed: number
   /**
    * 自校との対戦成績。
    * 「去年負けたあの学校」と分かるようにするための記録で、
@@ -127,6 +142,7 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
       strength: tradition + rng.int(-DRIFT, DRIFT),
       trend: 0,
       stars: createStars(rng, id, tradition, playerNames),
+      rosterSeed: rng.int(1, 2_000_000_000),
       record: emptyRivalRecord(),
     })
   }
@@ -196,6 +212,8 @@ function makeStar(
   grade: Grade,
   tradition: number,
   takenNames: string[],
+  /** 入学年。分かっていれば渡す（学年を数えて卒業させるため） */
+  enrolledYear?: number,
 ): RivalPlayer {
   const name = pickName(rng, takenNames)
   takenNames.push(name)
@@ -209,6 +227,7 @@ function makeStar(
     grade,
     isPitcher: rng.chance(0.35),
     rating: clampRating(base + rng.int(-6, 8)),
+    ...(enrolledYear !== undefined ? { enrolledYear } : {}),
   }
 }
 
@@ -240,10 +259,12 @@ export function advanceRival(rng: Rng, school: RivalSchool, year: number): Rival
       rating: clampRating(star.rating + rng.int(STAR_GROWTH_MIN, STAR_GROWTH_MAX)),
     }))
 
-  // 抜けたぶんだけ新入生を迎える
+  // 抜けたぶんだけ新入生を迎える。
+  // **スカウトで流れてきた選手が居る年は補充しない。**
+  // 補充まですると注目選手が毎年増え続ける
   while (stars.length < STARS_PER_SCHOOL) {
     stars.push(
-      makeStar(rng, `${school.id}-${year}-${stars.length}`, 1, school.tradition, takenNames),
+      makeStar(rng, `${school.id}-${year}-${stars.length}`, 1, school.tradition, takenNames, year),
     )
   }
 

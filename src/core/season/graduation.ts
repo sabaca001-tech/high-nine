@@ -19,14 +19,17 @@ const BASE_ROSTER_SIZE = 24
 const MIN_PITCHERS = 2
 
 /**
- * **その年に入部する投手の下限。スカウトで獲れた投手も数に入れる。**
+ * **その年に入部する投手の人数。スカウトで獲れた投手も数に入れる。**
  *
- * 部全体で2人という下限だけだったので、投手が引退した年に
- * 「新入生が全員野手」という引きを続けて食らうと立て直せなかった。
+ * 下限ではなく**固定**。抽選に任せていた頃は、
+ * 投手が引退した年に「新入生が全員野手」を引くと立て直せない一方で、
+ * 逆に投手ばかり5人入ってきて野手が薄くなる年もあった。
+ * どちらも編成の事故で、プレイヤーの判断とは関係がない。
+ *
  * 3年生が夏で引退することを考えると、毎年2人は入れておかないと
- * 秋の新チームで継投が組めない。
+ * 秋の新チームで継投が組めない。逆に3人以上は要らない。
  */
-const MIN_PITCHER_RECRUITS = 2
+const PITCHER_RECRUITS = 2
 
 /** 1年で入る新入生の下限・上限。強豪校ならベンチ入り争いが起きる規模になる */
 const MIN_RECRUITS = 4
@@ -100,37 +103,41 @@ export function recruitFreshmen(
       id,
       grade: 1,
       enrolledAt: { year: params.year, month: 4 },
-      // **投手は必ず確保する。** 2つの下限のどちらかを満たしていなければ
-      // 投手として作る（満たしていれば普通に抽選する）。
-      //  - 部全体で MIN_PITCHERS 人
-      //  - その年の入部で MIN_PITCHER_RECRUITS 人（スカウトぶんを含む）
+      // **投手の人数は抽選に任せず、こちらで決める。**
+      // 足りなければ投手として作り、足りていれば**野手として作る**。
+      // undefined（抽選）にしていた頃は、確約したぶんの上に
+      // 抽選ぶんが積み上がって投手だらけの代ができていた
       isPitcher: needsPitcher(
         pitchersLeft,
         newcomers.filter((p) => p.isPitcher).length,
         scoutedPitchers,
-      )
-        ? true
-        : undefined,
+      ),
       talentBonus: baseTalent + rng.int(-4, 4) + (isRecommended ? 14 : 0),
       // 在校生と新入生の両方と同姓同名にならないようにする
       takenNames: [...players, ...newcomers].map((player) => player.name),
     })
 
-    newcomers.push(player)
+    newcomers.push(isRecommended ? { ...player, origin: 'recommended' } : player)
     if (isRecommended) recommendedIds.push(id)
   }
 
   return { newcomers, recommendedIds, serial }
 }
 
-/** その1人を投手にしないと下限を満たせないか */
+/**
+ * その1人を投手にするか。**true / false のどちらかを必ず返す**（抽選しない）。
+ *
+ * 次のどちらかを満たしていなければ投手にする。
+ *  - 部全体で `MIN_PITCHERS` 人
+ *  - その年の入部で `PITCHER_RECRUITS` 人（スカウトぶんを含む）
+ */
 function needsPitcher(
   onRoster: number,
   recruitedSoFar: number,
   scoutedPitchers: number,
 ): boolean {
   const incoming = recruitedSoFar + scoutedPitchers
-  return onRoster + incoming < MIN_PITCHERS || incoming < MIN_PITCHER_RECRUITS
+  return onRoster + incoming < MIN_PITCHERS || incoming < PITCHER_RECRUITS
 }
 
 export type SeasonChange = {

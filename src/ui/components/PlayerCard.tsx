@@ -1,6 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { overallRating, toRank } from '@/core/player/rating'
-import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
+import {
+  ABILITY_LABELS,
+  MOTIVATION_LABELS,
+  PLAYER_ORIGIN_LABELS,
+} from '@/core/types/player'
 import { focusLabel } from '@/core/player/trainingFocus'
 import type { Motivation, Player } from '@/core/types/player'
 import type { UniformId } from '@/core/team/uniforms'
@@ -92,6 +96,13 @@ export function PlayerCard({
           </span>
           <span className={styles.sub}>
             {player.grade}年 / {player.isPitcher ? '投手' : player.position}
+            {/*
+              どうやって入部したか。**スカウトで通って獲った選手**が
+              他の新入生と見分けられなかったので、名前の下に出す
+            */}
+            {player.origin && (
+              <span className={styles.origin}>{PLAYER_ORIGIN_LABELS[player.origin]}</span>
+            )}
           </span>
         </span>
 

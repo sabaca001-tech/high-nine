@@ -331,7 +331,7 @@ describe('日単位の移動', () => {
       hand: base.hand.map((card) => ({ ...card, number: 5 as const })),
     }
 
-    const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    const next = stepCard(state)
 
     expect(next.boardPosition).toBe(GOAL_INDEX)
     expect(next.phase).toBe('yearEnd')

@@ -243,6 +243,21 @@ export type Player = {
   stats: import('@/core/player/careerStats').CareerStats
   /** U18日本代表に選ばれた記録。ドラフトの評価に効く */
   u18: import('@/core/player/u18').U18Cap[]
+  /**
+   * どうやって入部したか。省略時は一般入部。
+   *
+   * **スカウトで追いかけて獲った選手が分かるようにする。**
+   * 出張費を払って通った相手なのに、入部後は他の新入生と見分けが付かなかった。
+   */
+  origin?: PlayerOrigin
+}
+
+/** 入部の経路 */
+export type PlayerOrigin = 'scout' | 'recommended'
+
+export const PLAYER_ORIGIN_LABELS: Record<PlayerOrigin, string> = {
+  scout: 'スカウト',
+  recommended: '推薦',
 }
 
 /**

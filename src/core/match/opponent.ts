@@ -30,9 +30,29 @@ export type OpponentTeam = {
 
 /**
  * 相手チームを作る。
- * 選手データは保存しない（試合ごとに使い捨て）ため、GameState には入れない。
+ *
+ * **学校が分かっているときは、その学校の部員を使う**（`roster` を渡す）。
+ * 渡されなければ従来どおり戦力値から作る（学校を置いていない県への遠征など）。
+ *
+ * 学校の部員は保存せず、`rivalRoster` が種から毎回同じ名簿を作る。
+ * 同じ学校と2回戦えば同じ選手が出てくるし、
+ * スカウトで逃した選手もその学校に居る。
  */
-export function createOpponent(rng: Rng, strength: number, fixedName?: string): OpponentTeam {
+export function createOpponent(
+  rng: Rng,
+  strength: number,
+  fixedName?: string,
+  roster?: Player[],
+): OpponentTeam {
+  const name = fixedName ?? rng.pick(OPPONENT_NAMES)
+  if (roster && roster.length >= 9) {
+    return { name, players: roster, lineup: autoLineup(roster) }
+  }
+  return createDisposableOpponent(rng, strength, name)
+}
+
+/** 学校が分からないときの使い捨ての相手 */
+function createDisposableOpponent(rng: Rng, strength: number, fixedName?: string): OpponentTeam {
   // 名前は試合前の確認画面で先に決まっていることがある
   const name = fixedName ?? rng.pick(OPPONENT_NAMES)
 

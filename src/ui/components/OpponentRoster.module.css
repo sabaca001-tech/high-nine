@@ -1,0 +1,109 @@
+/*
+ * 相手校のスタメン。
+ * 畳んでおく（開きっぱなしだと自分のスタメンが画面外へ出る）。
+ */
+.toggle {
+  width: 100%;
+  min-height: 36px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.toggle:active {
+  background: var(--bg-panel-2);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+/* 9人ぶん。縦に伸びすぎないよう上限を置く */
+.list {
+  max-height: 180px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1.2em 2.2em 1fr auto auto;
+  grid-template-areas: 'order position name grade rating' '. . detail detail detail';
+  align-items: baseline;
+  gap: 2px var(--sp-1);
+  font-size: var(--fs-xs);
+  padding: 2px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.order {
+  grid-area: order;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.position {
+  grid-area: position;
+  font-weight: 800;
+  color: var(--text-sub);
+}
+
+.name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* こちらが追いかけていた選手。逃した相手だと分かるようにする */
+.scouted {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.grade {
+  grid-area: grade;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.rating {
+  grid-area: rating;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  grid-area: detail;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.note {
+  margin: 0;
+  font-size: 9px;
+  color: var(--text-dim);
+  text-align: center;
+}

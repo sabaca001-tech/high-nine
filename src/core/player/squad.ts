@@ -54,18 +54,65 @@ export function squadPriority(player: Player): number {
 }
 
 /**
+ * ベンチ入りに必ず入れる投手の数。
+ *
+ * 先発1人では大会を戦えない（連投で疲労が抜けない）し、
+ * 大差の試合で控えに投げさせる余地も無くなる。
+ * **総合だけで並べると投手が1人も入らない年がある**ので、枠を先に取る。
+ */
+export const MIN_SQUAD_PITCHERS = 3
+
+/**
  * ベンチ入りを埋める。
  * 新規ゲームと、指定が壊れたときの作り直しに使う。
  *
  * 総合だけで並べていた頃は、**引退間近の弱い3年生が枠を占め**、
  * 伸びしろのある1年生がベンチ外に落ちていた。
+ *
+ * **投手枠は先に取る。** 打力で並べると投手が押し出され、
+ * 大会で継投が組めなくなる。
  */
 export function autoSquad(players: Player[]): string[] {
-  return [...players]
-    .filter(isAvailable)
-    .sort((a, b) => squadPriority(b) - squadPriority(a))
-    .slice(0, FIRST_SQUAD_SIZE)
-    .map((player) => player.id)
+  const available = [...players].filter(isAvailable)
+  return fillSquad([], available)
+}
+
+/**
+ * 空きを埋める。**投手を先に確保してから**、残りを優先度順に詰める。
+ * `autoSquad` と `repairSquad` で同じ手順を使う。
+ */
+function fillSquad(kept: string[], pool: Player[]): string[] {
+  const chosen = [...kept]
+  const taken = new Set(chosen)
+  const byPriority = [...pool].sort((a, b) => squadPriority(b) - squadPriority(a))
+
+  const keptPitchers = pool.filter(
+    (player) => taken.has(player.id) && player.isPitcher,
+  ).length
+
+  // まず投手枠。足りないぶんだけ、良い投手から詰める
+  for (const player of byPriority) {
+    if (chosen.length >= FIRST_SQUAD_SIZE) break
+    const pitchers = keptPitchers + chosen.filter((id) => isPitcherId(id, pool)).length
+    if (pitchers >= MIN_SQUAD_PITCHERS) break
+    if (taken.has(player.id) || !player.isPitcher) continue
+    chosen.push(player.id)
+    taken.add(player.id)
+  }
+
+  // 残りは優先度順
+  for (const player of byPriority) {
+    if (chosen.length >= FIRST_SQUAD_SIZE) break
+    if (taken.has(player.id)) continue
+    chosen.push(player.id)
+    taken.add(player.id)
+  }
+
+  return chosen
+}
+
+function isPitcherId(id: string, pool: Player[]): boolean {
+  return pool.find((player) => player.id === id)?.isPitcher === true
 }
 
 /**
@@ -97,14 +144,7 @@ export function repairSquad(squad: readonly string[], players: Player[]): string
   const kept = trimSquad(squad, players)
   if (kept.length >= FIRST_SQUAD_SIZE) return kept
 
-  const inSquad = new Set(kept)
-  const promoted = [...players]
-    .filter((player) => !inSquad.has(player.id))
-    .sort((a, b) => squadPriority(b) - squadPriority(a))
-    .slice(0, FIRST_SQUAD_SIZE - kept.length)
-    .map((player) => player.id)
-
-  return [...kept, ...promoted]
+  return fillSquad(kept, players)
 }
 
 /** ベンチ入りのidを集合で返す（判定用） */

@@ -248,4 +248,10 @@ export type MatchSetup = {
   mercy?: boolean
   /** 自校の守備力への上乗せ（マネージャーなど） */
   defenseBonus?: number
+  /**
+   * 相手校の部員名簿。**分かっているときは必ず渡す。**
+   * 渡さないと戦力値から使い捨ての相手が作られ、
+   * 同じ学校と2回戦っても別人が出てくる。
+   */
+  opponentRoster?: Player[]
 }

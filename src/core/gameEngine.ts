@@ -54,6 +54,7 @@ import {
   upperStarRatingAtRank,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
+import { rivalRoster } from '@/core/rival/rivalRoster'
 import {
   allProspects,
   createNationalTeam,
@@ -737,6 +738,7 @@ function startMatch(state: GameState): EngineResult {
   }
 
   const rng = createRng(state.rngState)
+  const opponentRoster = rosterOfSchool(state, setup.opponentSchoolId)
   const matchState = startMatchState(rng, {
     players: matchRoster(state),
     lineup: state.lineup,
@@ -747,6 +749,8 @@ function startMatch(state: GameState): EngineResult {
     ...(setup.decisive ? { decisive: true } : {}),
     ...(setup.mercy === false ? { mercy: false } : {}),
     defenseBonus: managerDefenseBonus(state.managers),
+    // 相手が分かっているなら、その学校の部員をそのまま出す
+    ...(opponentRoster ? { opponentRoster } : {}),
   })
 
   return {
@@ -1454,6 +1458,18 @@ function applyCardTraining(
   }
 
   return { players: updated, events, boostConsumed: boost !== null }
+}
+
+/**
+ * 相手校の部員名簿。学校が分からなければ undefined。
+ *
+ * 名簿は保存していない。`rivalRoster` が学校の種から毎回同じ顔ぶれを作る
+ * （CLAUDE.md「他校を足すとき」— 全校ぶんの選手を抱えるとセーブが膨らむ）。
+ */
+function rosterOfSchool(state: GameState, schoolId?: string): Player[] | undefined {
+  if (!schoolId) return undefined
+  const school = state.rivals.find((rival) => rival.id === schoolId)
+  return school ? rivalRoster(school, state.year) : undefined
 }
 
 /**
@@ -2245,6 +2261,7 @@ function resolveScouting(
         ...player,
         name: prospect.name,
         skills: prospect.skillId ? [prospect.skillId] : [],
+        origin: 'scout',
       })
       results.push({
         name: prospect.name,
@@ -2261,8 +2278,10 @@ function resolveScouting(
     const school = schoolForProspect(rng, rivals, prospect.rating, prospect.regionId)
 
     // **素質の高い選手だけ**を他校の注目選手として残す。
-    // 10人×訪問県ぶんを全部抱えさせるとセーブが膨らむ
-    if (school && prospect.rating >= RIVAL_STAR_MIN_RATING) {
+    // 10人×訪問県ぶんを全部抱えさせるとセーブが膨らむ。
+    // ただし**会いに行った選手は素質を問わず残す。**
+    // 出張費を払って通った相手が、翌年どこにも居ないのでは張り合いが無い
+    if (school && (approached || prospect.rating >= RIVAL_STAR_MIN_RATING)) {
       rivals = rivals.map((s) =>
         s.id === school.id
           ? addStar(s, {
@@ -2271,6 +2290,10 @@ function resolveScouting(
               grade: 1,
               isPitcher: prospect.isPitcher,
               rating: prospect.rating,
+              enrolledYear: year,
+              ...(prospect.skillId ? { skillId: prospect.skillId } : {}),
+              // こちらが通っていた選手には印を付ける
+              ...(approached ? { scouted: true } : {}),
             })
           : s,
       )

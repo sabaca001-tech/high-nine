@@ -101,7 +101,12 @@ export type MatchState = {
 
 /** 試合を組み立てる。まだ1球も投げていない状態を返す */
 export function startMatchState(rng: Rng, setup: MatchSetup): MatchState {
-  const opponent = createOpponent(rng, setup.opponentStrength, setup.opponentName || undefined)
+  const opponent = createOpponent(
+    rng,
+    setup.opponentStrength,
+    setup.opponentName || undefined,
+    setup.opponentRoster,
+  )
 
   return {
     kind: setup.kind,

@@ -203,3 +203,17 @@
   font-size: 9px;
   font-weight: 700;
 }
+
+/*
+ * 入部の経路。**スカウトで通って獲った選手**を見分けられるようにする。
+ * 出張費を払って追いかけた相手が、入部後は他の新入生と同じ見た目だった。
+ */
+.origin {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffd98a;
+  font-size: 9px;
+  font-weight: 800;
+}
