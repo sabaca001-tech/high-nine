@@ -104,17 +104,36 @@ export function applyRoundResult(
  * （大会に挑むこと自体が罰にならないようにする）。
  */
 export function reputationGain(tournament: Tournament): number {
-  if (!tournament.champion) return 0
-  return CHAMPION_REPUTATION[tournament.kind]
+  const full = CHAMPION_REPUTATION[tournament.kind]
+  if (tournament.champion) return full
+
+  // 勝ち上がった割合ぶん。決勝進出でおよそ半分、初戦敗退なら0
+  const cleared = tournament.round - 1
+  if (cleared <= 0 || tournament.totalRounds <= 1) return 0
+
+  const progress = cleared / tournament.totalRounds
+  return round1(full * progress * RUNNER_UP_SHARE)
 }
 
 /**
- * 優勝したことへの評価。
+ * 優勝に対して、勝ち上がりをどれだけ評価するか。
+ * 決勝まで行っても優勝の半分弱に留めて、「勝ち切ること」の価値を残す。
+ */
+const RUNNER_UP_SHARE = 0.55
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+/**
+ * 大会での戦績への評価。
  *
- * **1勝ごとの評判はもう試合のたびに動いている**（`matchReputationDelta`）。
- * ここで勝ち数ぶんを足すと二重になるうえ、
- * 「1回戦で格上を倒した」と「1回戦で格下に勝った」が同じ重みになってしまう。
- * ここは「大会を制した」という一点だけを評価する。
+ * 1勝ごとの評判は試合のたびに動いている（`matchReputationDelta`）ので、
+ * ここは「どこまで勝ち上がったか」という**大会全体の格**を評価する。
+ *
+ * **優勝だけを見ていた頃は、決勝で負けた年と初戦で負けた年が同じ扱いだった。**
+ * 県大会でベスト4に入り続けても評判が動かず、
+ * 勝率6割のチームが30前後で頭打ちになっていた。
  */
 const CHAMPION_REPUTATION: Record<TournamentKind, number> = {
   summerPref: 12,

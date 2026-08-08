@@ -44,8 +44,13 @@ export const REPUTATION_MAX = 100
  */
 export function reputationGainAt(current: number, raw: number): number {
   if (raw > 0) {
+    // **2乗は効きすぎた。** 評判50で加算が4分の1、64で8分の1しか通らず、
+    // 勝率6割のチームが30前後で頭打ちになっていた
+    // （釣り合いに必要な勝敗比が 50で2:1、64で4.9:1）。
+    // 1.5乗にすると 50で0.35、64で0.22 通るので、
+    // 県内で勝ち続ければB（強豪）まで届く
     const room = Math.max(0, 1 - current / REPUTATION_MAX)
-    return raw * room * room
+    return raw * Math.pow(room, REPUTATION_DAMPING)
   }
   // 下がるほうも同じ考えで鈍らせる。**下限で止まらないと詰む。**
   // 負けるたびに削られる仕組みを入れたら、勝てないチームの評判が
@@ -59,6 +64,12 @@ export function reputationGainAt(current: number, raw: number): number {
  * 評判20なら下げ幅の25%しか通らないので、無戦略でも20前後で底を打つ。
  */
 const REPUTATION_LOSS_FLOOR = 0.25
+
+/**
+ * 上がりにくさの指数。大きいほど頭打ちが早い。
+ * 2.0 だと勝率6割でも30前後で止まってしまった。
+ */
+const REPUTATION_DAMPING = 1.5
 
 /** 評判は整数で持つ（小数だと表示も比較も読みにくい） */
 export function applyReputation(current: number, raw: number): number {

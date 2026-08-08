@@ -196,20 +196,39 @@ describe('roundName', () => {
 
 describe('reputationGain', () => {
   /**
-   * 1勝ごとの評判は試合のたびに動く（matchReputation）ので、ここは優勝だけを見る。
-   * 両方で勝ち数を数えると二重に加算される。
+   * 勝ち上がるほど積み上がり、優勝で満額になる。
+   *
+   * **優勝だけを見ていた頃は、決勝で負けた年と初戦で負けた年が同じ扱いだった。**
+   * 県大会でベスト4に入り続けても評判が動かず、
+   * 勝率6割のチームが評判30前後で頭打ちになっていた。
    */
-  it('優勝するまでは0で、優勝した瞬間に入る', () => {
+  it('勝ち上がるほど積み上がり、優勝で満額になる', () => {
     let t = createTournament('summerPref', TOTTORI)
+    expect(reputationGain(t)).toBe(0)
 
+    let previous = 0
     for (let i = 0; i < t.totalRounds - 1; i++) {
       t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
-      expect(reputationGain(t)).toBe(0)
+      const gain = reputationGain(t)
+      expect(gain).toBeGreaterThanOrEqual(previous)
+      previous = gain
     }
 
+    // 決勝まで来ても、優勝には届かない
+    const beforeFinal = reputationGain(t)
     t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
     expect(t.champion).toBe(true)
-    expect(reputationGain(t)).toBeGreaterThan(0)
+    expect(reputationGain(t)).toBeGreaterThan(beforeFinal * 1.5)
+  })
+
+  it('初戦で負ければ評判は動かない', () => {
+    const t = applyRoundResult(createTournament('summerPref', TOTTORI), {
+      opponentName: 'X',
+      scoreFor: 0,
+      scoreAgainst: 3,
+      won: false,
+    })
+    expect(reputationGain(t)).toBe(0)
   })
 
   it('負けても評判は減らない', () => {

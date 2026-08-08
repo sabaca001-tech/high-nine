@@ -99,6 +99,14 @@ const TRADITION_MIN = -10
 const TRADITION_MAX = 22
 
 /**
+ * 県内の名門校の地力。
+ * **県外の全国クラス（8〜34）と重なる水準まで上げる。**
+ * ここが低いと、育ったチームにとって県内が全部格下になる。
+ */
+const LOCAL_ELITE_MIN = 24
+const LOCAL_ELITE_MAX = 33
+
+/**
  * 全国クラスの学校の地力。
  * 県大会を勝ち抜いてきた学校なので、県内の平均よりはっきり上に置く。
  * ただし初出場の学校もいるので下限は低めにしてある。
@@ -148,9 +156,17 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
   }
 
   for (let i = 0; i < RIVALS_PER_REGION; i++) {
-    // 1校だけは必ず強豪にする。目標になる相手が居ないと張り合いが無い
+    // **県内にも名門校を置く。**
+    // 1校だけ「16以上」にしていた頃は、県内の地力が最高16しかなく、
+    // 3年も育てれば県内の全校が格下になっていた（実測で7年目に格上0校）。
+    // 甲子園常連（地力34）が県外にしか居ないのでは、
+    // 「県内に倒すべき壁がある」という手応えが出ない
     const tradition =
-      i === 0 ? rng.int(16, TRADITION_MAX) : rng.int(TRADITION_MIN, TRADITION_MAX - 6)
+      i === 0
+        ? rng.int(LOCAL_ELITE_MIN, LOCAL_ELITE_MAX)
+        : i === 1
+          ? rng.int(14, LOCAL_ELITE_MIN)
+          : rng.int(TRADITION_MIN, TRADITION_MAX - 6)
     add(`rs${i + 1}`, homeRegionId, tradition)
   }
 
