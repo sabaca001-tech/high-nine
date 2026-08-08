@@ -87,15 +87,23 @@ describe('matchReputationDelta', () => {
     expect(toGiant).toBeGreaterThan(toEqual)
   })
 
-  it('番狂わせの上がり幅は、格下に負けた下がり幅より小さい', () => {
-    // 勝ちで稼ぐより、取りこぼしのほうが痛い。勝ち続ける意味を出す
-    const upset = matchReputationDelta({ outcome: 'win', ourRating: our, opponentStrength: 25 })
+  it('1敗で失う量には上限がある', () => {
+    // **差がどれだけ開いても、1試合で学校の評価がひっくり返ることはない。**
+    // 上限が無かった頃は、強くなるほど相手との差が開いて1敗が -5 を超え、
+    // B（強豪校・64）を保つのに格下相手で9割の勝率が要った
     const collapse = matchReputationDelta({
       outcome: 'lose',
       ourRating: our,
-      opponentStrength: -25,
+      opponentStrength: -30,
     })
-    expect(upset).toBeLessThan(-collapse)
+    expect(-collapse).toBeLessThanOrEqual(2.5)
+  })
+
+  it('格上を倒すことが評判の主な稼ぎになる', () => {
+    // 格下に勝っても素の値は1のまま。挑んで勝つことが評価される
+    const upset = matchReputationDelta({ outcome: 'win', ourRating: our, opponentStrength: 25 })
+    const easy = matchReputationDelta({ outcome: 'win', ourRating: our, opponentStrength: -25 })
+    expect(upset).toBeGreaterThan(easy * 3)
   })
 })
 

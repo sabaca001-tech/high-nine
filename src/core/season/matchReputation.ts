@@ -62,8 +62,23 @@ const LOSS_BASE = 0.4
 /** 格上を倒したときの上乗せ（1差あたり） */
 const UPSET_RATE = 0.2
 
-/** 格下に負けたときの上乗せ（1差あたり）。勝ちより重くする */
-const COLLAPSE_RATE = 0.25
+/**
+ * 格下に負けたときの上乗せ（1差あたり）。勝ちより重くする。
+ *
+ * **0.25は重すぎた。** 強くなるほど相手との差が開くので、
+ * 1敗の代償が -5 を超える一方、勝ちはずっと +1 のまま。
+ * 結果として**強くなるほど評判が上がりにくくなる**という逆転が起きていて、
+ * B（強豪校・64）を保つのに格下相手で9割の勝率が要った。
+ */
+const COLLAPSE_RATE = 0.1
+
+/**
+ * 1敗で失う上限。
+ *
+ * 差がどれだけ開いても、1試合落としただけで学校の評価が
+ * ひっくり返るようなことにはしない。
+ */
+const MAX_LOSS = 2.5
 
 /** 格上に負けたときの割引（1差あたり）。強豪に挑んだこと自体は責められない */
 const EXCUSE_RATE = 0.05
@@ -92,11 +107,12 @@ export function matchReputationDelta(input: MatchReputationInput): number {
   const gap = clamp(opponentRating(input.opponentStrength) - input.ourRating, -GAP_CAP, GAP_CAP)
 
   if (input.outcome === 'win') {
+    // 格上を倒せば大きい。格下に勝っても、勝ち続けること自体は評価する
     return round1(WIN_BASE + Math.max(0, gap) * UPSET_RATE)
   }
 
   const loss = LOSS_BASE + Math.max(0, -gap) * COLLAPSE_RATE - Math.max(0, gap) * EXCUSE_RATE
-  return -round1(Math.max(MIN_LOSS, loss))
+  return -round1(Math.min(MAX_LOSS, Math.max(MIN_LOSS, loss)))
 }
 
 /**
