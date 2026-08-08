@@ -55,21 +55,29 @@ export function opponentStrengthFor(tournament: Tournament, region: Region): num
   const { round, totalRounds, kind } = tournament
   const progress = totalRounds <= 1 ? 1 : (round - 1) / (totalRounds - 1)
 
-  const base = -8 + progress * 30
-  const prestige = PRESTIGE[kind]
+  const range = OPPONENT_RANGE[kind]
+  const base = range.from + progress * (range.to - range.from)
 
   // 全国大会は全地区の代表が集まるので、地区の激戦度は関係ない
   const region_ = kind === 'nationals' || kind === 'springNationals' ? 0 : regionStrength(region)
 
-  return Math.round(base + region_ + prestige)
+  return Math.round(base + region_)
 }
 
-/** 大会の格。相手の強さに加算される */
-const PRESTIGE: Record<TournamentKind, number> = {
-  summerPref: 0,
-  nationals: 10,
-  springNationals: 8,
-  autumnPref: -4,
+/**
+ * 回戦ごとの相手の強さ。1回戦から決勝までの幅。
+ *
+ * **全国大会の下限を大きく上げた。** 以前は1回戦が +2（総合45相当）で、
+ * 県大会の1回戦とほとんど変わらなかった。
+ * 甲子園に出てくるのは**全員が県の代表**なので、
+ * 初戦から県大会の決勝級の相手が来るのが筋。
+ * 育て切ったチームが初出場でそのまま優勝できてしまっていた。
+ */
+const OPPONENT_RANGE: Record<TournamentKind, { from: number; to: number }> = {
+  summerPref: { from: -8, to: 22 },
+  autumnPref: { from: -12, to: 16 },
+  nationals: { from: 14, to: 36 },
+  springNationals: { from: 10, to: 32 },
 }
 
 /** 1試合ぶんの結果を反映した新しい大会状態を返す */

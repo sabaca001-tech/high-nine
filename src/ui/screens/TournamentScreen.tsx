@@ -81,18 +81,38 @@ export function TournamentScreen() {
           </div>
         )}
 
-        {tournament.results.map((entry) => (
-          <div
-            key={entry.round}
-            className={`${styles.result} ${entry.won ? styles.won : styles.lost}`}
-          >
-            <span className={styles.roundLabel}>{entry.roundName}</span>
-            <span className={styles.opponent}>{entry.opponentName}</span>
-            <span className={styles.score}>
-              {entry.scoreFor} - {entry.scoreAgainst}
-            </span>
-          </div>
-        ))}
+        {/*
+          トーナメント表。**まだ戦っていない回戦も並べる。**
+          勝ち上がった記録だけを出していた頃は、
+          「あと何回勝てば優勝なのか」「次は準決勝なのか」が
+          開幕時点では読めなかった。
+          相手はその回戦に進んでから決まるので、先の欄は伏せてある。
+        */}
+        <div className={styles.ladder}>
+          {Array.from({ length: tournament.totalRounds }, (_, index) => {
+            const round = index + 1
+            const entry = tournament.results.find((result) => result.round === round)
+            const isNext = !over && round === tournament.round
+
+            const classNames = [styles.rung]
+            if (entry) classNames.push(entry.won ? styles.won : styles.lost)
+            else if (isNext) classNames.push(styles.upcoming)
+
+            return (
+              <div key={round} className={classNames.join(' ')}>
+                <span className={styles.roundLabel}>
+                  {roundName(round, tournament.totalRounds)}
+                </span>
+                <span className={styles.opponent}>
+                  {entry ? entry.opponentName : isNext ? '抽選中' : '—'}
+                </span>
+                <span className={styles.score}>
+                  {entry ? `${entry.scoreFor} - ${entry.scoreAgainst}` : ''}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className={styles.controls}>

@@ -195,3 +195,34 @@
   transform: translateY(4px);
   box-shadow: none;
 }
+
+
+/*
+ * トーナメント表。まだ戦っていない回戦も並べる。
+ * 開幕時点で「あと何勝で優勝か」「次は何回戦か」が読めるようにする。
+ */
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rung {
+  display: grid;
+  grid-template-columns: 5.5em 1fr auto;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--line);
+  background: var(--bg-panel);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+/* これから戦う回戦。相手はまだ決まっていない */
+.upcoming {
+  border-left-color: var(--accent);
+  color: var(--text-main);
+  font-weight: 700;
+}

@@ -678,9 +678,14 @@ function playTournamentMatch(state: GameState): EngineResult {
   // 地区大会は県内の学校、全国大会は県外の全国クラスから引く
   const base = opponentStrengthFor(tournament, findRegion(state.regionId))
   const local = tournament.kind === 'summerPref' || tournament.kind === 'autumnPref'
-  const pool = local
+  // **一度当たった学校は除く。** 同じ大会で同じ学校が2回出てきていた
+  // （トーナメントなので、負けた学校がもう一度現れることはあり得ない）
+  const faced = new Set(tournament.results.map((entry) => entry.opponentName))
+  const all = local
     ? localRivals(state.rivals, state.regionId)
     : nationalRivals(state.rivals, state.regionId)
+  const remaining = all.filter((school) => !faced.has(school.name))
+  const pool = remaining.length > 0 ? remaining : all
   const rival = pickRivalFor(rng, pool, base)
 
   // ここでは試合をせず、スタメンを確認する画面へ送る
