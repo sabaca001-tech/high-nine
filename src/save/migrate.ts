@@ -147,6 +147,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 34) {
     data = migrateV33ToV34(data)
   }
+  if (version < 35) {
+    data = migrateV34ToV35(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -862,6 +865,20 @@ function migrateV33ToV34(raw: Record<string, unknown>): Record<string, unknown> 
   })
 
   return { ...raw, version: 34, graduates }
+}
+
+/**
+ * v34 → v35
+ *  - 大会に draw（開幕時の抽選で決まる山）を追加
+ *
+ * 進行中の大会には山が無い。空で足すと相手が決まらないので、
+ * **その大会を打ち切る**（次の大会からは正しく抽選される）。
+ * 中断中の1大会のために、遡って抽選を作り直すほうが筋が悪い。
+ */
+function migrateV34ToV35(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!isRecord(raw.tournament)) return { ...raw, version: 35, tournament: null }
+  if (Array.isArray(raw.tournament.draw)) return { ...raw, version: 35 }
+  return { ...raw, version: 35, tournament: null, phase: 'cardSelect' }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

@@ -1,5 +1,6 @@
 import { isTournamentOver, roundName } from '@/core/types/tournament'
 import { findRegion } from '@/core/types/region'
+import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { formatFunds } from '@/core/shop/funds'
 import { tournamentTravel } from '@/core/shop/travel'
 import { useGameStore } from '@/state/useGameStore'
@@ -15,6 +16,7 @@ export function TournamentScreen() {
   const finishTournament = useGameStore((s) => s.finishTournament)
 
   const tournament = game?.tournament ?? null
+  const ourRating = game ? teamRating(game.players, game.lineup) : 0
   if (!game || !tournament) return null
 
   const over = isTournamentOver(tournament)
@@ -92,6 +94,7 @@ export function TournamentScreen() {
           {Array.from({ length: tournament.totalRounds }, (_, index) => {
             const round = index + 1
             const entry = tournament.results.find((result) => result.round === round)
+            const drawn = tournament.draw[index]
             const isNext = !over && round === tournament.round
 
             const classNames = [styles.rung]
@@ -104,7 +107,16 @@ export function TournamentScreen() {
                   {roundName(round, tournament.totalRounds)}
                 </span>
                 <span className={styles.opponent}>
-                  {entry ? entry.opponentName : isNext ? '抽選中' : '—'}
+                  {entry?.opponentName ?? drawn?.name ?? '—'}
+                  {/*
+                    **抽選は開幕時に済んでいる。** 1回戦から優勝候補と当たることもあるので、
+                    どの山に入ったのかがここで分かるようにする
+                  */}
+                  {!entry && drawn && (
+                    <span className={styles.matchup}>
+                      {matchupLabel(ourRating, drawn.strength)}
+                    </span>
+                  )}
                 </span>
                 <span className={styles.score}>
                   {entry ? `${entry.scoreFor} - ${entry.scoreAgainst}` : ''}

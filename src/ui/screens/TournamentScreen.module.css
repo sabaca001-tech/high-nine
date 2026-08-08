@@ -226,3 +226,13 @@
   color: var(--text-main);
   font-weight: 700;
 }
+
+/* 抽選で決まった相手の格。1回戦から優勝候補と当たることもある */
+.matchup {
+  margin-left: var(--sp-1);
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  font-size: 9px;
+  font-weight: 800;
+}

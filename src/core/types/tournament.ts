@@ -37,6 +37,24 @@ export type Tournament = {
   eliminated: boolean
   champion: boolean
   results: TournamentRoundResult[]
+  /**
+   * 抽選で決まった山。**開幕時に全回戦の相手が決まる。**
+   *
+   * トーナメントなので、運が悪ければ1回戦から優勝候補と当たる。
+   * 回戦ごとに難易度を決め打ちしていた頃は、
+   * 1回戦は必ず格下・決勝は必ず格上という筋書きになっていて、
+   * 抽選の妙という高校野球のいちばん面白いところが消えていた。
+   */
+  draw: TournamentDrawEntry[]
+}
+
+/** 抽選で決まった1回戦ぶんの相手 */
+export type TournamentDrawEntry = {
+  /** ライバル校のid。使い捨ての相手なら省略 */
+  schoolId?: string
+  name: string
+  /** 相手の強さ。0が互角 */
+  strength: number
 }
 
 /** 大会が終わっているか（優勝か敗退） */

@@ -42,6 +42,7 @@ import { benchPlayers } from './match/teamState'
 import { localRivals, nationalRivals } from './rival/rivals'
 import { isTournamentOver } from './types/tournament'
 import { overallRating } from './player/rating'
+import { opponentRating, teamRating } from './season/matchReputation'
 import { findPlayerEvent } from './event/playerEvents'
 import {
   findScoutRegion,
@@ -908,18 +909,47 @@ describe('大会', () => {
     throw new Error('2勝以上するシードが見つからない')
   })
 
-  it('初戦で敗れると評判が下がる', () => {
+  it('格下に初戦で敗れると評判が下がる', () => {
+    // **格上に負けたことは責められない**（EXCUSE_RATE）。
+    // 抽選なので1回戦から優勝候補と当たることがあり、
+    // その敗戦まで罰していては「挑む」意味が無くなる
     for (let seed = 400; seed < 480; seed++) {
       const state = untilTournament(startedGame({ seed }))
       const before = state.reputation
       const played = playOutTournament(state)
       if (played.tournament!.results.some((r) => r.won)) continue
 
+      // 相手がこちらより弱かった場合だけを見る
+      const ourRating = teamRating(state.players, state.lineup)
+      const opponent = state.tournament!.draw[0]
+      if (!opponent || opponentRating(opponent.strength) >= ourRating) continue
+
       const finished = applyCommand(played, { type: 'finishTournament' }).state
       expect(finished.reputation).toBeLessThan(before)
       return
     }
-    throw new Error('初戦敗退するシードが見つからない')
+    throw new Error('格下に初戦敗退するシードが見つからない')
+  })
+
+  it('1回戦から優勝候補と当たることがある', () => {
+    // トーナメントなので、抽選で強豪と当たるのは当たり前。
+    // 回戦ごとに難易度を決め打ちしていた頃は、1回戦は必ず格下だった
+    let toughOpener = 0
+    for (let seed = 500; seed < 560; seed++) {
+      const state = untilTournament(startedGame({ seed }))
+      const ourRating = teamRating(state.players, state.lineup)
+      const opponent = state.tournament!.draw[0]
+      if (opponent && opponentRating(opponent.strength) > ourRating + 4) toughOpener++
+    }
+    expect(toughOpener).toBeGreaterThan(0)
+  })
+
+  it('同じ大会に同じ学校は二度出てこない', () => {
+    for (let seed = 600; seed < 640; seed++) {
+      const draw = untilTournament(startedGame({ seed })).tournament!.draw
+      const named = draw.filter((entry) => entry.schoolId)
+      expect(new Set(named.map((entry) => entry.schoolId)).size).toBe(named.length)
+    }
   })
 
   it('地区大会で優勝しないと全国大会は開かれない', () => {

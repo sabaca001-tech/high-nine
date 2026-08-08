@@ -8,7 +8,12 @@
 
 import type { Region } from '@/core/types/region'
 import { NATIONAL_ENTRANTS, regionStrength, roundsFor } from '@/core/types/region'
-import type { Tournament, TournamentKind } from '@/core/types/tournament'
+import type { Rng } from '@/core/rng/random'
+import type {
+  Tournament,
+  TournamentDrawEntry,
+  TournamentKind,
+} from '@/core/types/tournament'
 import { roundName, TOURNAMENT_LABELS } from '@/core/types/tournament'
 
 /** 秋季大会は夏より参加校が少ない（新チームで規模が小さい想定） */
@@ -22,7 +27,12 @@ const SPRING_ENTRANTS = 32
 // 盤面が1マス1日になり日付で置けるようになったので不要になった。
 
 /** 大会を作る */
-export function createTournament(kind: TournamentKind, region: Region): Tournament {
+export function createTournament(
+  kind: TournamentKind,
+  region: Region,
+  /** 抽選に使う。省略すると相手が決まらないので、必ず渡すこと */
+  draw: TournamentDrawEntry[] = [],
+): Tournament {
   const entrants = entrantsOf(kind, region)
   const totalRounds = roundsFor(entrants)
 
@@ -37,8 +47,67 @@ export function createTournament(kind: TournamentKind, region: Region): Tourname
     eliminated: false,
     champion: false,
     results: [],
+    draw,
   }
 }
+
+/**
+ * 山を引く。**開幕時に全回戦の相手を決める。**
+ *
+ * 回戦ごとに「1回戦は格下・決勝は格上」と難易度を決め打ちしていた頃は、
+ * どの大会も同じ筋書きになっていて、抽選の妙が無かった。
+ *
+ * ここでは**勝ち残る確率**で重みを付ける。
+ * 1回戦は全校が同じ重み（＝完全な抽選）なので、**優勝候補と当たることもある**。
+ * 回戦が進むほど強い学校の重みが増える。勝ち上がってきた相手なのだから当然で、
+ * 難易度の上がり方は決め打ちではなく**そこから自然に出てくる**。
+ *
+ * 同じ学校は二度出てこない（トーナメントなので当たり前）。
+ */
+export function drawTournament(
+  rng: Rng,
+  pool: { id: string; name: string; strength: number }[],
+  totalRounds: number,
+  /** 学校が足りないときに使う使い捨ての相手 */
+  fallback: (round: number) => TournamentDrawEntry,
+): TournamentDrawEntry[] {
+  const average =
+    pool.length > 0 ? pool.reduce((sum, s) => sum + s.strength, 0) / pool.length : 0
+
+  const remaining = [...pool]
+  const draw: TournamentDrawEntry[] = []
+
+  for (let round = 1; round <= totalRounds; round++) {
+    if (remaining.length === 0) {
+      draw.push(fallback(round))
+      continue
+    }
+
+    // 1回戦は重み1（完全な抽選）。回戦が進むほど強い学校が残りやすい
+    const weights = remaining.map((school) => ({
+      value: school,
+      weight: Math.pow(
+        Math.max(SURVIVAL_FLOOR, 1 + (school.strength - average) * SURVIVAL_RATE),
+        round - 1,
+      ),
+    }))
+
+    const picked = rng.weighted(weights)
+    remaining.splice(remaining.indexOf(picked), 1)
+    draw.push({ schoolId: picked.id, name: picked.name, strength: picked.strength })
+  }
+
+  return draw
+}
+
+/**
+ * 勝ち残りやすさ。平均より1点強いと1回戦ぶんの生存率が5%上がる。
+ * 6回戦制なら、平均+20の学校は決勝で32倍出やすくなる。
+ */
+const SURVIVAL_RATE = 0.05
+
+/** どれだけ弱くても勝ち上がる目はある */
+const SURVIVAL_FLOOR = 0.2
 
 function entrantsOf(kind: TournamentKind, region: Region): number {
   if (kind === 'nationals') return NATIONAL_ENTRANTS

@@ -116,6 +116,7 @@ function makeTournament(kind: TournamentKind, wins: number, champion: boolean): 
     totalRounds: 6,
     round: wins + 1,
     eliminated: !champion,
+    draw: [],
     champion,
     results,
   }

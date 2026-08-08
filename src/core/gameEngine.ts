@@ -47,7 +47,6 @@ import {
   addStar,
   advanceRival,
   createRivals,
-  pickRivalFor,
   localRivals,
   nationalRivals,
   schoolForProspect,
@@ -120,6 +119,7 @@ import { findEquipment, unlockedKinds } from '@/core/shop/equipmentDefs'
 import {
   applyRoundResult,
   createTournament,
+  drawTournament,
   opponentStrengthFor,
   reputationGain,
 } from '@/core/tournament/tournament'
@@ -141,7 +141,11 @@ import { DEFAULT_UNIFORM, normalizeUniform } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
 import type { RegionId } from '@/core/types/region'
 import { isTournamentOver, roundName } from '@/core/types/tournament'
-import type { Tournament } from '@/core/types/tournament'
+import type {
+  Tournament,
+  TournamentDrawEntry,
+  TournamentKind,
+} from '@/core/types/tournament'
 import { createAlumnus, trimGraduates } from '@/core/career/career'
 import { overallRating } from '@/core/player/rating'
 import { draftBonus } from '@/core/player/u18'
@@ -674,19 +678,12 @@ function playTournamentMatch(state: GameState): EngineResult {
 
   const rng = createRng(state.rngState)
 
-  // 回戦ごとの難易度の曲線は変えず、それに近い戦力の学校を当てる。
-  // 地区大会は県内の学校、全国大会は県外の全国クラスから引く
-  const base = opponentStrengthFor(tournament, findRegion(state.regionId))
-  const local = tournament.kind === 'summerPref' || tournament.kind === 'autumnPref'
-  // **一度当たった学校は除く。** 同じ大会で同じ学校が2回出てきていた
-  // （トーナメントなので、負けた学校がもう一度現れることはあり得ない）
-  const faced = new Set(tournament.results.map((entry) => entry.opponentName))
-  const all = local
-    ? localRivals(state.rivals, state.regionId)
-    : nationalRivals(state.rivals, state.regionId)
-  const remaining = all.filter((school) => !faced.has(school.name))
-  const pool = remaining.length > 0 ? remaining : all
-  const rival = pickRivalFor(rng, pool, base)
+  // **相手は開幕時の抽選で決まっている。** 回戦ごとに引き直すと、
+  // 同じ学校が2回出てきたり、先の相手が読めなかったりする
+  const entry = tournament.draw[tournament.round - 1]
+  const rival = entry?.schoolId
+    ? (state.rivals.find((school) => school.id === entry.schoolId) ?? null)
+    : null
 
   // ここでは試合をせず、スタメンを確認する画面へ送る
   return {
@@ -695,16 +692,18 @@ function playTournamentMatch(state: GameState): EngineResult {
       rngState: rng.state,
       pendingSetup: {
         kind: 'friendly',
-        opponentName: rival?.name ?? pickOpponentName(rng),
+        opponentName: rival?.name ?? entry?.name ?? pickOpponentName(rng),
         ...(rival ? { opponentSchoolId: rival.id } : {}),
-        opponentStrength: rival?.strength ?? base,
+        opponentStrength: rival?.strength ?? entry?.strength ?? 0,
         // 全国大会では相手がどこの代表かを出す（甲子園の実感）
-        ...(local || !rival ? {} : { opponentRegionName: findRegion(rival.regionId).name }),
+        ...(isLocalTournament(tournament.kind) || !rival
+          ? {}
+          : { opponentRegionName: findRegion(rival.regionId).name }),
         // トーナメントなので引き分けはあり得ない
         decisive: true,
         // **コールドは地区大会だけ。** 甲子園まで来た相手に
         // 「5回10点差で打ち切り」は成立しない
-        mercy: local,
+        mercy: isLocalTournament(tournament.kind),
         roundName: roundName(tournament.round, tournament.totalRounds),
       },
       phase: 'lineupCheck',
@@ -1465,6 +1464,41 @@ function applyCardTraining(
   return { players: updated, events, boostConsumed: boost !== null }
 }
 
+/** 地区大会か（全国大会でなければ true） */
+function isLocalTournament(kind: TournamentKind): boolean {
+  return kind === 'summerPref' || kind === 'autumnPref'
+}
+
+/**
+ * 大会の山を引く。
+ *
+ * **1回戦は完全な抽選**なので、運が悪ければ初戦から優勝候補と当たる。
+ * 回戦が進むほど強い学校が残りやすくなるだけで、
+ * 難易度を回戦ごとに決め打ちしてはいない。
+ */
+function drawFor(rng: Rng, state: GameState, kind: TournamentKind): TournamentDrawEntry[] {
+  const region = findRegion(state.regionId)
+  const pool = isLocalTournament(kind)
+    ? localRivals(state.rivals, state.regionId)
+    : nationalRivals(state.rivals, state.regionId)
+
+  const totalRounds = createTournament(kind, region).totalRounds
+
+  return drawTournament(
+    rng,
+    pool.map((school) => ({ id: school.id, name: school.name, strength: school.strength })),
+    totalRounds,
+    // 学校が足りない県だけ、従来の難易度曲線で使い捨ての相手を作る
+    (round) => ({
+      name: pickOpponentName(rng),
+      strength: opponentStrengthFor(
+        { ...createTournament(kind, region), round },
+        region,
+      ),
+    }),
+  )
+}
+
 /**
  * 相手校の部員名簿。学校が分からなければ undefined。
  *
@@ -1641,7 +1675,11 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   } else if (cell.kind === 'tournament' && cell.tournamentKind) {
     // 大会マスに止まった。まだ始まっていなければ開幕させる
     if (!tournament || tournament.kind !== cell.tournamentKind) {
-      tournament = createTournament(cell.tournamentKind, findRegion(state.regionId))
+      tournament = createTournament(
+        cell.tournamentKind,
+        findRegion(state.regionId),
+        drawFor(rng, state, cell.tournamentKind),
+      )
       events.push({
         type: 'message',
         text: `${tournament.name}が開幕（${tournament.entrants}校・${tournament.totalRounds}回戦制）`,
