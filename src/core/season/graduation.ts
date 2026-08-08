@@ -9,8 +9,10 @@ import { createPlayer } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
 import { draftBonus } from '@/core/player/u18'
 import type { Grade, Player } from '@/core/types/player'
+import { snapshotOf } from '@/core/types/player'
 import type { GraduateRecord } from '@/core/types/season'
 import { REPUTATION_INITIAL } from '@/core/types/season'
+import { GRADUATION_MONTH } from '@/core/types/career'
 
 /** 部員数の目安。評判が高いほど多くの入部希望者が来る */
 const BASE_ROSTER_SIZE = 24
@@ -194,6 +196,8 @@ export function advanceSeason(
           skills: [...player.skills],
           highSchool: player.stats,
           u18Bonus: draftBonus(player.u18),
+          // 卒業時の各能力。総合だけでは何が武器だったのか分からない
+          finalAbilities: snapshotOf(player, year, GRADUATION_MONTH),
         },
         reputation,
       ),

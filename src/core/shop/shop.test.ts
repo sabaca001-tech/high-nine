@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
+
+/** 他校同士の試合の解決に乱数が要る */
+const rng = createRng(1)
 import { createInitialRoster } from '@/core/player/createPlayer'
 import { createTournament, applyRoundResult } from '@/core/tournament/tournament'
 import { findRegion } from '@/core/types/region'
@@ -23,7 +26,7 @@ describe('部費の収入', () => {
     const prizes: number[] = []
 
     for (let i = 0; i < t.totalRounds; i++) {
-      t = applyRoundResult(t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
+      t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
       prizes.push(tournamentPrize(t))
     }
     for (let i = 1; i < prizes.length; i++) {
@@ -32,7 +35,7 @@ describe('部費の収入', () => {
   })
 
   it('負けても賞金はマイナスにならない', () => {
-    const t = applyRoundResult(createTournament('summerPref', TOTTORI), {
+    const t = applyRoundResult(rng, createTournament('summerPref', TOTTORI), {
       opponentName: 'X',
       scoreFor: 0,
       scoreAgainst: 9,
@@ -45,7 +48,7 @@ describe('部費の収入', () => {
     const champion = (kind: 'summerPref' | 'nationals') => {
       let t = createTournament(kind, TOTTORI)
       for (let i = 0; i < t.totalRounds; i++) {
-        t = applyRoundResult(t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
+        t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
       }
       return tournamentPrize(t)
     }

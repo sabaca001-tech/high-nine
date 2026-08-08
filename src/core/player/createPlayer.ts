@@ -4,7 +4,8 @@ import type { Rng } from '@/core/rng/random'
 import { createAptitudes } from '@/core/lineup/aptitude'
 import { rollInitialPitches } from './pitchDefs'
 import { snapshotOf } from '@/core/types/player'
-import { armFromVelocity } from './growth'
+import { armFromVelocity, ARM_SPREAD } from './growth'
+import { pitchingRating } from './rating'
 import { emptyCareerStats } from './careerStats'
 import type {
   Grade,
@@ -160,6 +161,13 @@ const ABILITY_SPREAD = 10
  */
 const PITCHER_RATE = 0.18
 
+/**
+ * 投手の野手能力の下限。投手としての総合に対する割合。
+ * 0.55 なら、投手総合60の投手の打撃・守備は33〜60に散らばる。
+ * 下げすぎると打席が完全な穴になるので、幅は残してある。
+ */
+const PITCHER_FIELDING_FLOOR = 0.55
+
 export type CreatePlayerOptions = {
   id: string
   grade: Grade
@@ -207,6 +215,31 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const position: Position = isPitcher ? 'P' : rng.pick(FIELDER_POSITIONS)
   const breaking = ability()
 
+  // **投手能力を先に決める。** 野手能力の上限に使うため
+  const pitching = isPitcher
+    ? {
+        velocity: velocityFor(rng, base, grade),
+        control: ability(),
+        stamina: ability(),
+        breaking,
+        pitches: rollInitialPitches(rng, breaking),
+      }
+    : null
+
+  /**
+   * 投手の野手能力。**自分の投手としての総合を超えない範囲で振る。**
+   *
+   * 以前は野手と同じ `ability()` で振っていたので、素質の高い投手は
+   * 打撃・守備・走塁まで軒並み高く出ていた。
+   * 自動編成が「打てるから」と別のポジションへ回したり、
+   * 打線の中軸に据えたりして、**投手を投手として扱えなくなっていた**。
+   */
+  const fielderAbility = (): number => {
+    if (!pitching) return ability()
+    const cap = pitchingRating(pitching)
+    return clampAbility(rng.int(Math.max(1, Math.round(cap * PITCHER_FIELDING_FLOOR)), cap))
+  }
+
   const player: Player = {
     id,
     name,
@@ -215,24 +248,15 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     isPitcher,
     batting: {
       trajectory: rollTrajectory(rng),
-      // 投手の打撃はやや低めにする
-      meet: isPitcher ? clampAbility(ability() - 12) : ability(),
-      power: isPitcher ? clampAbility(ability() - 12) : ability(),
-      speed: ability(),
+      meet: fielderAbility(),
+      power: fielderAbility(),
+      speed: fielderAbility(),
       // 投手の肩力は球速から導く（下で上書きする）
-      arm: ability(),
-      fielding: ability(),
-      catching: ability(),
+      arm: fielderAbility(),
+      fielding: fielderAbility(),
+      catching: fielderAbility(),
     },
-    pitching: isPitcher
-      ? {
-          velocity: velocityFor(rng, base, grade),
-          control: ability(),
-          stamina: ability(),
-          breaking,
-          pitches: rollInitialPitches(rng, breaking),
-        }
-      : null,
+    pitching,
     motivation: rollMotivation(rng),
     trust: 20 + rng.int(0, 20),
     condition: 70 + rng.int(0, 30),
@@ -246,9 +270,11 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     u18: [],
   }
 
-  // 投手の肩力は球速に比例させる。速い球を投げる腕が送球だけ弱いのは不自然
+  // 投手の肩力は球速に連動させる。速い球を投げる腕が送球だけ弱いのは不自然。
+  // ただし一致はさせない（`ARM_SPREAD` ぶんの個体差を乗せる）
   if (player.pitching) {
-    player.batting = { ...player.batting, arm: armFromVelocity(player.pitching.velocity) }
+    const arm = armFromVelocity(player.pitching.velocity) + rng.int(-ARM_SPREAD, ARM_SPREAD)
+    player.batting = { ...player.batting, arm: clampAbility(arm) }
   }
 
   // 入学時点を推移の起点として残す

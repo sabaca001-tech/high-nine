@@ -1,0 +1,128 @@
+.wrap {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+
+/* 回戦のタブ。回戦数は最大8なので横スクロールで収める */
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 16px;
+  background: var(--bg-base);
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.tab:disabled {
+  opacity: 0.35;
+}
+
+.tabActive {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── 対戦カード ───────────────────────────── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 1fr 14px 1fr;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: var(--bg-base);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+  overflow-wrap: anywhere;
+}
+
+.winner {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.ours {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.vs {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+/* ── 勝ち残り一覧 ─────────────────────────── */
+.count {
+  margin: 4px 0 6px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 3px 7px;
+  border-radius: 12px;
+  background: var(--bg-base);
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+}
+
+.chipOurs {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+}
+
+.more {
+  padding: 3px 7px;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.strength {
+  font-size: var(--fs-xs);
+  color: inherit;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 6px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--accent);
+}

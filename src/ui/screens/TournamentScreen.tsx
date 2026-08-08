@@ -4,6 +4,8 @@ import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { formatFunds } from '@/core/shop/funds'
 import { tournamentTravel } from '@/core/shop/travel'
 import { useGameStore } from '@/state/useGameStore'
+import { BracketView } from '@/ui/components/BracketView'
+import { championOf, opponentAt } from '@/core/tournament/bracket'
 import styles from './TournamentScreen.module.css'
 
 /**
@@ -21,6 +23,7 @@ export function TournamentScreen() {
 
   const over = isTournamentOver(tournament)
   const currentRoundName = roundName(tournament.round, tournament.totalRounds)
+  const champion = championOf(tournament.bracket)
 
   // ここまでの遠征費。大会が終わったときに部費から引かれる
   const travel = tournamentTravel(
@@ -84,17 +87,18 @@ export function TournamentScreen() {
         )}
 
         {/*
-          トーナメント表。**まだ戦っていない回戦も並べる。**
+          自分の道のり。**まだ戦っていない回戦も並べる。**
           勝ち上がった記録だけを出していた頃は、
           「あと何回勝てば優勝なのか」「次は準決勝なのか」が
           開幕時点では読めなかった。
-          相手はその回戦に進んでから決まるので、先の欄は伏せてある。
+          **先の相手はまだ決まっていない。** 隣の山を勝ち上がってきた
+          学校が相手になるので、次の回戦ぶんだけが埋まる。
         */}
         <div className={styles.ladder}>
           {Array.from({ length: tournament.totalRounds }, (_, index) => {
             const round = index + 1
             const entry = tournament.results.find((result) => result.round === round)
-            const drawn = tournament.draw[index]
+            const drawn = round === tournament.round ? opponentAt(tournament.bracket, round) : null
             const isNext = !over && round === tournament.round
 
             const classNames = [styles.rung]
@@ -109,8 +113,8 @@ export function TournamentScreen() {
                 <span className={styles.opponent}>
                   {entry?.opponentName ?? drawn?.name ?? '—'}
                   {/*
-                    **抽選は開幕時に済んでいる。** 1回戦から優勝候補と当たることもあるので、
-                    どの山に入ったのかがここで分かるようにする
+                    次の相手は勝ち上がりで決まる。1回戦から優勝候補と当たることもあるので、
+                    どんな相手なのかがここで分かるようにする
                   */}
                   {!entry && drawn && (
                     <span className={styles.matchup}>
@@ -125,6 +129,17 @@ export function TournamentScreen() {
             )
           })}
         </div>
+
+        {/* トーナメント表。他校の勝ち上がりもここで追える */}
+        <BracketView
+          bracket={tournament.bracket}
+          totalRounds={tournament.totalRounds}
+          currentRound={Math.min(tournament.round, tournament.totalRounds)}
+        />
+
+        {over && !tournament.champion && champion && (
+          <p className={styles.note}>この大会は{champion.name}が制した</p>
+        )}
       </div>
 
       <div className={styles.controls}>

@@ -8,7 +8,14 @@
 import type { Rng } from '@/core/rng/random'
 import type { PracticeDef, PracticeGain } from '@/core/card/cardDefs'
 import { RARE_MULTIPLIER } from '@/core/card/cardDefs'
-import type { AbilityChange, GrowableKey, Grade, Motivation, Player } from '@/core/types/player'
+import type {
+  AbilityChange,
+  GrowableKey,
+  Grade,
+  Motivation,
+  Player,
+  Trajectory,
+} from '@/core/types/player'
 import {
   ABILITY_MAX,
   ABILITY_MIN,
@@ -25,13 +32,42 @@ import { focusMultiplier } from './trainingFocus'
 const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
 
 /**
- * 投手の肩力は球速に比例させる。
+ * 球速から決まる肩力の**目安**。
  *
  * 速い球を投げる腕が、送球だけ弱いということは無い。
- * 球速が伸びたら肩力も一緒に上がるので、**投手の肩力は独立して育てない**。
+ * ただし**ぴったり一致させるのはやり過ぎだった**。
+ * 以前は `velocityScore + 5` で、
+ *  - 140km/h の投手が肩力76、148km/h なら99
+ *  - つまり少し速いだけで全投手が肩力S
+ *  - そのうえ全員が同じ式なので、球速が同じなら**肩力も1ポイント違わない**
+ * という状態になっていた。送球（塁への矢）と投球（打者への球速）は
+ * 使う動きが違うので、連動はさせつつ幅は圧縮し、
+ * **選手ごとの個体差（`ARM_SPREAD`）を上に乗せる**形にした。
+ *
+ * 125km/h で58・135km/h で71・142km/h で80・148km/h で87 が目安。
  */
 export function armFromVelocity(velocity: number): number {
-  return Math.round(Math.min(ABILITY_MAX, Math.max(ABILITY_MIN, velocityScore(velocity) + 5)))
+  return Math.round(
+    Math.min(ABILITY_MAX, Math.max(ABILITY_MIN, ARM_BASE + velocityScore(velocity) * ARM_RATE)),
+  )
+}
+
+const ARM_BASE = 45
+const ARM_RATE = 0.45
+
+/** 生成時に肩力へ乗せる個体差（±）。「球速の割に肩が強い／弱い」を作る */
+export const ARM_SPREAD = 8
+
+/**
+ * 球速が動いたときに肩力を追従させる。
+ *
+ * **目安に置き換えるのではなく、目安の差分だけ動かす。**
+ * 置き換えると、生成時に持たせた個体差（`ARM_SPREAD`）が
+ * 最初の1km/hで消えてしまう。
+ */
+export function armAfterVelocityChange(arm: number, before: number, after: number): number {
+  const delta = armFromVelocity(after) - armFromVelocity(before)
+  return Math.min(ABILITY_MAX, Math.max(ABILITY_MIN, arm + delta))
 }
 
 /**
@@ -408,7 +444,10 @@ export function raiseAbility(
       player: {
         ...player,
         pitching: { ...player.pitching!, velocity: after },
-        batting: { ...player.batting, arm: armFromVelocity(after) },
+        batting: {
+          ...player.batting,
+          arm: armAfterVelocityChange(player.batting.arm, before, after),
+        },
       },
       change: { playerId: player.id, key, before, after },
     }
@@ -430,6 +469,31 @@ export function raiseAbility(
     change,
   }
 }
+
+/**
+ * 弾道を上下させる。
+ *
+ * **練習では動かない。** 弾道はスイングの軌道そのもので、
+ * 日々の積み重ねで1ずつ増えていく類の値ではない。
+ * 動くのは打撃フォームを作り直したとき（イベント）だけにしてある。
+ * 1〜4の4段階しかないので、1段の重みが他の能力とまるで違う。
+ */
+export function raiseTrajectory(
+  player: Player,
+  delta: number,
+): { player: Player; change: AbilityChange | null } {
+  const before = player.batting.trajectory
+  const after = clamp(before + delta, TRAJECTORY_MIN, TRAJECTORY_MAX) as Trajectory
+  if (after === before) return { player, change: null }
+
+  return {
+    player: { ...player, batting: { ...player.batting, trajectory: after } },
+    change: { playerId: player.id, key: 'trajectory', before, after },
+  }
+}
+
+export const TRAJECTORY_MIN = 1
+export const TRAJECTORY_MAX = 4
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))

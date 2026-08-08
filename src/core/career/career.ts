@@ -6,8 +6,8 @@
  */
 
 import type { Rng } from '@/core/rng/random'
-import type { Alumnus, CareerPath, ProSeason } from '@/core/types/career'
-import { isCareerActive, isInHallOfFame } from '@/core/types/career'
+import type { Alumnus, CareerEntry, CareerPath, CareerStatus, ProSeason } from '@/core/types/career'
+import { ageAt, isCareerActive, isInHallOfFame } from '@/core/types/career'
 
 /** プロ球団名（実在球団を想起させない独自の名称） */
 const PRO_TEAMS = [
@@ -157,6 +157,8 @@ export function createAlumnus(
     highSchool: import('@/core/player/careerStats').CareerStats
     /** U18代表の実績による上乗せ */
     u18Bonus?: number
+    /** 卒業時の各能力。名鑑で「何が武器だったか」を見せる */
+    finalAbilities?: import('@/core/types/player').AbilitySnapshot
   },
   reputation: number,
 ): Alumnus {
@@ -166,30 +168,54 @@ export function createAlumnus(
   // 高校からそのままプロへ行く選手は、この時点でプロの物差しに置き換わる
   const ability = path === 'pro' ? toProAbility(rng, base.rating).ability : base.rating
 
+  const status: CareerStatus =
+    path === 'pro' ? 'pro' : path === 'college' ? 'college' : path === 'corporate' ? 'corporate' : 'retired'
+  const team =
+    path === 'pro'
+      ? rng.pick(PRO_TEAMS)
+      : path === 'college'
+        ? rng.pick(COLLEGES)
+        : path === 'corporate'
+          ? rng.pick(CORPORATE_TEAMS)
+          : null
+
   return {
     ...record,
     path,
-    status:
-      path === 'pro'
-        ? 'pro'
-        : path === 'college'
-          ? 'college'
-          : path === 'corporate'
-            ? 'corporate'
-            : 'retired',
+    status,
     ability,
-    team:
-      path === 'pro'
-        ? rng.pick(PRO_TEAMS)
-        : path === 'college'
-          ? rng.pick(COLLEGES)
-          : path === 'corporate'
-            ? rng.pick(CORPORATE_TEAMS)
-            : null,
+    team,
     collegeYears: path === 'college' ? 1 : 0,
     proSeasons: [],
     note: path === 'none' ? '高校で競技を終えた' : null,
+    careerLog: [
+      entryOf(base.year, base.year, status, team, ability, graduationText(path, team)),
+    ],
   }
+}
+
+/** 経歴の1行を作る */
+function entryOf(
+  graduatedYear: number,
+  year: number,
+  status: CareerStatus,
+  team: string | null,
+  ability: number,
+  text: string,
+): CareerEntry {
+  return { year, age: ageAt(graduatedYear, year), status, team, ability, text }
+}
+
+/** 経歴に1行足した記録を返す */
+function withEntry(alumnus: Alumnus, year: number, status: CareerStatus, team: string | null, ability: number, text: string): CareerEntry[] {
+  return [...(alumnus.careerLog ?? []), entryOf(alumnus.year, year, status, team, ability, text)]
+}
+
+function graduationText(path: CareerPath, team: string | null): string {
+  if (path === 'pro') return `高校卒業後、${team}にドラフト指名され入団`
+  if (path === 'college') return `${team}へ進学`
+  if (path === 'corporate') return `${team}へ入社`
+  return '高校で競技を終えた'
 }
 
 /**
@@ -227,19 +253,19 @@ export function advanceCareer(rng: Rng, alumnus: Alumnus, year: number): CareerU
 
   switch (alumnus.status) {
     case 'college':
-      return advanceCollege(rng, alumnus)
+      return advanceCollege(rng, alumnus, year)
     case 'pro':
     case 'mlb':
       return advancePro(rng, alumnus, year)
     case 'corporate':
-      return advanceCorporate(rng, alumnus)
+      return advanceCorporate(rng, alumnus, year)
     default:
       return { alumnus, news: null }
   }
 }
 
 /** 大学。4年で卒業し、そこでの実力で進路が分かれる */
-function advanceCollege(rng: Rng, alumnus: Alumnus): CareerUpdate {
+function advanceCollege(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
   // 大学の4年間はまだ伸びる時期。ただし伸び幅には個人差がある
   const ability = clamp(alumnus.ability + rng.int(-3, 9))
   const years = alumnus.collegeYears + 1
@@ -261,6 +287,7 @@ function advanceCollege(rng: Rng, alumnus: Alumnus): CareerUpdate {
         collegeYears: COLLEGE_LENGTH,
         status: 'pro',
         team,
+        careerLog: withEntry(alumnus, year, 'pro', team, pro.ability, `${team}にドラフト指名され入団`),
       },
       news: `${alumnus.name}が大学を経て${team}に入団した${
         pro.adapted ? '。プロの水にすぐ慣れそうだ' : ''
@@ -276,6 +303,7 @@ function advanceCollege(rng: Rng, alumnus: Alumnus): CareerUpdate {
         collegeYears: COLLEGE_LENGTH,
         status: 'corporate',
         team,
+        careerLog: withEntry(alumnus, year, 'corporate', team, ability, `大学卒業後、${team}へ`),
       },
       news: `${alumnus.name}が大学卒業後、${team}に進んだ`,
     }
@@ -288,6 +316,7 @@ function advanceCollege(rng: Rng, alumnus: Alumnus): CareerUpdate {
       status: 'retired',
       team: null,
       note: '大学卒業とともに競技を終えた',
+      careerLog: withEntry(alumnus, year, 'retired', null, ability, '大学卒業とともに競技を終えた'),
     },
     news: null,
   }
@@ -316,7 +345,12 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
   ) {
     const team = rng.pick(OVERSEAS_TEAMS)
     return {
-      alumnus: { ...updated, status: 'mlb', team },
+      alumnus: {
+        ...updated,
+        status: 'mlb',
+        team,
+        careerLog: withEntry(alumnus, year, 'mlb', team, ability, `海外リーグの${team}へ移籍`),
+      },
       news: `${alumnus.name}が海外リーグの${team}へ移籍！`,
     }
   }
@@ -332,6 +366,7 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
           status: 'corporate',
           team,
           note: '戦力外通告を受け、社会人でプレーを続けた',
+          careerLog: withEntry(alumnus, year, 'corporate', team, ability, `戦力外通告。${team}で現役を続ける`),
         },
         news: `${alumnus.name}が戦力外に。${team}で現役を続ける`,
       }
@@ -342,6 +377,7 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
         status: 'retired',
         team: null,
         note: `プロ${years}年で引退`,
+        careerLog: withEntry(alumnus, year, 'retired', null, ability, `プロ${years}年で引退`),
       },
       news: `${alumnus.name}が現役を引退した（プロ${years}年）`,
     }
@@ -355,16 +391,65 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
         status: 'retired',
         team: null,
         note: `プロ${years}年で現役を退いた`,
+        careerLog: withEntry(alumnus, year, 'retired', null, ability, `プロ${years}年で現役を退いた`),
       },
       news: `${alumnus.name}が現役を引退した（プロ${years}年）`,
+    }
+  }
+
+  // 移籍。**同じ球団で引退まで、ばかりでは経歴が動かない。**
+  // 実力があればFAで、無ければトレードで動く。国内のプロだけが対象
+  const transfer = transferFor(rng, updated, years)
+  if (transfer) {
+    return {
+      alumnus: {
+        ...updated,
+        team: transfer.team,
+        careerLog: withEntry(alumnus, year, updated.status, transfer.team, ability, transfer.text),
+      },
+      news: `${alumnus.name}が${transfer.team}へ移籍した（${transfer.kind}）`,
     }
   }
 
   return { alumnus: updated, news: null }
 }
 
+/**
+ * 移籍するか。しないなら null。
+ *
+ * FAは実力のある選手が9年目以降に、トレードは伸び悩んだ選手が中堅で動く。
+ * どちらも**移籍先は今と違う球団**にする。
+ */
+function transferFor(
+  rng: Rng,
+  alumnus: Alumnus,
+  years: number,
+): { team: string; kind: string; text: string } | null {
+  if (alumnus.status !== 'pro') return null
+
+  const fa = years >= FA_YEARS && alumnus.ability >= FA_ABILITY && rng.chance(FA_CHANCE)
+  const trade = !fa && years >= 3 && alumnus.ability < FA_ABILITY && rng.chance(TRADE_CHANCE)
+  if (!fa && !trade) return null
+
+  const others = PRO_TEAMS.filter((team) => team !== alumnus.team)
+  if (others.length === 0) return null
+  const team = rng.pick(others)
+
+  return fa
+    ? { team, kind: 'FA', text: `FA権を行使し${team}へ移籍` }
+    : { team, kind: 'トレード', text: `トレードで${team}へ移籍` }
+}
+
+/** FAで動ける年数と、声がかかる実力 */
+const FA_YEARS = 8
+const FA_ABILITY = 42
+const FA_CHANCE = 0.18
+
+/** 伸び悩んだ選手のトレード */
+const TRADE_CHANCE = 0.07
+
 /** 社会人。数年で競技を離れる */
-function advanceCorporate(rng: Rng, alumnus: Alumnus): CareerUpdate {
+function advanceCorporate(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
   const ability = clamp(alumnus.ability + rng.int(-5, 3))
 
   if (ability < 40 || rng.chance(0.2)) {
@@ -375,6 +460,7 @@ function advanceCorporate(rng: Rng, alumnus: Alumnus): CareerUpdate {
         status: 'retired',
         team: null,
         note: '社会人でプレーを終えた',
+        careerLog: withEntry(alumnus, year, 'retired', null, ability, '社会人でプレーを終えた'),
       },
       news: null,
     }

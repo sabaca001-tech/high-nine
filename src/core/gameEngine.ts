@@ -119,10 +119,11 @@ import { findEquipment, unlockedKinds } from '@/core/shop/equipmentDefs'
 import {
   applyRoundResult,
   createTournament,
-  drawTournament,
   opponentStrengthFor,
   reputationGain,
 } from '@/core/tournament/tournament'
+import { createBracket, opponentAt } from '@/core/tournament/bracket'
+import type { Bracket, BracketTeam } from '@/core/tournament/bracket'
 import { applyTournamentGrowth } from '@/core/tournament/tournamentGrowth'
 import { findSkill } from '@/core/skill/skillDefs'
 import { PRACTICE_LABELS } from '@/core/types/card'
@@ -136,17 +137,15 @@ import type { PendingGrowth } from '@/core/types/game'
 import type { Lineup } from '@/core/types/lineup'
 import type { BoardCell, CellKind } from '@/core/types/board'
 import { applyReputation, handSizeFor, REPUTATION_INITIAL } from '@/core/types/season'
-import { DEFAULT_REGION_ID, findRegion } from '@/core/types/region'
+import { DEFAULT_REGION_ID, findRegion, REGIONS } from '@/core/types/region'
+import { makeSchoolName } from '@/core/rival/rivalDefs'
 import { DEFAULT_UNIFORM, normalizeUniform } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
 import type { RegionId } from '@/core/types/region'
 import { isTournamentOver, roundName } from '@/core/types/tournament'
-import type {
-  Tournament,
-  TournamentDrawEntry,
-  TournamentKind,
-} from '@/core/types/tournament'
+import type { Tournament, TournamentKind } from '@/core/types/tournament'
 import { createAlumnus, trimGraduates } from '@/core/career/career'
+import { GRADUATION_MONTH } from '@/core/types/career'
 import { overallRating } from '@/core/player/rating'
 import { draftBonus } from '@/core/player/u18'
 
@@ -678,9 +677,9 @@ function playTournamentMatch(state: GameState): EngineResult {
 
   const rng = createRng(state.rngState)
 
-  // **相手は開幕時の抽選で決まっている。** 回戦ごとに引き直すと、
-  // 同じ学校が2回出てきたり、先の相手が読めなかったりする
-  const entry = tournament.draw[tournament.round - 1]
+  // **相手は勝ち上がりで決まる。** 開幕時に決まっているのは組み合わせだけで、
+  // 隣の山を勝ち抜いてきた学校がそのまま次の相手になる
+  const entry = opponentAt(tournament.bracket, tournament.round)
   const rival = entry?.schoolId
     ? (state.rivals.find((school) => school.id === entry.schoolId) ?? null)
     : null
@@ -992,6 +991,8 @@ function retireThirdYears(
         skills: [...player.skills],
         highSchool: player.stats,
         u18Bonus: draftBonus(player.u18),
+        // 卒業時の各能力。総合だけでは何が武器だったのか分からない
+        finalAbilities: snapshotOf(player, state.year, GRADUATION_MONTH),
       },
       state.reputation,
     ),
@@ -1214,7 +1215,7 @@ function finishMatch(state: GameState): EngineResult {
 
   // 大会の試合だった場合は、勝敗を大会に反映する
   if (state.tournament) {
-    const tournament = applyRoundResult(state.tournament, {
+    const tournament = applyRoundResult(rng, state.tournament, {
       opponentName: match.opponentName,
       scoreFor: match.finalScore.player,
       scoreAgainst: match.finalScore.opponent,
@@ -1472,31 +1473,69 @@ function isLocalTournament(kind: TournamentKind): boolean {
 /**
  * 大会の山を引く。
  *
- * **1回戦は完全な抽選**なので、運が悪ければ初戦から優勝候補と当たる。
- * 回戦が進むほど強い学校が残りやすくなるだけで、
+ * **1回戦の組み合わせは完全な抽選**なので、運が悪ければ初戦から優勝候補と当たる。
  * 難易度を回戦ごとに決め打ちしてはいない。
+ *
+ * 県大会は**県内の学校をそのまま並べる**（全校を持っている）。
+ * 全国大会は各県の代表が集まる場なので、
+ * 持っている県外20校に、その大会限りの代表校を足して埋める。
  */
-function drawFor(rng: Rng, state: GameState, kind: TournamentKind): TournamentDrawEntry[] {
+function bracketFor(rng: Rng, state: GameState, kind: TournamentKind): Bracket {
   const region = findRegion(state.regionId)
-  const pool = isLocalTournament(kind)
+  const base = createTournament(kind, region)
+
+  const schools = isLocalTournament(kind)
     ? localRivals(state.rivals, state.regionId)
     : nationalRivals(state.rivals, state.regionId)
 
-  const totalRounds = createTournament(kind, region).totalRounds
+  const pool: BracketTeam[] = schools.map((school) => ({
+    schoolId: school.id,
+    name: school.name,
+    strength: school.strength,
+  }))
 
-  return drawTournament(
-    rng,
-    pool.map((school) => ({ id: school.id, name: school.name, strength: school.strength })),
-    totalRounds,
-    // 学校が足りない県だけ、従来の難易度曲線で使い捨ての相手を作る
-    (round) => ({
-      name: pickOpponentName(rng),
-      strength: opponentStrengthFor(
-        { ...createTournament(kind, region), round },
-        region,
-      ),
-    }),
+  // 学校が足りないぶんは、その大会限りの相手で埋める。
+  // 全国大会は49校ぶんの代表が要るので、ここが主に効く。
+  // **名前は `makeSchoolName` で作る。** 固定の一覧から重複しない名前を
+  // 引き続けようとすると、一覧を使い切った時点で止まらなくなる
+  const takenNames = pool.map((team) => team.name)
+  const range = opponentRangeFor(kind, region)
+
+  // 全国大会の相手は各県の代表。まだ代表が居ない県から順に割り当てる
+  const usedRegions = new Set([state.regionId, ...schools.map((school) => school.regionId)])
+  const spare = REGIONS.filter((r) => !usedRegions.has(r.id))
+
+  while (pool.length < base.entrants - 1) {
+    const from = isLocalTournament(kind)
+      ? region.id
+      : (spare[(pool.length - schools.length) % Math.max(1, spare.length)]?.id ?? region.id)
+    const name = makeSchoolName(rng, takenNames, from)
+    takenNames.push(name)
+    pool.push({ name, strength: rng.int(range.from, range.to) })
+  }
+
+  return createBracket(rng, {
+    totalRounds: base.totalRounds,
+    ours: { name: state.schoolName, strength: 0 },
+    pool,
+    entrants: base.entrants,
+  })
+}
+
+/**
+ * その大会限りの相手の強さの幅。
+ * 実在の学校（`rivals`）と釣り合う水準に置く。
+ */
+function opponentRangeFor(
+  kind: TournamentKind,
+  region: ReturnType<typeof findRegion>,
+): { from: number; to: number } {
+  const first = opponentStrengthFor({ ...createTournament(kind, region), round: 1 }, region)
+  const last = opponentStrengthFor(
+    { ...createTournament(kind, region), round: createTournament(kind, region).totalRounds },
+    region,
   )
+  return { from: first, to: last }
 }
 
 /**
@@ -1678,7 +1717,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       tournament = createTournament(
         cell.tournamentKind,
         findRegion(state.regionId),
-        drawFor(rng, state, cell.tournamentKind),
+        bracketFor(rng, state, cell.tournamentKind),
       )
       events.push({
         type: 'message',

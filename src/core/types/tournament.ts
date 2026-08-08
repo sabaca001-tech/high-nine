@@ -1,5 +1,7 @@
 /** 大会の型定義 */
 
+import type { Bracket } from '@/core/tournament/bracket'
+
 /** 大会の種類 */
 export type TournamentKind =
   | 'summerPref' // 夏の地区大会。優勝すると夏の全国大会へ
@@ -38,23 +40,14 @@ export type Tournament = {
   champion: boolean
   results: TournamentRoundResult[]
   /**
-   * 抽選で決まった山。**開幕時に全回戦の相手が決まる。**
+   * トーナメント表。**参加校を全部並べたブラケット。**
    *
-   * トーナメントなので、運が悪ければ1回戦から優勝候補と当たる。
-   * 回戦ごとに難易度を決め打ちしていた頃は、
-   * 1回戦は必ず格下・決勝は必ず格上という筋書きになっていて、
-   * 抽選の妙という高校野球のいちばん面白いところが消えていた。
+   * 開幕時に決まるのは組み合わせだけで、**相手は勝ち上がりで決まる**。
+   * 以前は自校の相手を決勝まで並べていたので、
+   * 1回戦の時点で決勝の相手が確定していたし、
+   * 他校同士の試合が存在しないので「優勝候補が3回戦で消えた」も起きなかった。
    */
-  draw: TournamentDrawEntry[]
-}
-
-/** 抽選で決まった1回戦ぶんの相手 */
-export type TournamentDrawEntry = {
-  /** ライバル校のid。使い捨ての相手なら省略 */
-  schoolId?: string
-  name: string
-  /** 相手の強さ。0が互角 */
-  strength: number
+  bracket: Bracket
 }
 
 /** 大会が終わっているか（優勝か敗退） */

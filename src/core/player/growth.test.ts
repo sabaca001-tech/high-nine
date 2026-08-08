@@ -6,6 +6,7 @@ import {
   applyCardCost,
   applyPractice,
   armFromVelocity,
+  ARM_SPREAD,
   CARD_COST_SCALE,
   getAbility,
   raiseAbility,
@@ -492,13 +493,20 @@ describe('球速の成長', () => {
   })
 })
 
-describe('投手の肩力は球速に比例する', () => {
-  it('生成した時点で比例している', () => {
+describe('投手の肩力は球速に連動する', () => {
+  it('生成した時点で目安の周りに収まっている', () => {
+    // **ぴったり一致はさせない。** 一致させると球速が同じ投手の肩力が
+    // 1ポイントも違わなくなり、「球速の割に肩が強い」が作れない
     const roster = createInitialRoster(createRng(61))
+    let varied = false
+
     for (const player of roster) {
       if (!player.pitching) continue
-      expect(player.batting.arm).toBe(armFromVelocity(player.pitching.velocity))
+      const base = armFromVelocity(player.pitching.velocity)
+      expect(Math.abs(player.batting.arm - base)).toBeLessThanOrEqual(ARM_SPREAD)
+      if (player.batting.arm !== base) varied = true
     }
+    expect(varied).toBe(true)
   })
 
   it('球速が伸びると肩力も上がる', () => {
@@ -507,7 +515,15 @@ describe('投手の肩力は球速に比例する', () => {
 
     expect(after.pitching!.velocity).toBe(before.pitching!.velocity + 8)
     expect(after.batting.arm).toBeGreaterThan(before.batting.arm)
-    expect(after.batting.arm).toBe(armFromVelocity(after.pitching!.velocity))
+  })
+
+  it('球速が伸びても個体差は消えない', () => {
+    // 目安に置き換えていた頃は、最初の1km/hで生成時の個体差が消えていた
+    const before = makePitcher({ grade: 1 })
+    const gap = before.batting.arm - armFromVelocity(before.pitching!.velocity)
+    const { player: after } = raiseAbility(before, 'velocity', 8)
+
+    expect(after.batting.arm - armFromVelocity(after.pitching!.velocity)).toBe(gap)
   })
 
   it('投手は遠投で肩力が直接は伸びない（球速経由で上がる）', () => {

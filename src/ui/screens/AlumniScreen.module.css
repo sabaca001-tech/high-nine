@@ -179,3 +179,64 @@
   margin-left: 2px;
   color: var(--accent);
 }
+
+/* ── 経歴の年表 ───────────────────────────── */
+.blockTitle {
+  margin: 12px 0 6px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.timelineRow {
+  display: grid;
+  grid-template-columns: 40px 10px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: var(--fs-sm);
+}
+
+.timelineAge {
+  color: var(--text-sub);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.timelineDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.timelineText {
+  color: var(--text);
+}
+
+/* ── 卒業時の能力 ─────────────────────────── */
+.finalGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.final {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--bg-base);
+}
+
+.finalLabel {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.finalValue {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

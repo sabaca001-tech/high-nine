@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
-import { overallRating, toRank, trajectoryStars } from './rating'
+import { overallRating, toRank, trajectoryArrow } from './rating'
 
 describe('toRank', () => {
   it('境界値が正しくランク分けされる', () => {
@@ -24,10 +24,17 @@ describe('toRank', () => {
   })
 })
 
-describe('trajectoryStars', () => {
-  it('弾道を星4つで表す', () => {
-    expect(trajectoryStars(1)).toBe('★☆☆☆')
-    expect(trajectoryStars(4)).toBe('★★★★')
+describe('trajectoryArrow', () => {
+  it('弾道を矢印の向きで表す', () => {
+    // 星は「多いほど良い」に見えるが、弾道は高ければ良い値ではない
+    expect(trajectoryArrow(1)).toBe('↘')
+    expect(trajectoryArrow(2)).toBe('→')
+    expect(trajectoryArrow(3)).toBe('↗')
+    expect(trajectoryArrow(4)).toBe('↑')
+  })
+
+  it('範囲外でも落ちない', () => {
+    expect(trajectoryArrow(0)).toBe('→')
   })
 })
 

@@ -41,6 +41,7 @@ import {
 import { benchPlayers } from './match/teamState'
 import { localRivals, nationalRivals } from './rival/rivals'
 import { isTournamentOver } from './types/tournament'
+import { championOf, opponentAt } from './tournament/bracket'
 import { overallRating } from './player/rating'
 import { opponentRating, teamRating } from './season/matchReputation'
 import { findPlayerEvent } from './event/playerEvents'
@@ -297,8 +298,10 @@ describe('日単位の移動', () => {
     }
 
     let next = state
-    // 4/29 から 6月に入るまで（33日ぶん）。5枚ずつなので7手あれば足りる
-    for (let i = 0; i < 8; i++) {
+    // 4/29 から 6月に入るまで（33日ぶん）進める。
+    // **手数を決め打ちしない。** 補充された手札の数字は5とは限らないので、
+    // 「◯手で届くはず」と書くと編成を触るたびに落ちる
+    for (let i = 0; i < 20 && next.month < 6; i++) {
       next = stepCard(next)
     }
 
@@ -921,7 +924,7 @@ describe('大会', () => {
 
       // 相手がこちらより弱かった場合だけを見る
       const ourRating = teamRating(state.players, state.lineup)
-      const opponent = state.tournament!.draw[0]
+      const opponent = opponentAt(state.tournament!.bracket, 1)
       if (!opponent || opponentRating(opponent.strength) >= ourRating) continue
 
       const finished = applyCommand(played, { type: 'finishTournament' }).state
@@ -938,7 +941,7 @@ describe('大会', () => {
     for (let seed = 500; seed < 560; seed++) {
       const state = untilTournament(startedGame({ seed }))
       const ourRating = teamRating(state.players, state.lineup)
-      const opponent = state.tournament!.draw[0]
+      const opponent = opponentAt(state.tournament!.bracket, 1)
       if (opponent && opponentRating(opponent.strength) > ourRating + 4) toughOpener++
     }
     expect(toughOpener).toBeGreaterThan(0)
@@ -946,10 +949,45 @@ describe('大会', () => {
 
   it('同じ大会に同じ学校は二度出てこない', () => {
     for (let seed = 600; seed < 640; seed++) {
-      const draw = untilTournament(startedGame({ seed })).tournament!.draw
-      const named = draw.filter((entry) => entry.schoolId)
-      expect(new Set(named.map((entry) => entry.schoolId)).size).toBe(named.length)
+      const bracket = untilTournament(startedGame({ seed })).tournament!.bracket
+      const named = bracket.slots.filter((team) => team?.schoolId)
+      expect(new Set(named.map((team) => team!.schoolId)).size).toBe(named.length)
     }
+  })
+
+  it('トーナメント表に参加校が並んでいる', () => {
+    // **相手を決勝まで決め打ちするのをやめた。**
+    // 参加校を全部ブラケットに並べ、勝ち上がりで相手が決まる
+    const state = untilTournament(startedGame({ seed: 601 }))
+    const tournament = state.tournament!
+    const { bracket } = tournament
+
+    expect(bracket.slots).toHaveLength(2 ** tournament.totalRounds)
+    expect(bracket.slots.filter((team) => team !== null)).toHaveLength(tournament.entrants)
+    expect(bracket.slots.filter((team) => team?.ours)).toHaveLength(1)
+    // 1回戦の相手は決まっているが、2回戦の相手はまだ決まらない
+    expect(opponentAt(bracket, 1)).not.toBeNull()
+    expect(opponentAt(bracket, 2)).toBeNull()
+  })
+
+  it('自校が勝つと、他校同士の試合も同じ回戦ぶん解決される', () => {
+    for (let seed = 700; seed < 760; seed++) {
+      const state = untilTournament(startedGame({ seed }))
+      const played = playOutTournament(state)
+      const tournament = played.tournament!
+      if (tournament.results.length === 0) continue
+
+      // 戦った回戦ぶんは勝ち上がりが埋まっている
+      expect(tournament.bracket.winners.length).toBeGreaterThanOrEqual(
+        tournament.results.length,
+      )
+      // 敗退したら、そのあとの回戦まで消化して優勝校が決まる
+      if (tournament.eliminated) {
+        expect(championOf(tournament.bracket)).not.toBeNull()
+      }
+      return
+    }
+    throw new Error('大会を戦うシードが見つからない')
   })
 
   it('地区大会で優勝しないと全国大会は開かれない', () => {

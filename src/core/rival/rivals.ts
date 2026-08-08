@@ -18,7 +18,7 @@ import type { Rng } from '@/core/rng/random'
 import { pickName } from '@/core/player/createPlayer'
 import type { Grade } from '@/core/types/player'
 import type { RegionId } from '@/core/types/region'
-import { REGIONS } from '@/core/types/region'
+import { findRegion, REGIONS } from '@/core/types/region'
 import { makeSchoolName } from './rivalDefs'
 
 /** 他校の注目選手。名前と実力だけを持つ */
@@ -56,6 +56,15 @@ export type RivalSchool = {
   /** 注目選手。U18の選考とスカウトの進学先に使う */
   stars: RivalPlayer[]
   /**
+   * 注目選手を抱える学校か。
+   *
+   * **県内は全校を持つ（178校の県もある）**ので、
+   * 全部に注目選手を置くと名簿が注目選手だらけになるうえ、
+   * U18の選考基準もその数に引きずられる。
+   * 名の通った学校（`stars` を持つ学校）だけに立てる。
+   */
+  notable?: boolean
+  /**
    * 部員名簿を作るための種。**選手そのものは保存しない。**
    * 30校×15人を抱えるとセーブが膨らむので、
    * 同じ種から毎回同じ部員を作り直す（`rivalRoster`）。
@@ -82,7 +91,14 @@ export function emptyRivalRecord(): RivalRecord {
   return { wins: 0, losses: 0, draws: 0, last: null }
 }
 
-/** 1つの県に置くライバル校の数 */
+/**
+ * 1つの県に置く**注目校**の数。
+ *
+ * **県内の学校そのものは全校ぶん作る。**（`createRivals`）
+ * 10校しか無かった頃は、大会の対戦相手が10校の中から選ばれるだけで、
+ * トーナメント表を出そうにも「勝ち上がってきた学校」が存在しなかった。
+ * ここで決めるのは、注目選手（U18の選考基準・スカウトの進学先）を抱える校数。
+ */
 export const RIVALS_PER_REGION = 10
 
 /**
@@ -94,17 +110,23 @@ export const RIVALS_PER_REGION = 10
  */
 export const NATIONAL_RIVALS = 20
 
-/** 地力の分布。強豪1・中堅・弱小がまざるようにする */
-const TRADITION_MIN = -10
-const TRADITION_MAX = 22
-
 /**
- * 県内の名門校の地力。
- * **県外の全国クラス（8〜34）と重なる水準まで上げる。**
- * ここが低いと、育ったチームにとって県内が全部格下になる。
+ * 県内の学校の地力の分布。
+ *
+ * **格上が少なすぎた。** 県内10校のうち格上は実質2校で、
+ * 3年も育てれば県内が全部格下になっていた。
+ * 実際の県には甲子園常連が数校、それに続く強豪が十数校あり、
+ * その下に大多数が広がっている。**校数のピラミッドをそのまま作る。**
+ *
+ * 178校の県なら、常連5校・強豪12校・中堅上位27校が出てくる。
  */
-const LOCAL_ELITE_MIN = 24
-const LOCAL_ELITE_MAX = 33
+const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
+  { weight: 3, min: 28, max: 40 }, // 甲子園常連
+  { weight: 7, min: 18, max: 28 }, // 強豪
+  { weight: 15, min: 8, max: 18 }, // 中堅上位
+  { weight: 30, min: -2, max: 8 }, // 中堅
+  { weight: 45, min: -16, max: -2 }, // 下位
+]
 
 /**
  * 全国クラスの学校の地力。
@@ -138,7 +160,7 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
   const names: string[] = []
   const playerNames: string[] = []
 
-  const add = (id: string, regionId: RegionId, tradition: number) => {
+  const add = (id: string, regionId: RegionId, tradition: number, notable: boolean) => {
     // その県らしい地名を混ぜる。どこと戦っているのか実感が湧くように
     const name = makeSchoolName(rng, names, regionId)
     names.push(name)
@@ -149,36 +171,52 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
       tradition,
       strength: tradition + rng.int(-DRIFT, DRIFT),
       trend: 0,
-      stars: createStars(rng, id, tradition, playerNames),
+      ...(notable ? { notable: true } : {}),
+      stars: notable ? createStars(rng, id, tradition, playerNames) : [],
       rosterSeed: rng.int(1, 2_000_000_000),
       record: emptyRivalRecord(),
     })
   }
 
-  for (let i = 0; i < RIVALS_PER_REGION; i++) {
-    // **県内にも名門校を置く。**
-    // 1校だけ「16以上」にしていた頃は、県内の地力が最高16しかなく、
-    // 3年も育てれば県内の全校が格下になっていた（実測で7年目に格上0校）。
-    // 甲子園常連（地力34）が県外にしか居ないのでは、
-    // 「県内に倒すべき壁がある」という手応えが出ない
-    const tradition =
-      i === 0
-        ? rng.int(LOCAL_ELITE_MIN, LOCAL_ELITE_MAX)
-        : i === 1
-          ? rng.int(14, LOCAL_ELITE_MIN)
-          : rng.int(TRADITION_MIN, TRADITION_MAX - 6)
-    add(`rs${i + 1}`, homeRegionId, tradition)
-  }
+  /**
+   * 県内は**参加校ぶん全部**作る。
+   *
+   * 10校しか無かった頃は、大会の相手をその10校から引くしかなく、
+   * 「他の学校がどこまで勝ち上がったか」というトーナメント表そのものが
+   * 作れなかった。名簿は種から作り直すので、
+   * 1校あたりに保存するのは数値と名前だけで済む。
+   */
+  const localCount = findRegion(homeRegionId).schools
+
+  // 地力の高い順に並べて作る。先頭の RIVALS_PER_REGION 校が注目校になる
+  const traditions = Array.from({ length: localCount }, () => rollTradition(rng)).sort(
+    (a, b) => b - a,
+  )
+
+  traditions.forEach((tradition, index) => {
+    add(`rs${index + 1}`, homeRegionId, tradition, index < RIVALS_PER_REGION)
+  })
 
   // 県外の全国クラス。1県に1校までにして、全国に散らす
   const elsewhere = REGIONS.filter((region) => region.id !== homeRegionId)
   const picked = shuffle(rng, elsewhere).slice(0, NATIONAL_RIVALS)
 
   picked.forEach((region, index) => {
-    add(`rn${index + 1}`, region.id, rng.int(NATIONAL_TRADITION_MIN, NATIONAL_TRADITION_MAX))
+    add(
+      `rn${index + 1}`,
+      region.id,
+      rng.int(NATIONAL_TRADITION_MIN, NATIONAL_TRADITION_MAX),
+      true,
+    )
   })
 
   return schools
+}
+
+/** 校数のピラミッドから地力を1つ引く */
+function rollTradition(rng: Rng): number {
+  const tier = rng.weighted(TRADITION_TIERS.map((t) => ({ value: t, weight: t.weight })))
+  return rng.int(tier.min, tier.max)
 }
 
 /** 県内の学校。地区大会と地元の練習試合の相手 */
@@ -277,8 +315,9 @@ export function advanceRival(rng: Rng, school: RivalSchool, year: number): Rival
 
   // 抜けたぶんだけ新入生を迎える。
   // **スカウトで流れてきた選手が居る年は補充しない。**
-  // 補充まですると注目選手が毎年増え続ける
-  while (stars.length < STARS_PER_SCHOOL) {
+  // 補充まですると注目選手が毎年増え続ける。
+  // 注目校でない学校（県内の大多数）はそもそも注目選手を持たない
+  while (school.notable && stars.length < STARS_PER_SCHOOL) {
     stars.push(
       makeStar(rng, `${school.id}-${year}-${stars.length}`, 1, school.tradition, takenNames, year),
     )
@@ -289,8 +328,15 @@ export function advanceRival(rng: Rng, school: RivalSchool, year: number): Rival
   return { school: updated, news: newsFor(updated) }
 }
 
-/** はっきり動いた学校だけ報告する。全校ぶん出すと読めない */
+/**
+ * はっきり動いた学校だけ報告する。全校ぶん出すと読めない。
+ *
+ * **県内は全校ぶんあるので、注目校に絞る。**
+ * 178校を毎年見ていると、揺れ幅6以上の学校が数十校出てきて
+ * 世代交代の画面が他校の話で埋まる。
+ */
 function newsFor(school: RivalSchool): string | null {
+  if (!school.notable) return null
   if (school.trend >= 6) return `${school.name}が力をつけてきた`
   if (school.trend <= -6) return `${school.name}は主力が抜けて苦しそうだ`
   return null

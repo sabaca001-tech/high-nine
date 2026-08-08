@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import type { Alumnus } from '@/core/types/career'
 import {
+  ageAt,
   careerTotals,
   isCareerActive,
   isCareerPending,
@@ -459,5 +460,57 @@ describe('OB名鑑の対象', () => {
   it('上限を超えていなければそのまま返す', () => {
     const list = [pro(), college()]
     expect(trimGraduates(list, 10)).toBe(list)
+  })
+})
+
+describe('経歴と年齢', () => {
+  it('卒業した年が18歳', () => {
+    expect(ageAt(5, 5)).toBe(18)
+    expect(ageAt(5, 12)).toBe(25)
+  })
+
+  it('卒業時点で経歴が1行できる', () => {
+    const rng = createRng(3)
+    const alumnus = createAlumnus(rng, base(90), 60)
+    expect(alumnus.careerLog).toHaveLength(1)
+    expect(alumnus.careerLog![0].age).toBe(18)
+    expect(alumnus.careerLog![0].text).toBeTruthy()
+  })
+
+  it('プロで移籍すると経歴に残る', () => {
+    // **同じ球団で引退まで、ばかりでは経歴が動かない**
+    let transferred = 0
+    for (let seed = 1; seed <= 80; seed++) {
+      const rng = createRng(seed)
+      const drafted = createAlumnus(rng, base(95), 80)
+      if (drafted.path !== 'pro') continue
+      let alumnus: Alumnus = { ...drafted, status: 'pro', ability: 55 }
+
+      const teams = new Set<string | null>([alumnus.team])
+      for (let year = 0; year < 12 && alumnus.status === 'pro'; year++) {
+        alumnus = advanceCareer(rng, alumnus, 6 + year).alumnus
+        teams.add(alumnus.team)
+      }
+      if (teams.size > 1) transferred++
+    }
+    expect(transferred).toBeGreaterThan(0)
+  })
+
+  it('進路が変わるたびに経歴が積み上がる', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const rng = createRng(seed)
+      let alumnus = createAlumnus(rng, base(70), 40)
+      if (alumnus.path !== 'college') continue
+
+      for (let year = 0; year < 6; year++) {
+        alumnus = advanceCareer(rng, alumnus, 6 + year).alumnus
+      }
+      expect(alumnus.careerLog!.length).toBeGreaterThanOrEqual(2)
+      // 年齢は単調に増える
+      const ages = alumnus.careerLog!.map((entry) => entry.age)
+      expect([...ages].sort((a, b) => a - b)).toEqual(ages)
+      return
+    }
+    throw new Error('大学へ進むシードが見つからない')
   })
 })

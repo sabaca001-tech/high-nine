@@ -289,3 +289,16 @@
   line-height: 1.7;
   color: var(--text-sub);
 }
+
+/* 県内の学校は全校ぶんある。既定は上位だけ出して、続きはここで開く */
+.moreRivals {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}

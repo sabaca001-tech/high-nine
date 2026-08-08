@@ -77,7 +77,7 @@ import type { FriendlyOffer } from '@/core/match/friendlyOffers'
  *            titles（獲得タイトル）を追加。
  * v34 → v35: 大会に draw（開幕時の抽選で決まる山）を追加。
  */
-export const SAVE_VERSION = 35
+export const SAVE_VERSION = 36
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12

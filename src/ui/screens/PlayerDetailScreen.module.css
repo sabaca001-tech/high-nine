@@ -188,8 +188,20 @@
 }
 
 .trajectory {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--accent);
-  letter-spacing: 2px;
+  /* 矢印は1文字しかないので、向きが読める大きさまで上げる */
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.trajectoryName {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-sub);
 }
 
 .velocity {

@@ -9,12 +9,10 @@
 import type { Region } from '@/core/types/region'
 import { NATIONAL_ENTRANTS, regionStrength, roundsFor } from '@/core/types/region'
 import type { Rng } from '@/core/rng/random'
-import type {
-  Tournament,
-  TournamentDrawEntry,
-  TournamentKind,
-} from '@/core/types/tournament'
+import type { Tournament, TournamentKind } from '@/core/types/tournament'
 import { roundName, TOURNAMENT_LABELS } from '@/core/types/tournament'
+import type { Bracket } from './bracket'
+import { resolveRound } from './bracket'
 
 /** 秋季大会は夏より参加校が少ない（新チームで規模が小さい想定） */
 const AUTUMN_RATIO = 3
@@ -30,8 +28,8 @@ const SPRING_ENTRANTS = 32
 export function createTournament(
   kind: TournamentKind,
   region: Region,
-  /** 抽選に使う。省略すると相手が決まらないので、必ず渡すこと */
-  draw: TournamentDrawEntry[] = [],
+  /** トーナメント表。省略すると相手が決まらないので、必ず渡すこと */
+  bracket: Bracket = { slots: [], winners: [] },
 ): Tournament {
   const entrants = entrantsOf(kind, region)
   const totalRounds = roundsFor(entrants)
@@ -47,67 +45,9 @@ export function createTournament(
     eliminated: false,
     champion: false,
     results: [],
-    draw,
+    bracket,
   }
 }
-
-/**
- * 山を引く。**開幕時に全回戦の相手を決める。**
- *
- * 回戦ごとに「1回戦は格下・決勝は格上」と難易度を決め打ちしていた頃は、
- * どの大会も同じ筋書きになっていて、抽選の妙が無かった。
- *
- * ここでは**勝ち残る確率**で重みを付ける。
- * 1回戦は全校が同じ重み（＝完全な抽選）なので、**優勝候補と当たることもある**。
- * 回戦が進むほど強い学校の重みが増える。勝ち上がってきた相手なのだから当然で、
- * 難易度の上がり方は決め打ちではなく**そこから自然に出てくる**。
- *
- * 同じ学校は二度出てこない（トーナメントなので当たり前）。
- */
-export function drawTournament(
-  rng: Rng,
-  pool: { id: string; name: string; strength: number }[],
-  totalRounds: number,
-  /** 学校が足りないときに使う使い捨ての相手 */
-  fallback: (round: number) => TournamentDrawEntry,
-): TournamentDrawEntry[] {
-  const average =
-    pool.length > 0 ? pool.reduce((sum, s) => sum + s.strength, 0) / pool.length : 0
-
-  const remaining = [...pool]
-  const draw: TournamentDrawEntry[] = []
-
-  for (let round = 1; round <= totalRounds; round++) {
-    if (remaining.length === 0) {
-      draw.push(fallback(round))
-      continue
-    }
-
-    // 1回戦は重み1（完全な抽選）。回戦が進むほど強い学校が残りやすい
-    const weights = remaining.map((school) => ({
-      value: school,
-      weight: Math.pow(
-        Math.max(SURVIVAL_FLOOR, 1 + (school.strength - average) * SURVIVAL_RATE),
-        round - 1,
-      ),
-    }))
-
-    const picked = rng.weighted(weights)
-    remaining.splice(remaining.indexOf(picked), 1)
-    draw.push({ schoolId: picked.id, name: picked.name, strength: picked.strength })
-  }
-
-  return draw
-}
-
-/**
- * 勝ち残りやすさ。平均より1点強いと1回戦ぶんの生存率が5%上がる。
- * 6回戦制なら、平均+20の学校は決勝で32倍出やすくなる。
- */
-const SURVIVAL_RATE = 0.05
-
-/** どれだけ弱くても勝ち上がる目はある */
-const SURVIVAL_FLOOR = 0.2
 
 function entrantsOf(kind: TournamentKind, region: Region): number {
   if (kind === 'nationals') return NATIONAL_ENTRANTS
@@ -149,8 +89,15 @@ const OPPONENT_RANGE: Record<TournamentKind, { from: number; to: number }> = {
   springNationals: { from: 10, to: 32 },
 }
 
-/** 1試合ぶんの結果を反映した新しい大会状態を返す */
+/**
+ * 1試合ぶんの結果を反映した新しい大会状態を返す。
+ *
+ * **同じ回戦の他校同士の試合もここで解決する。**
+ * 自校の次の相手は、隣の山を勝ち上がってきた学校になる。
+ * 自校が負けた回戦も解決しておく（そのあと誰が優勝したかを見せるため）。
+ */
 export function applyRoundResult(
+  rng: Rng,
   tournament: Tournament,
   result: { opponentName: string; scoreFor: number; scoreAgainst: number; won: boolean },
 ): Tournament {
@@ -161,18 +108,30 @@ export function applyRoundResult(
   }
 
   const results = [...tournament.results, entry]
+  const bracket = resolveRound(rng, tournament.bracket, tournament.round, result.won)
 
   if (!result.won) {
-    return { ...tournament, results, eliminated: true }
+    // 自校が消えたあとも大会は続く。優勝校まで一気に決めてしまう
+    return { ...tournament, results, bracket: runOut(rng, bracket, tournament), eliminated: true }
   }
 
   const isFinal = tournament.round >= tournament.totalRounds
   return {
     ...tournament,
     results,
+    bracket,
     champion: isFinal,
     round: isFinal ? tournament.round : tournament.round + 1,
   }
+}
+
+/** 残りの回戦を他校同士で消化する。自校が敗退したあとに使う */
+function runOut(rng: Rng, bracket: Bracket, tournament: Tournament): Bracket {
+  let next = bracket
+  for (let round = bracket.winners.length + 1; round <= tournament.totalRounds; round++) {
+    next = resolveRound(rng, next, round, false)
+  }
+  return next
 }
 
 /**

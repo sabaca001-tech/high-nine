@@ -3,7 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
 import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
-import { overallRating, toRank, trajectoryStars } from '@/core/player/rating'
+import { overallRating, toRank, trajectoryArrow } from '@/core/player/rating'
 import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
 import { skillsOf } from '@/core/skill/skillEffects'
 import {
@@ -488,7 +488,7 @@ function AbilityPanel({ player }: { player: Player }) {
       ) : (
         <Row
           label={ABILITY_LABELS.trajectory}
-          value={trajectoryStars(player.batting.trajectory)}
+          value={trajectoryArrow(player.batting.trajectory)}
         />
       )}
 

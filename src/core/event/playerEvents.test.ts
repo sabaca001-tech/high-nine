@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from '@/core/player/createPlayer'
 import type { Player } from '@/core/types/player'
+import { overallRating } from '@/core/player/rating'
 import {
   eventText,
   findEventChoice,
@@ -113,5 +114,70 @@ describe('pickPlayerEvent', () => {
     }
     // 一部の選手に固まらない
     expect(seen.size).toBeGreaterThan(roster.length / 2)
+  })
+})
+
+describe('スイング軌道（弾道の増減）', () => {
+  const batter = roster.find((p) => !p.isPitcher)!
+  const event = findPlayerEvent('swing-plane')!
+
+  it('野手にだけ起こる', () => {
+    expect(event.applies!(batter)).toBe(true)
+    expect(event.applies!(roster.find((p) => p.isPitcher)!)).toBe(false)
+  })
+
+  it('鋭い打球を追わせると弾道が1段下がる', () => {
+    const target: Player = { ...batter, batting: { ...batter.batting, trajectory: 3 } }
+    const choice = findEventChoice(event, 'level')!
+    const outcome = choice.resolve(createRng(1), target)
+
+    expect(outcome.player.batting.trajectory).toBe(2)
+    // ミートは伸びる（引き換えがある）
+    expect(outcome.player.batting.meet).toBeGreaterThan(target.batting.meet)
+    expect(outcome.changes.some((c) => c.key === 'trajectory')).toBe(true)
+  })
+
+  it('打球を上げさせると、上がることも上がらないこともある', () => {
+    // **簡単には上がらない。** 弾道は4段階しかないので1段の重みが違う
+    const target: Player = { ...batter, batting: { ...batter.batting, trajectory: 2 } }
+    const choice = findEventChoice(event, 'upper')!
+
+    let raised = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      if (choice.resolve(createRng(seed), target).player.batting.trajectory === 3) raised++
+    }
+    expect(raised).toBeGreaterThan(0)
+    expect(raised).toBeLessThan(60)
+  })
+
+  it('弾道は1〜4の外へ出ない', () => {
+    const top: Player = { ...batter, batting: { ...batter.batting, trajectory: 4 } }
+    const bottom: Player = { ...batter, batting: { ...batter.batting, trajectory: 1 } }
+
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(
+        findEventChoice(event, 'upper')!.resolve(createRng(seed), top).player.batting.trajectory,
+      ).toBe(4)
+      expect(
+        findEventChoice(event, 'level')!.resolve(createRng(seed), bottom).player.batting.trajectory,
+      ).toBe(1)
+    }
+  })
+
+  it('今の軌道を通させれば弾道は動かない', () => {
+    const choice = findEventChoice(event, 'keep')!
+    const outcome = choice.resolve(createRng(4), batter)
+    expect(outcome.player.batting.trajectory).toBe(batter.batting.trajectory)
+  })
+})
+
+describe('投手の総合は野手能力を含まない', () => {
+  it('打撃を伸ばしても投手の総合は動かない', () => {
+    const pitcher = roster.find((p) => p.isPitcher)!
+    const slugger: Player = {
+      ...pitcher,
+      batting: { ...pitcher.batting, meet: 99, power: 99, speed: 99 },
+    }
+    expect(overallRating(slugger)).toBe(overallRating(pitcher))
   })
 })

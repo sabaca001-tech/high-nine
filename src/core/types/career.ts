@@ -6,7 +6,45 @@
  * 大学組は4年後の成績でプロ／社会人／引退に分かれる。
  */
 
-import type { Position } from './player'
+import type { AbilitySnapshot, Position } from './player'
+
+/**
+ * 高校を卒業した年の年齢。プロの成績を**年度ではなく年齢で読ませる**ための起点。
+ *
+ * 「3年目に24本」より「23歳で24本」のほうが、
+ * その選手が早咲きだったのか遅咲きだったのかが分かる。
+ */
+export const GRADUATION_AGE = 18
+
+/** 卒業する月。能力の記録を残す月に使う */
+export const GRADUATION_MONTH = 3
+
+/** 卒業した年（通算年）と見たい年から年齢を出す */
+export function ageAt(graduatedYear: number, year: number): number {
+  return GRADUATION_AGE + (year - graduatedYear)
+}
+
+/**
+ * 経歴の1行。**所属が変わった出来事だけ**を積む。
+ *
+ * 「大学へ進み、4年後に指名され、7年目に移籍し、11年目に海外へ」
+ * という道のりが、名鑑の数字からは一切読めなかった。
+ * プロの成績（`proSeasons`）は毎年増えるが、
+ * どこで何が起きたのかはそこには残らない。
+ */
+export type CareerEntry = {
+  /** 通算年 */
+  year: number
+  /** そのときの年齢 */
+  age: number
+  status: CareerStatus
+  /** 所属。無所属なら null */
+  team: string | null
+  /** そのときの実力（進んだ先の物差し） */
+  ability: number
+  /** 一言 */
+  text: string
+}
 
 /** 卒業時に決まる進路 */
 export type CareerPath =
@@ -117,6 +155,16 @@ export type Alumnus = {
   proSeasons: ProSeason[]
   /** 引退・戦力外などの一言 */
   note: string | null
+  /**
+   * 卒業時の各能力。**総合だけでは何が武器だったのか分からない。**
+   * 古いセーブには無いので省略可。
+   */
+  finalAbilities?: AbilitySnapshot
+  /**
+   * 所属が変わった出来事の年表（古い順）。
+   * 古いセーブには無いので省略可。
+   */
+  careerLog?: CareerEntry[]
 }
 
 /** プロで通算成績を集計する */

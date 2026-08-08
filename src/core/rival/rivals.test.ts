@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
+import { findRegion } from '@/core/types/region'
 import {
   addStar,
   bestStarRating,
@@ -51,10 +52,27 @@ describe('bestStarRating', () => {
 })
 
 describe('createRivals', () => {
-  it('県内と県外をまとめて作る', () => {
-    expect(rivals).toHaveLength(RIVALS_PER_REGION + NATIONAL_RIVALS)
-    expect(localRivals(rivals, 'kanagawa')).toHaveLength(RIVALS_PER_REGION)
+  it('県内は参加校ぶん全部、県外は全国クラスだけを作る', () => {
+    // **県内は全校。** トーナメント表で勝ち上がりを見せるには、
+    // 参加校がそのまま存在していないといけない
+    const local = localRivals(rivals, 'kanagawa')
+    expect(local).toHaveLength(findRegion('kanagawa').schools)
     expect(nationalRivals(rivals, 'kanagawa')).toHaveLength(NATIONAL_RIVALS)
+    expect(rivals).toHaveLength(local.length + NATIONAL_RIVALS)
+  })
+
+  it('注目選手を持つのは名の通った学校だけ', () => {
+    // 全校に置くと、U18の選考基準が注目選手の数に引きずられる
+    const local = localRivals(rivals, 'kanagawa')
+    expect(local.filter((school) => school.stars.length > 0)).toHaveLength(RIVALS_PER_REGION)
+  })
+
+  it('県内に格上が十分いる', () => {
+    // **格下ばかりでは県大会が作業になる。** 校数のピラミッドから引くので、
+    // 甲子園常連クラス（地力28以上）も数校は出てくる
+    const local = localRivals(rivals, 'kanagawa')
+    expect(local.filter((school) => school.tradition >= 28).length).toBeGreaterThanOrEqual(2)
+    expect(local.filter((school) => school.tradition >= 18).length).toBeGreaterThanOrEqual(8)
   })
 
   it('県外の学校は1県に1校まで（全国に散らす）', () => {

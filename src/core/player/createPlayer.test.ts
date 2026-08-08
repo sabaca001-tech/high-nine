@@ -4,6 +4,7 @@ import { ABILITY_MAX, ABILITY_MIN } from '@/core/types/player'
 import type { Grade } from '@/core/types/player'
 import { createInitialRoster, createPlayer } from './createPlayer'
 import { overallRating } from './rating'
+import { pitchingRating } from './rating'
 
 describe('createPlayer', () => {
   it('同じシードなら同じ選手ができる', () => {
@@ -202,5 +203,35 @@ describe('学年による差', () => {
   it('3年生の下位は1年生の平均を下回る（弱い3年は弱い）', () => {
     const lowThird = [...third].sort((a, b) => a - b)[Math.floor(third.length * 0.1)]
     expect(lowThird).toBeLessThan(average(first))
+  })
+})
+
+describe('投手の野手能力', () => {
+  /**
+   * **投手としての総合を超えない。**
+   * 野手と同じ振り方をしていた頃は、素質の高い投手は打撃・守備・走塁まで
+   * 軒並み高く、自動編成が「打てるから」と別のポジションへ回していた。
+   */
+  it('入部時点の野手能力が投手としての総合を超えない', () => {
+    const rng = createRng(77)
+    for (let i = 0; i < 200; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: true })
+      const cap = pitchingRating(player.pitching!)
+      const b = player.batting
+
+      for (const value of [b.meet, b.power, b.speed, b.fielding, b.catching]) {
+        expect(value).toBeLessThanOrEqual(cap)
+      }
+      // 肩力だけは球速から導くので、この上限の外にある
+    }
+  })
+
+  it('野手能力は一律ではなく散らばる', () => {
+    const rng = createRng(78)
+    const meets = new Set<number>()
+    for (let i = 0; i < 40; i++) {
+      meets.add(createPlayer(rng, { id: `p${i}`, grade: 2, isPitcher: true }).batting.meet)
+    }
+    expect(meets.size).toBeGreaterThan(10)
   })
 })

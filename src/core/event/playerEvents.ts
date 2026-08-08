@@ -16,7 +16,8 @@
  */
 
 import type { Rng } from '@/core/rng/random'
-import { clamp, raiseAbility } from '@/core/player/growth'
+import { clamp, raiseAbility, raiseTrajectory, TRAJECTORY_MAX } from '@/core/player/growth'
+import { trajectoryArrow } from '@/core/player/rating'
 import { grantSkill } from '@/core/skill/grantSkill'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { EventTone } from '@/core/types/event'
@@ -99,6 +100,13 @@ function withCondition(player: Player, delta: number): Player {
 function withTrust(player: Player, delta: number): Player {
   return { ...player, trust: clamp(player.trust + delta, 0, 100) }
 }
+
+/**
+ * 弾道が1段上がる確率。
+ * **上げるのは難しく、下げるのは確実**にしてある。
+ * 上げ下げが同じ重みだと、良い弾道を引くまで振り直すだけの操作になる。
+ */
+const TRAJECTORY_UP_CHANCE = 0.45
 
 // ── イベント定義 ────────────────────────────────────
 
@@ -351,6 +359,75 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
           return {
             player: bumped,
             text: `${player.name}は今の形を磨いた。${ABILITY_LABELS[key]}が少し伸びた`,
+            tone: 'normal',
+            changes,
+          }
+        },
+      },
+    ],
+  },
+  {
+    id: 'swing-plane',
+    title: 'スイング軌道',
+    text: '{name}のスイングの軌道を作り直せる時期に来た。',
+    // 弾道は野手の値。投手には出さない
+    applies: (player) => !player.isPitcher,
+    choices: [
+      {
+        id: 'upper',
+        label: '打球を上げさせる',
+        hint: '弾道が上がるかもしれない。ただしミートは落ちる',
+        resolve: (rng, player) => {
+          const meet = bump(player, 'meet', -rng.int(2, 4))
+          // **簡単には上がらない。** 弾道は4段階しかないので、
+          // 1段の重みが他の能力とまるで違う
+          if (player.batting.trajectory < TRAJECTORY_MAX && rng.chance(TRAJECTORY_UP_CHANCE)) {
+            const { player: raised, change } = raiseTrajectory(meet.player, 1)
+            return {
+              player: raised,
+              text: `${player.name}の打球が上がるようになった（弾道 ${trajectoryArrow(
+                player.batting.trajectory,
+              )} → ${trajectoryArrow(raised.batting.trajectory)}）`,
+              tone: 'good',
+              changes: change ? [...meet.changes, change] : meet.changes,
+            }
+          }
+          return {
+            player: meet.player,
+            text: `${player.name}は振り上げる形が身につかなかった。ミートだけが落ちた`,
+            tone: 'bad',
+            changes: meet.changes,
+          }
+        },
+      },
+      {
+        id: 'level',
+        label: '鋭い打球を追わせる',
+        hint: '弾道は下がるが、ミートが確かに伸びる',
+        resolve: (rng, player) => {
+          const meet = bump(player, 'meet', rng.int(3, 5))
+          const { player: lowered, change } = raiseTrajectory(meet.player, -1)
+          return {
+            player: lowered,
+            text: change
+              ? `${player.name}は線で捉えるようになった（弾道 ${trajectoryArrow(
+                  change.before,
+                )} → ${trajectoryArrow(change.after)}／ミート上昇）`
+              : `${player.name}のミートが伸びた`,
+            tone: 'good',
+            changes: change ? [...meet.changes, change] : meet.changes,
+          }
+        },
+      },
+      {
+        id: 'keep',
+        label: '今の軌道を通させる',
+        hint: '弾道は動かない。パワーを少し積む',
+        resolve: (rng, player) => {
+          const { player: bumped, changes } = bump(player, 'power', rng.int(1, 3))
+          return {
+            player: withTrust(bumped, 3),
+            text: `${player.name}は今の形を信じて振り込んだ`,
             tone: 'normal',
             changes,
           }

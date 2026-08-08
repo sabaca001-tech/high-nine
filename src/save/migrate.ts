@@ -150,6 +150,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 35) {
     data = migrateV34ToV35(data)
   }
+  if (version < 36) {
+    data = migrateV35ToV36(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -879,6 +882,35 @@ function migrateV34ToV35(raw: Record<string, unknown>): Record<string, unknown> 
   if (!isRecord(raw.tournament)) return { ...raw, version: 35, tournament: null }
   if (Array.isArray(raw.tournament.draw)) return { ...raw, version: 35 }
   return { ...raw, version: 35, tournament: null, phase: 'cardSelect' }
+}
+
+/**
+ * v35 → v36
+ *  - 大会の `draw`（自校の相手を決勝まで並べたもの）を
+ *    `bracket`（参加校を全部並べたトーナメント表）に差し替え
+ *  - ライバル校が県内10校から**県内全校**になり、`notable` が付いた
+ *
+ * 進行中の大会にはブラケットが無い。空で足すと相手が決まらないので
+ * **その大会を打ち切る**（次の大会からは正しく組まれる）。
+ *
+ * ライバル校は作り直さない。10校のままでも大会は成立する
+ * （足りないぶんはその大会限りの相手で埋まる）し、
+ * 既存のセーブから対戦成績や注目選手を捨てるほうが損失が大きい。
+ * ただし `notable` が無いと注目選手が補充されなくなるので、
+ * **注目選手を持っている学校には立てておく**。
+ */
+function migrateV35ToV36(raw: Record<string, unknown>): Record<string, unknown> {
+  const rivals = Array.isArray(raw.rivals)
+    ? raw.rivals.map((value) => {
+        if (!isRecord(value)) return value
+        const stars = Array.isArray(value.stars) ? value.stars : []
+        return stars.length > 0 ? { ...value, notable: true } : value
+      })
+    : raw.rivals
+
+  if (!isRecord(raw.tournament)) return { ...raw, version: 36, rivals, tournament: null }
+  if (isRecord(raw.tournament.bracket)) return { ...raw, version: 36, rivals }
+  return { ...raw, version: 36, rivals, tournament: null, phase: 'cardSelect' }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

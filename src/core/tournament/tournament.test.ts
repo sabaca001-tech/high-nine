@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { findRegion, REGIONS, regionStrength, roundsFor } from '@/core/types/region'
 import { isTournamentOver, roundName } from '@/core/types/tournament'
+import { createRng } from '@/core/rng/random'
 import {
   applyRoundResult,
   createTournament,
   opponentStrengthFor,
   reputationGain,
 } from './tournament'
+
+/** 他校同士の試合の解決に乱数が要る。テストでは固定のカーソルを使い回す */
+const rng = createRng(1)
 
 const KANAGAWA = findRegion('kanagawa') // 178校
 const TOTTORI = findRegion('tottori') // 24校
@@ -109,7 +113,7 @@ describe('opponentStrengthFor', () => {
     const first = opponentStrengthFor(t, KANAGAWA)
 
     for (let i = 0; i < t.totalRounds - 1; i++) {
-      t = applyRoundResult(t, {
+      t = applyRoundResult(rng, t, {
         opponentName: 'X',
         scoreFor: 1,
         scoreAgainst: 0,
@@ -143,7 +147,7 @@ describe('opponentStrengthFor', () => {
 
 describe('applyRoundResult', () => {
   it('勝つと次の回戦へ進む', () => {
-    const t = applyRoundResult(createTournament('summerPref', KANAGAWA), {
+    const t = applyRoundResult(rng, createTournament('summerPref', KANAGAWA), {
       opponentName: '青葉学院',
       scoreFor: 5,
       scoreAgainst: 2,
@@ -156,7 +160,7 @@ describe('applyRoundResult', () => {
   })
 
   it('負けると敗退する', () => {
-    const t = applyRoundResult(createTournament('summerPref', KANAGAWA), {
+    const t = applyRoundResult(rng, createTournament('summerPref', KANAGAWA), {
       opponentName: '北嶺高校',
       scoreFor: 1,
       scoreAgainst: 4,
@@ -169,7 +173,7 @@ describe('applyRoundResult', () => {
   it('決勝に勝つと優勝', () => {
     let t = createTournament('summerPref', TOTTORI)
     for (let i = 0; i < t.totalRounds; i++) {
-      t = applyRoundResult(t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
+      t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
     }
     expect(t.champion).toBe(true)
     expect(isTournamentOver(t)).toBe(true)
@@ -179,7 +183,7 @@ describe('applyRoundResult', () => {
 
   it('元の大会状態を変更しない', () => {
     const t = createTournament('summerPref', KANAGAWA)
-    applyRoundResult(t, { opponentName: 'X', scoreFor: 1, scoreAgainst: 0, won: true })
+    applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 1, scoreAgainst: 0, won: true })
     expect(t.round).toBe(1)
     expect(t.results).toHaveLength(0)
   })
@@ -208,7 +212,7 @@ describe('reputationGain', () => {
 
     let previous = 0
     for (let i = 0; i < t.totalRounds - 1; i++) {
-      t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
+      t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
       const gain = reputationGain(t)
       expect(gain).toBeGreaterThanOrEqual(previous)
       previous = gain
@@ -216,13 +220,13 @@ describe('reputationGain', () => {
 
     // 決勝まで来ても、優勝には届かない
     const beforeFinal = reputationGain(t)
-    t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
+    t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
     expect(t.champion).toBe(true)
     expect(reputationGain(t)).toBeGreaterThan(beforeFinal * 1.5)
   })
 
   it('初戦で負ければ評判は動かない', () => {
-    const t = applyRoundResult(createTournament('summerPref', TOTTORI), {
+    const t = applyRoundResult(rng, createTournament('summerPref', TOTTORI), {
       opponentName: 'X',
       scoreFor: 0,
       scoreAgainst: 3,
@@ -232,7 +236,7 @@ describe('reputationGain', () => {
   })
 
   it('負けても評判は減らない', () => {
-    const t = applyRoundResult(createTournament('summerPref', KANAGAWA), {
+    const t = applyRoundResult(rng, createTournament('summerPref', KANAGAWA), {
       opponentName: 'X',
       scoreFor: 0,
       scoreAgainst: 5,
@@ -245,7 +249,7 @@ describe('reputationGain', () => {
     const champion = (kind: 'summerPref' | 'nationals', region = TOTTORI) => {
       let t = createTournament(kind, region)
       for (let i = 0; i < t.totalRounds; i++) {
-        t = applyRoundResult(t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
+        t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
       }
       return reputationGain(t)
     }

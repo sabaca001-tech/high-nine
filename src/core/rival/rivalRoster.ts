@@ -44,7 +44,6 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
   for (const grade of [3, 2, 1] as Grade[]) {
     // 入学年で種を決める。学年が上がっても同じ人物になる
     const enrolledYear = year - (grade - 1)
-    const rng = createRng(cohortSeed(school.rosterSeed, enrolledYear))
 
     // **名前の重複避けは学年の中だけで行う。**
     // 3学年ぶんをまとめて避けていた頃は、
@@ -54,6 +53,12 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
     const takenNames: string[] = []
 
     for (let i = 0; i < PER_GRADE; i++) {
+      // **選手ごとに種を分ける。** 代ぶんの乱数を1本で回していた頃は、
+      // 前の選手が引いた回数（投手の持ち球の数は能力で変わる）が
+      // 後ろの選手の名前をずらしていた。
+      // 学年が上がると能力の基準も上がるので、
+      // 同じ代なのに翌年は3人目以降が別人になっていた
+      const rng = createRng(playerSeed(school.rosterSeed, enrolledYear, i))
       const player = createPlayer(rng, {
         id: `${school.id}-${enrolledYear}-${i}`,
         grade,
@@ -146,9 +151,14 @@ function starGrade(star: RivalPlayer, year: number): Grade | null {
   return grade as Grade
 }
 
-/** 学年ごとの種。入学年で分けることで、進級しても同じ人物になる */
-function cohortSeed(rosterSeed: number, enrolledYear: number): number {
-  return (rosterSeed * 1103515245 + enrolledYear * 12345) >>> 0
+/**
+ * 選手1人ぶんの種。
+ * 入学年で分けることで進級しても同じ人物になり、
+ * 背番号（i）で分けることで**前の選手の引いた回数に左右されない**。
+ */
+function playerSeed(rosterSeed: number, enrolledYear: number, index: number): number {
+  const base = (rosterSeed * 1103515245 + enrolledYear * 12345) >>> 0
+  return (Math.imul(base ^ (index + 1), 2654435761) + index) >>> 0
 }
 
 /** 文字列から種を作る（注目選手の能力を毎回同じにするため） */

@@ -5,7 +5,7 @@ import { LINEUP_SIZE } from '@/core/types/lineup'
 import { isAvailable } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, defenseScore, POSITION_WEIGHT } from './aptitude'
-import { overallRating } from '@/core/player/rating'
+import { battingRating } from '@/core/player/rating'
 import {
   battingScore,
   clutchScore,
@@ -102,7 +102,11 @@ const YOUTH_PLAN_BONUS = 22
 function fitFor(plan: AutoLineupPlan, player: Player, position: Position): number {
   const defense = defenseScore(player, position)
   const hitting = player.batting.meet * 0.55 + player.batting.power * 0.45
-  const overall = overallRating(player)
+  // **野手枠の評価に投手能力を混ぜない。**
+  // `overallRating` は投手なら投球能力を返すので、
+  // 良い投手ほど一塁でも外野でも高く見えて、
+  // 「エースが野手として出場する」編成になっていた
+  const overall = battingRating(player.batting)
 
   // 若手優先のときだけ大きな下駄。それ以外でも僅差なら下級生を上に置く
   const youth =

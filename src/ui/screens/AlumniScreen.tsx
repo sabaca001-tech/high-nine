@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Alumnus, CareerStatus, ProSeason } from '@/core/types/career'
-import { CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
+import { ageAt, CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
+import { ABILITY_LABELS } from '@/core/types/player'
+import type { AbilitySnapshot } from '@/core/types/player'
+import { toRank } from '@/core/player/rating'
 import { AbilityChart } from '@/ui/components/AbilityChart'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -130,15 +133,19 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
           <TitleList seasons={alumnus.proSeasons} />
 
           <button type="button" className={styles.toggle} onClick={() => setOpen(!open)}>
-            {open ? '年度別成績を閉じる' : '年度別成績を見る'}
+            {open ? '詳しい成績を閉じる' : '詳しい成績を見る'}
           </button>
 
           {open && (
             <>
+              <CareerTimeline alumnus={alumnus} />
+              <FinalAbilities alumnus={alumnus} />
               <AbilityChart
                 title="実力の推移（プロ基準）"
                 points={alumnus.proSeasons.map((season) => ({
-                  label: `${season.year}年目`,
+                  // **年度ではなく年齢で並べる。** 「3年目に24本」より
+                  // 「23歳で24本」のほうが、早咲きか遅咲きかが読める
+                  label: `${ageAt(alumnus.year, season.year)}歳`,
                   value: season.ability,
                 }))}
                 max={PRO_ABILITY_MAX}
@@ -148,6 +155,70 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
           )}
         </>
       )}
+
+      {/* プロの成績がまだ無くても、経歴と卒業時の能力は見せる */}
+      {!hasStats && (
+        <>
+          <CareerTimeline alumnus={alumnus} />
+          <FinalAbilities alumnus={alumnus} />
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 経歴。**所属が変わった出来事だけ**を年表にする。
+ * 大学経由なのか、移籍したのか、海外へ出たのかが数字からは読めなかった。
+ */
+function CareerTimeline({ alumnus }: { alumnus: Alumnus }) {
+  const log = alumnus.careerLog ?? []
+  if (log.length === 0) return null
+
+  return (
+    <div className={styles.timeline}>
+      <h3 className={styles.blockTitle}>経歴</h3>
+      {log.map((entry, index) => (
+        <div key={`${entry.year}-${index}`} className={styles.timelineRow}>
+          <span className={styles.timelineAge}>{entry.age}歳</span>
+          <span
+            className={styles.timelineDot}
+            style={{ background: STATUS_COLOR[entry.status] }}
+            aria-hidden
+          />
+          <span className={styles.timelineText}>{entry.text}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 卒業時の各能力。総合だけでは何が武器だったのかが分からない */
+function FinalAbilities({ alumnus }: { alumnus: Alumnus }) {
+  const abilities = alumnus.finalAbilities
+  if (!abilities) return null
+
+  const keys: (keyof AbilitySnapshot)[] = alumnus.isPitcher
+    ? ['velocity', 'control', 'stamina', 'breaking', 'fielding', 'speed']
+    : ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
+
+  return (
+    <div className={styles.finals}>
+      <h3 className={styles.blockTitle}>卒業時の能力</h3>
+      <div className={styles.finalGrid}>
+        {keys.map((key) => {
+          const value = abilities[key]
+          if (typeof value !== 'number') return null
+          return (
+            <span key={key} className={styles.final}>
+              <span className={styles.finalLabel}>{ABILITY_LABELS[key as 'meet']}</span>
+              <span className={styles.finalValue}>
+                {key === 'velocity' ? `${value}` : toRank(value)}
+              </span>
+            </span>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -174,7 +245,7 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
       <thead>
         {alumnus.isPitcher ? (
           <tr>
-            <th>年</th>
+            <th>歳</th>
             <th>球団</th>
             <th>登板</th>
             <th>回</th>
@@ -186,7 +257,7 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
           </tr>
         ) : (
           <tr>
-            <th>年</th>
+            <th>歳</th>
             <th>球団</th>
             <th>試合</th>
             <th>打数</th>
@@ -204,7 +275,7 @@ function SeasonTable({ alumnus }: { alumnus: Alumnus }) {
         {alumnus.proSeasons.map((season) => (
           <tr key={season.year} className={season.overseas ? styles.overseas : undefined}>
             <td>
-              {season.year}
+              {ageAt(alumnus.year, season.year)}
               {/* タイトルを獲った年が一目で分かるようにする */}
               {season.titles.length > 0 && <span className={styles.titleMark}>★</span>}
             </td>
