@@ -297,29 +297,6 @@ describe('決着必須の試合（大会）', () => {
 })
 
 describe('特殊能力の影響', () => {
-  /** 全員に特定の特殊能力を付けたチームで戦わせ、平均得点を測る */
-  function averageRuns(skill: string | null, seedBase: number): number {
-    let total = 0
-    const trials = 40
-
-    for (let seed = 0; seed < trials; seed++) {
-      const players = createInitialRoster(createRng(seedBase + seed))
-      const withSkill = skill
-        ? players.map((p) => ({ ...p, skills: p.isPitcher ? p.skills : [skill] }))
-        : players
-
-      const result = simulateGame(createRng(seedBase * 7 + seed), {
-        players: withSkill,
-        lineup: autoLineup(withSkill),
-        opponentName: '',
-        opponentStrength: 0,
-        kind: 'friendly',
-      })
-      total += result.finalScore.player
-    }
-    return total / trials
-  }
-
   it('選球眼を持つと四球が増える', () => {
     const walks = (skill: string | null): number => {
       let total = 0
@@ -342,11 +319,35 @@ describe('特殊能力の影響', () => {
     expect(walks('chase-swing')).toBeLessThan(walks(null))
   })
 
-  it('広角打法を持つと得点が増える', () => {
-    // 1試合の得点は振れ幅が大きい。100試合では
-    // **先発が1人変わっただけで乱数の並びがずれて**逆転することがあるので、
-    // 差が安定して見える試合数まで増やす
-    expect(averageRuns('power-hitter', 400)).toBeGreaterThan(averageRuns(null, 400))
+  it('広角打法を持つと長打が増える', () => {
+    /** 全員に特殊能力を付けたチームの長打（二塁打・三塁打・本塁打）を数える */
+    const longHits = (skill: string | null): number => {
+      let total = 0
+      for (let seed = 0; seed < 60; seed++) {
+        const players = createInitialRoster(createRng(400 + seed))
+        const withSkill = skill
+          ? players.map((p) => ({ ...p, skills: p.isPitcher ? p.skills : [skill] }))
+          : players
+
+        const result = simulateGame(createRng(400 * 7 + seed), {
+          players: withSkill,
+          lineup: autoLineup(withSkill),
+          opponentName: '',
+          opponentStrength: 0,
+          kind: 'friendly',
+        })
+        total += result.battingLines.reduce(
+          (sum, line) => sum + line.doubles + line.triples + line.homeruns,
+          0,
+        )
+      }
+      return total
+    }
+
+    // **得点で測るのはやめた。** 1試合の得点は振れ幅が大きいうえ、
+    // スタメンが1人変わるだけで乱数の並びがずれて逆転する。
+    // 広角打法はパワー+8なので、長打の数で見るほうが素直に効果が出る
+    expect(longHits('power-hitter')).toBeGreaterThan(longHits(null))
   })
 })
 

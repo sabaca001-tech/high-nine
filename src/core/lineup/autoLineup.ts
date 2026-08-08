@@ -15,6 +15,7 @@ import {
 } from './battingTraits'
 import { FATIGUE_AVOID, FATIGUE_MAX, fatigueOf } from '@/core/player/fatigue'
 import { pitcherValue } from '@/core/match/teamState'
+import { YOUTH_TIEBREAK } from '@/core/player/squad'
 
 /**
  * 守備位置を埋める順番。
@@ -56,6 +57,43 @@ export const AUTO_LINEUP_PLANS: { id: AutoLineupPlan; label: string; description
 ]
 
 /**
+ * **守備と打撃のどちらを重く見るか**を守備位置ごとに決める。
+ *
+ * 全ポジション一律で「守備0.7・打撃0.3」にしていたので、
+ * 一塁に守備型を置き、遊撃に打撃型を置くという噛み合わない編成が出ていた。
+ * 実際には守備の負担が位置ごとに大きく違う。
+ *
+ * 重要度の並びは `POSITION_WEIGHT` を使い回す（**表を2つ持たない**）。
+ * あちらは「守れない選手を置いたときの痛手」で、こちらは
+ * 「誰を置くか選ぶときの物差し」。同じ順序で並んでいないとおかしい。
+ *
+ * | 位置 | 守備 : 打撃 |
+ * |---|---|
+ * | 遊撃 | 0.85 : 0.15 |
+ * | 二塁 | 0.80 : 0.20 |
+ * | 捕手 | 0.76 : 0.24 |
+ * | 中堅 | 0.72 : 0.28 |
+ * | 三塁 | 0.62 : 0.38 |
+ * | 右翼 | 0.55 : 0.45 |
+ * | 一塁 | 0.47 : **0.53** |
+ * | 左翼 | 0.43 : **0.57** |
+ */
+const DEFENSE_SHARE_MIN = 0.25
+const DEFENSE_SHARE_MAX = 0.85
+
+export function defenseShare(position: Position): number {
+  return (
+    DEFENSE_SHARE_MIN + (DEFENSE_SHARE_MAX - DEFENSE_SHARE_MIN) * POSITION_WEIGHT[position]
+  )
+}
+
+/**
+ * 「若手優先」で足す大きな下駄。こちらは序列を動かすためのもの。
+ * 僅差用の同点崩し（`YOUTH_TIEBREAK`）はベンチ入りと共有している。
+ */
+const YOUTH_PLAN_BONUS = 22
+
+/**
  * その方針での「その位置にどれだけ向いているか」。
  *
  * どの方針でも守備適性は必ず見る。守れない位置に置くと
@@ -66,7 +104,11 @@ function fitFor(plan: AutoLineupPlan, player: Player, position: Position): numbe
   const hitting = player.batting.meet * 0.55 + player.batting.power * 0.45
   const overall = overallRating(player)
 
-  const youth = plan === 'youth' ? (3 - player.grade) * 22 : 0
+  // 若手優先のときだけ大きな下駄。それ以外でも僅差なら下級生を上に置く
+  const youth =
+    plan === 'youth'
+      ? (3 - player.grade) * YOUTH_PLAN_BONUS
+      : (3 - player.grade) * YOUTH_TIEBREAK
 
   // **投手枠は投球能力で決める。**
   // 守備適性と打力で選んでいたので、球威も制球も見ずに
@@ -77,16 +119,17 @@ function fitFor(plan: AutoLineupPlan, player: Player, position: Position): numbe
     return pitcherValue(player) * rest + youth
   }
 
+  const share = defenseShare(position)
+
   switch (plan) {
     case 'ability':
       // 総合を主に見つつ、守れない位置は避ける
-      return overall * 1.2 + defense * 0.5
+      return overall * 1.2 + defense * 0.5 + youth
     case 'youth':
-      // 下級生を大きく優遇する。3年生は夏で抜けるので伸ばす価値が薄い
-      return defense * 0.7 + hitting * 0.3 + youth
     case 'balanced':
     default:
-      return defense * 0.7 + hitting * 0.3
+      // 遊撃なら守備、一塁なら打撃。位置ごとに見るものを変える
+      return defense * share + hitting * (1 - share) + youth
   }
 }
 
@@ -133,12 +176,60 @@ export function autoLineup(players: Player[], plan: AutoLineupPlan = 'balanced')
     used.add(best.id)
   }
 
+  // 埋め終わってから入れ替えて詰める（下記の理由で greedy だけでは足りない）
+  improveBySwaps(plan, assigned)
+
   const slots = battingOrder([...assigned.entries()].map(([position, player]) => ({
     position,
     playerId: player.id,
   })), pool)
 
   return { slots }
+}
+
+/**
+ * 埋めたあと、2人ずつ入れ替えて噛み合わせを直す。
+ *
+ * **守備の重要度順に埋めるだけでは、後回しの枠に余り物しか来ない。**
+ * 遊撃・二塁・捕手が先に良い選手を抜いていくので、
+ * 打撃を重く見るはずの一塁・左翼に「打てない選手」が残っていた
+ * （実測で「一塁のほうが打撃が上」は40例中5例しかなかった）。
+ *
+ * 総和が増える入れ替えが無くなるまで繰り返す。
+ * 8枠なので1巡28通り、数巡で落ち着く。
+ *
+ * **投手枠は動かさない。** 野手を混ぜても意味が無いうえ、
+ * 誰が投げるかは投球能力だけで決めたい。
+ */
+const MAX_SWAP_PASSES = 4
+
+function improveBySwaps(plan: AutoLineupPlan, assigned: Map<Position, Player>): void {
+  const positions = [...assigned.keys()].filter((position) => position !== 'P')
+
+  for (let pass = 0; pass < MAX_SWAP_PASSES; pass++) {
+    let improved = false
+
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const a = positions[i]
+        const b = positions[j]
+        const playerA = assigned.get(a)
+        const playerB = assigned.get(b)
+        if (!playerA || !playerB) continue
+
+        const current = fitFor(plan, playerA, a) + fitFor(plan, playerB, b)
+        const swapped = fitFor(plan, playerB, a) + fitFor(plan, playerA, b)
+
+        if (swapped > current + 1e-9) {
+          assigned.set(a, playerB)
+          assigned.set(b, playerA)
+          improved = true
+        }
+      }
+    }
+
+    if (!improved) break
+  }
 }
 
 /**

@@ -5,7 +5,14 @@ import { LINEUP_SIZE } from '@/core/types/lineup'
 import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, createAptitudes, defenseScore, isPlayable } from './aptitude'
 import { overallRating } from '@/core/player/rating'
-import { AUTO_LINEUP_PLANS, autoLineup, repairLineup, starterOf, validateLineup } from './autoLineup'
+import {
+  AUTO_LINEUP_PLANS,
+  autoLineup,
+  defenseShare,
+  repairLineup,
+  starterOf,
+  validateLineup,
+} from './autoLineup'
 import { battingScore, onBaseScore, runningScore, sluggingScore } from './battingTraits'
 import { pitcherValue } from '@/core/match/teamState'
 
@@ -76,18 +83,37 @@ describe('autoLineup', () => {
     }
   })
 
-  it('いちばん良い投手がマウンドに立つ', () => {
+  it('学年が同じなら、いちばん良い投手がマウンドに立つ', () => {
     // **球速を見ずに投手を選んでいた頃は、147km/hのエースが
     // 制球のいい142km/hの投手にマウンドを譲ってベンチに座っていた。**
     // 打席の判定が球速を重く見ているのに、選ぶ側が見ていなければ食い違う
     for (let seed = 0; seed < 40; seed++) {
-      const roster = createInitialRoster(createRng(seed))
+      const roster = createInitialRoster(createRng(seed)).map((player) => ({
+        ...player,
+        grade: 2 as const,
+      }))
       const pitchers = roster.filter((p) => p.pitching)
       if (pitchers.length < 2) continue
 
       const lineup = autoLineup(roster)
       const best = [...pitchers].sort((a, b) => pitcherValue(b) - pitcherValue(a))[0]
       expect(starterOf(lineup)).toBe(best.id)
+    }
+  })
+
+  it('学年差で投手が入れ替わるのは僅差のときだけ', () => {
+    // 同点崩しは「同じくらいなら下級生」であって、序列を覆すものではない
+    for (let seed = 0; seed < 60; seed++) {
+      const roster = createInitialRoster(createRng(seed))
+      const pitchers = roster.filter((p) => p.pitching)
+      if (pitchers.length < 2) continue
+
+      const lineup = autoLineup(roster)
+      const starter = roster.find((p) => p.id === starterOf(lineup))!
+      const best = [...pitchers].sort((a, b) => pitcherValue(b) - pitcherValue(a))[0]
+
+      // 3学年ぶんの下駄（1.5 × 2）を超えて劣る投手は先発にならない
+      expect(pitcherValue(best) - pitcherValue(starter)).toBeLessThanOrEqual(3.001)
     }
   })
 
@@ -260,6 +286,101 @@ describe('おまかせの方針', () => {
   })
 })
 
+
+describe('守備位置ごとの重み', () => {
+  it('遊撃は守備重視、一塁は打撃重視', () => {
+    expect(defenseShare('SS')).toBeGreaterThan(0.7)
+    expect(defenseShare('1B')).toBeLessThan(0.5)
+    expect(defenseShare('LF')).toBeLessThan(0.5)
+  })
+
+  it('守備の負担が重い順に並んでいる', () => {
+    // POSITION_WEIGHT と同じ順序でなければおかしい
+    const order: Position[] = ['SS', '2B', 'C', 'CF', '3B', 'RF', '1B', 'LF']
+    for (let i = 1; i < order.length; i++) {
+      expect(defenseShare(order[i - 1])).toBeGreaterThan(defenseShare(order[i]))
+    }
+  })
+
+  it('守備型は遊撃へ、打撃型は一塁へ入る', () => {
+    // 守備も打撃もできる選手が9人。適性は全ポジションSにして、
+    // 「どちらを重く見るか」だけで配置が決まる状況にする
+    const roster = createInitialRoster(createRng(31))
+    const fielders = roster.filter((p) => !p.pitching).slice(0, 8)
+
+    const anyPosition = Object.fromEntries(
+      ALL_POSITIONS.map((position) => [position, 'S']),
+    ) as Player['aptitudes']
+
+    const glove: Player = {
+      ...fielders[0],
+      id: 'glove',
+      aptitudes: anyPosition,
+      batting: { ...fielders[0].batting, meet: 30, power: 30, fielding: 90, catching: 90, arm: 90 },
+    }
+    const bat: Player = {
+      ...fielders[1],
+      id: 'bat',
+      aptitudes: anyPosition,
+      batting: { ...fielders[1].batting, meet: 90, power: 90, fielding: 30, catching: 30, arm: 30 },
+    }
+    const rest = fielders.slice(2).map((player) => ({ ...player, aptitudes: anyPosition }))
+    const pitcher = roster.find((p) => p.pitching)!
+
+    const lineup = autoLineup([glove, bat, ...rest, pitcher])
+    const at = (id: string) => lineup.slots.find((slot) => slot.playerId === id)?.position
+
+    expect(defenseShare(at('glove')!)).toBeGreaterThan(defenseShare(at('bat')!))
+  })
+})
+
+describe('同じくらいなら下級生', () => {
+  /** 能力を完全に揃えた3人（学年だけ違う）から9人ぶん作る */
+  function evenRoster(): Player[] {
+    const base = createInitialRoster(createRng(41))
+    const template = base.find((p) => !p.pitching)!
+    const pitchers = base.filter((p) => p.pitching).slice(0, 2)
+
+    const clones = [1, 2, 3].flatMap((grade) =>
+      [0, 1, 2, 3].map((n) => ({
+        ...template,
+        id: `g${grade}-${n}`,
+        name: `選手${grade}${n}`,
+        grade: grade as Player['grade'],
+      })),
+    )
+    return [...clones, ...pitchers]
+  }
+
+  it('能力が同じならスタメンは下級生から埋まる', () => {
+    const lineup = autoLineup(evenRoster())
+    const byId = new Map(evenRoster().map((p) => [p.id, p]))
+    const grades = lineup.slots
+      .map((slot) => byId.get(slot.playerId))
+      .filter((p): p is Player => p !== undefined && !p.pitching)
+      .map((p) => p.grade)
+
+    // 3年生だらけにはならない
+    expect(grades.filter((g) => g === 3).length).toBeLessThan(grades.length / 2)
+    expect(grades.filter((g) => g === 1).length).toBeGreaterThan(0)
+  })
+
+  it('はっきり力の差がある上級生は残る', () => {
+    // 同点崩しは僅差用。3点を超える差はひっくり返さない
+    const roster = evenRoster().map((player) =>
+      player.grade === 3 && !player.pitching
+        ? { ...player, batting: { ...player.batting, meet: player.batting.meet + 20 } }
+        : player,
+    )
+    const lineup = autoLineup(roster)
+    const byId = new Map(roster.map((p) => [p.id, p]))
+    const thirdYears = lineup.slots
+      .map((slot) => byId.get(slot.playerId))
+      .filter((p): p is Player => p !== undefined && !p.pitching && p.grade === 3).length
+
+    expect(thirdYears).toBeGreaterThan(0)
+  })
+})
 
 describe('打順の組み方', () => {
   const roster = createInitialRoster(createRng(77))
