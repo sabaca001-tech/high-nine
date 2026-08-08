@@ -256,11 +256,16 @@ export function createProspects(
 
 /**
  * 県の候補の素質の中心（評判20のとき）。
- * 通常の新入生（`GRADE_BASE[1]` ＝ 36）より10ほど上に置く。
+ * 通常の新入生（`GRADE_BASE[1]` ＝ 36）より数点上に置く。
  * **`GRADE_BASE[1]` を動かしたらここも動かす。**
  * 差が縮むと、出張費を払って通う意味が無くなる。
+ *
+ * **46は高すぎた。** スカウトで獲った選手が入学した時点で
+ * 3年生（`GRADE_BASE[3]` ＝ 50）に並び、そこから3年伸びるので
+ * チームがスカウト組だけで埋まっていた。
+ * 通う価値は残しつつ、**入学時点では上級生に届かない**水準に下げる。
  */
-const LOCAL_BASE = 46
+const LOCAL_BASE = 40
 
 /**
  * U15日本代表の30人を作る。**年度の初めに一度だけ。**
@@ -304,11 +309,14 @@ export function createNationalTeam(rng: Rng, year: number): Prospect[] {
 /**
  * 代表選手の素質の中心。
  *
- * 県ごとの候補（評判20で中心46）より**はっきり上**に置く。
+ * 県ごとの候補（評判20で中心40）より**はっきり上**に置く。
  * 近づけると「代表を狙う理由」が獲得率の低さに見合わなくなる。
- * 1年生でいきなり3年生（`GRADE_BASE[3]` ＝ 50）を上回る素材。
+ * 1年生でいきなり3年生（`GRADE_BASE[3]` ＝ 50）に並ぶ素材。
+ *
+ * **60は高すぎた。** 獲れた瞬間にチームで一番の選手になり、
+ * 3年育てる意味が薄れていた。
  */
-const NATIONAL_BASE = 60
+const NATIONAL_BASE = 52
 
 /** 中学の成績を作る。素質と噛み合った数字にする */
 function rollJuniorStats(rng: Rng, isPitcher: boolean, rating: number): JuniorStats {
