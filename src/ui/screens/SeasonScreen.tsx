@@ -5,7 +5,12 @@ import { findSkill } from '@/core/skill/skillDefs'
 import type { Player } from '@/core/types/player'
 import { CAREER_PATH_LABELS } from '@/core/types/career'
 import type { GraduateRecord } from '@/core/types/season'
-import { handSizeFor, reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/types/season'
+import {
+  handSizeFor,
+  reputationDisplay,
+  reputationGrade,
+  REPUTATION_GRADE_LABELS,
+} from '@/core/types/season'
 import { DEFAULT_UNIFORM, UNIFORMS, uniformName } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
 import { findRegion, REGIONS } from '@/core/types/region'
@@ -119,7 +124,7 @@ export function SeasonScreen() {
           <div className={styles.reputation}>
             <span className={styles.stars}>{grade}</span>
             <span>
-              {REPUTATION_GRADE_LABELS[grade]}（{game.reputation}）
+              {REPUTATION_GRADE_LABELS[grade]}（{reputationDisplay(game.reputation)}）
             </span>
           </div>
           <p className={styles.reputationNote}>

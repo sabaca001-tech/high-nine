@@ -19,7 +19,12 @@ import { monthlyUpkeep } from '@/core/shop/upkeep'
 import { uniformName } from '@/core/team/uniforms'
 import { CAREER_PATH_LABELS, isCareerPending, isInHallOfFame } from '@/core/types/career'
 import type { GraduateRecord } from '@/core/types/season'
-import { handSizeFor, reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/types/season'
+import {
+  handSizeFor,
+  reputationDisplay,
+  reputationGrade,
+  REPUTATION_GRADE_LABELS,
+} from '@/core/types/season'
 import { findRegion, regionStrength, roundsFor } from '@/core/types/region'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -123,7 +128,7 @@ function TeamTab() {
         <Row label="地区の激戦度" value={`相手の強さ ${signed(regionStrength(region))}`} />
         <Row
           label="評判"
-          value={`${grade} ${REPUTATION_GRADE_LABELS[grade]}（${game.reputation}）`}
+          value={`${grade} ${REPUTATION_GRADE_LABELS[grade]}（${reputationDisplay(game.reputation)}）`}
         />
         <Row label="手札の枚数" value={`${handSizeFor(game.reputation)}枚`} />
         <p className={styles.note}>

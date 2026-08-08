@@ -71,10 +71,31 @@ const REPUTATION_LOSS_FLOOR = 0.25
  */
 const REPUTATION_DAMPING = 1.5
 
-/** 評判は整数で持つ（小数だと表示も比較も読みにくい） */
+/**
+ * 評判を動かす。**小数第1位まで保つ。**
+ *
+ * **整数に丸めていたら、勝ちの加算だけが消えていた。**
+ * 試合ごとの加算は素の値+1で、評判40では0.47しか通らない。
+ * `Math.round(40 + 0.47)` は 40 なので、**1試合勝つたびに切り捨てられていた**。
+ * 一方、負けの素の値は格下相手だと-2を超えるので0.86通り、
+ * こちらは -1 として確実に残る。
+ *
+ * 結果として「勝ってもびくとも動かないのに、負けると下がる」状態になり、
+ * 大会に優勝しても評判が上がらなかった。
+ * 積み上げる値を表示の桁で丸めてはいけない。
+ */
 export function applyReputation(current: number, raw: number): number {
   const next = current + reputationGainAt(current, raw)
-  return Math.round(Math.min(REPUTATION_MAX, Math.max(0, next)))
+  return round1(Math.min(REPUTATION_MAX, Math.max(0, next)))
+}
+
+/** 画面に出すときの評判。小数は見せない */
+export function reputationDisplay(reputation: number): number {
+  return Math.round(reputation)
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
 }
 
 /** 評判の初期値 */

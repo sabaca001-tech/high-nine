@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyReputation,
+  reputationDisplay,
   handSizeFor,
   HAND_SIZE_MAX,
   REPUTATION_GRADE_LABELS,
@@ -85,9 +86,21 @@ describe('applyReputation', () => {
     expect(applyReputation(99, 999)).toBeLessThanOrEqual(REPUTATION_MAX)
   })
 
-  it('整数で返る', () => {
-    expect(Number.isInteger(applyReputation(37, 1.7))).toBe(true)
-    expect(Number.isInteger(applyReputation(37, -1.7))).toBe(true)
+  it('小数第1位まで保つ（表示のときだけ整数にする）', () => {
+    // **整数に丸めていたら、勝ちの加算だけが消えていた。**
+    // 評判40で1勝の加算は0.47。Math.round(40 + 0.47) は 40 なので、
+    // 勝つたびに切り捨てられ、負け（-0.86）だけが残っていた
+    const after = applyReputation(37, 1.7)
+    expect(after).toBeGreaterThan(37)
+    expect(Math.round(after * 10)).toBe(after * 10)
+    expect(reputationDisplay(after)).toBe(Math.round(after))
+  })
+
+  it('小さな勝ちを積み重ねれば評判が上がる', () => {
+    // 1試合ぶんの加算（素の値+1）を10回。丸めで消えてはいけない
+    let reputation = 40
+    for (let i = 0; i < 10; i++) reputation = applyReputation(reputation, 1)
+    expect(reputation).toBeGreaterThan(43)
   })
 
   it('負けが込んでも底を打つ（立て直せなくならない）', () => {
