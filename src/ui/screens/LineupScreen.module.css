@@ -11,71 +11,25 @@
   flex: 1 1 auto;
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex: 0 0 auto;
-}
+
+
+
+
 
 /*
- * 状態を出す帯。入れ替え待ちは色だけでは伝わらないので言葉でも出す。
- *
- * **3つの状態すべてで同じ高さを保つ。**
- * 出たり消えたりすると一覧が上下にずれ、
- * 「同じ選手をもう一度タップ」が隣の行に当たってしまう
+ * 「おまかせ」。**見出しの行に同居させる。**
+ * 専用の行を1つ使っていた頃は、説明の帯と合わせて
+ * 90pxほど（選手2人ぶん）を文字だけで消費していた。
  */
-.picked {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  min-height: 30px;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-2);
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--radius);
-  background: var(--accent);
-  color: var(--text-on-accent);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-}
-
-.pickedName {
-  font-weight: 800;
-}
-
-/*
- * 能力を見ているだけの状態の帯。
- * **入れ替え待ちの帯と同じ色にしない。** 同じ見た目だと
- * 「いま次のタップで入れ替わるのか」が読めない
- */
-.previewBar {
-  background: var(--bg-raised);
-  color: var(--text-sub);
-  font-weight: 600;
-}
-
-.pickedCancel {
-  margin-left: auto;
-  min-height: 28px;
-  padding: 0 var(--sp-2);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--text-on-accent);
-  font-size: 11px;
-  font-weight: 800;
-}
-
 .autoButton {
-  /* 一覧の上に単独で置くので右寄せにする */
   margin-left: auto;
   flex: 0 0 auto;
-  min-height: var(--tap-min);
-  padding: 0 var(--sp-3);
+  min-height: 30px;
+  padding: 0 var(--sp-2);
   border-radius: var(--radius);
   background: var(--bg-raised);
   color: var(--text-main);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 700;
 }
 
@@ -228,6 +182,40 @@
   padding: var(--sp-2);
   border-radius: var(--radius);
   background: var(--bg-panel);
+}
+
+/*
+ * 入れ替え待ちの案内。**右の枠に出す。**
+ * 一覧の上に帯として出すと、現れたぶん行が下へずれて
+ * 「同じ選手をもう一度タップ」が隣の行に当たっていた。
+ */
+.armedNote {
+  padding: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.armedName {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.armedCancel {
+  display: block;
+  width: 100%;
+  margin-top: var(--sp-1);
+  min-height: 26px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-on-accent);
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .panelName {

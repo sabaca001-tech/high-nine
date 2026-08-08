@@ -260,16 +260,6 @@ export function LineupEditor() {
         onPointerUp={drag.handlePointerUp}
         onPointerCancel={drag.handlePointerUp}
       >
-        <div className={styles.toolbar}>
-          <button
-            type="button"
-            className={styles.autoButton}
-            onClick={() => setShowPlans((open) => !open)}
-          >
-            おまかせ ▾
-          </button>
-        </div>
-
         {/* おまかせは方針を選ばせる。1種類だと納得できない結果になることがある */}
         {showPlans && (
           <div className={styles.plans}>
@@ -290,35 +280,6 @@ export function LineupEditor() {
           </div>
         )}
 
-        {/*
-          選択中であることを言葉でも出す。
-          色だけだと「次にタップしたら入れ替わる」ことが伝わらない
-        */}
-        {/*
-          **帯は常に出しておく。** 状態によって出したり消したりしていたら、
-          帯が現れたぶん一覧が下へずれて、
-          「同じ選手をもう一度タップ」したつもりが隣の行に当たっていた。
-          高さを変えないことがそのまま操作の正確さになる
-        */}
-        {armed ? (
-          <div className={styles.picked}>
-            <span className={styles.pickedName}>{armed.name}</span>
-            を入れ替える相手をタップ
-            <button type="button" className={styles.pickedCancel} onClick={clearSelection}>
-              やめる
-            </button>
-          </div>
-        ) : previewed ? (
-          <div className={`${styles.picked} ${styles.previewBar}`}>
-            <span className={styles.pickedName}>{previewed.name}</span>
-            をもう一度タップすると入れ替えられます
-          </div>
-        ) : (
-          <div className={`${styles.picked} ${styles.previewBar}`}>
-            タップで能力表示／もう一度で選択／長押しで詳細
-          </div>
-        )}
-
         {problems.length > 0 && (
           <div className={styles.warning}>
             {problems.map((problem) => (
@@ -330,7 +291,20 @@ export function LineupEditor() {
         <div className={styles.body}>
           <div className={styles.lists}>
             <section className={styles.column} data-drop-zone={ZONE_STARTER}>
-              <h2 className={styles.columnTitle}>スタメン</h2>
+              {/*
+                **「おまかせ」は見出しの行に置く。** 専用の行を1つ使っていた頃は、
+                説明の帯と合わせて90pxほど（選手2人ぶん）を文字だけで消費していた
+              */}
+              <h2 className={styles.columnTitle}>
+                スタメン
+                <button
+                  type="button"
+                  className={styles.autoButton}
+                  onClick={() => setShowPlans((open) => !open)}
+                >
+                  おまかせ ▾
+                </button>
+              </h2>
               {lineup.slots.map((slot, index) => {
                 const player = byId.get(slot.playerId)
                 if (!player) return null
@@ -405,10 +379,25 @@ export function LineupEditor() {
 
           {/* 選んだ選手の能力を右側に固定表示する */}
           <aside className={styles.detail}>
+            {/*
+              **入れ替え待ちの案内はここに出す。** 一覧の上に帯として出していた頃は、
+              現れたぶん行が下へずれて、
+              「同じ選手をもう一度タップ」が隣の行に当たっていた。
+              右の枠は選手を選ぶまで空いているので、ここなら一覧が動かない
+            */}
+            {armed && (
+              <div className={styles.armedNote}>
+                <span className={styles.armedName}>{armed.name}</span>
+                を入れ替える相手をタップ
+                <button type="button" className={styles.armedCancel} onClick={clearSelection}>
+                  やめる
+                </button>
+              </div>
+            )}
             {previewed ? (
               <AbilityPanel player={previewed} />
             ) : (
-              <p className={styles.empty}>選手をタップすると能力が出ます</p>
+              !armed && <p className={styles.empty}>選手をタップ</p>
             )}
           </aside>
         </div>
