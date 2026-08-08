@@ -22,6 +22,11 @@ export type AutoPlayOptions = {
   chooseCampPlan?: (state: GameState) => string
   /** 個人イベントの選択。既定は最初の選択肢 */
   choosePlayerEventChoice?: (state: GameState) => string
+  /**
+   * 練習試合の相手の選び方。null なら試合を行わない。
+   * 既定は**県内（遠征費0）の候補**。無戦略プレイで部費を溶かさない
+   */
+  chooseFriendlyMatch?: (state: GameState) => string | null
   /** ルート分岐の選び方。既定は練習の道 */
   chooseRoute?: (state: GameState) => string
   /** 1年ぶんの操作回数の上限。超えたら例外 */
@@ -51,6 +56,8 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
   const chooseRoute = options.chooseRoute ?? (() => 'practice')
   const choosePlayerEventChoice =
     options.choosePlayerEventChoice ?? ((s: GameState) => firstChoiceId(s))
+  const chooseFriendlyMatch =
+    options.chooseFriendlyMatch ?? ((s: GameState) => cheapestOfferId(s))
 
   switch (state.phase) {
     case 'lineupCheck':
@@ -84,6 +91,12 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
       // 自動プレイでは成長の報告をその場で閉じる
       return applyCommand(state, { type: 'closeGrowthReport' }).state
 
+    case 'matchOffer':
+      return applyCommand(state, {
+        type: 'chooseFriendlyMatch',
+        offerId: chooseFriendlyMatch(state),
+      }).state
+
     case 'playerEvent':
       return applyCommand(state, {
         type: 'choosePlayerEventChoice',
@@ -114,6 +127,21 @@ function firstChoiceId(state: GameState): string {
     (choice) => choice.cost === undefined || state.funds >= choice.cost,
   )
   return (affordable[0] ?? event.choices[0]).id
+}
+
+/**
+ * いちばん安い練習試合の相手のid。無戦略プレイの既定値。
+ * **県内の候補が必ず入っている**ので、遠征費0の相手が必ず見つかる。
+ */
+function cheapestOfferId(state: GameState): string | null {
+  const offers = state.pendingOffers
+  if (!offers || offers.length === 0) return null
+
+  const affordable = offers.filter((offer) => offer.travelCost <= state.funds)
+  const pool = affordable.length > 0 ? affordable : []
+  if (pool.length === 0) return null
+
+  return pool.reduce((a, b) => (b.travelCost < a.travelCost ? b : a)).id
 }
 
 /**

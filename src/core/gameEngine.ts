@@ -219,6 +219,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     managers: [],
     pendingEvent: null,
     pendingGrowth: null,
+    pendingOffers: null,
     equipment: [],
     pendingFork: false,
     reputation: REPUTATION_INITIAL,
@@ -302,6 +303,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return choosePlayerEventChoice(state, command.choiceId)
     case 'closeGrowthReport':
       return closeGrowthReport(state)
+    case 'chooseFriendlyMatch':
+      return chooseFriendlyMatch(state, command.offerId)
     case 'buyItem':
       return buyItem(state, command.itemId)
     case 'setTrainingFocus':
@@ -1318,6 +1321,74 @@ function closeGrowthReport(state: GameState): EngineResult {
 }
 
 /**
+ * 練習試合の相手を選ぶ。`offerId` が null なら試合を行わない。
+ *
+ * **遠征費はここで初めて引く。** 候補を出した時点では何も起きていないので、
+ * 「気づいたら部費が減っていた」ということにならない。
+ * 払えない相手は選べない（借金は作らない）。
+ */
+function chooseFriendlyMatch(state: GameState, offerId: string | null): EngineResult {
+  const offers = state.pendingOffers
+  if (state.phase !== 'matchOffer' || !offers) return { state, events: [] }
+
+  // 断った。何も起きずに練習へ戻る
+  if (offerId === null) {
+    const events: GameEvent[] = [
+      { type: 'message', text: '今日は練習試合を組まなかった', tone: 'normal' },
+    ]
+    const { log, serial } = appendLog(state.log, events, state.serial)
+    return {
+      state: { ...state, pendingOffers: null, phase: 'cardSelect', serial, log },
+      events,
+    }
+  }
+
+  const offer = offers.find((entry) => entry.id === offerId)
+  if (!offer || state.funds < offer.travelCost) return { state, events: [] }
+
+  const away = offer.travelCost > 0
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: away
+        ? `${offer.regionName}へ遠征し、${offer.opponentName}と練習試合を行う`
+        : `${offer.opponentName}と練習試合を行う`,
+      tone: 'normal',
+    },
+  ]
+  if (away) {
+    events.push({
+      type: 'message',
+      text: `遠征費 ${formatFunds(offer.travelCost)} がかかった`,
+      tone: 'bad',
+    })
+  }
+
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: {
+      ...state,
+      pendingOffers: null,
+      pendingSetup: {
+        kind: 'friendly',
+        opponentName: offer.opponentName,
+        ...(offer.opponentSchoolId ? { opponentSchoolId: offer.opponentSchoolId } : {}),
+        opponentStrength: offer.opponentStrength,
+        ...(away ? { awayRegionName: offer.regionName } : {}),
+      },
+      funds: clamp(state.funds - offer.travelCost, 0, FUNDS_MAX),
+      // 他県まで出向くこと自体が学校の知名度になる
+      reputation: away ? applyReputation(state.reputation, 1) : state.reputation,
+      serial,
+      phase: 'lineupCheck',
+      log,
+    },
+    events,
+  }
+}
+
+/**
  * カード1枚ぶんの練習を全部員に適用する。
  *
  * **成長の土台はここ。** 止まったマスは倍率（`cellGrowthBonus`）で効くだけで、
@@ -1514,6 +1585,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     funds: monthly.funds,
     // 練習試合の相手はその土地の学校から引く（地元でも遠征先でも）
     rivals: state.rivals,
+    serial: state.serial,
   })
   events.push(...outcome.events)
 
@@ -1537,7 +1609,9 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   let tournament = state.tournament
   let phase: GameState['phase']
 
-  if (outcome.matchSetup) {
+  if (outcome.friendlyOffers) {
+    phase = 'matchOffer'
+  } else if (outcome.matchSetup) {
     phase = 'lineupCheck'
   } else if (outcome.fork) {
     phase = 'fork'
@@ -1590,6 +1664,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       pendingSetup: outcome.matchSetup ?? null,
       pendingFork: outcome.fork === true,
       pendingEvent: outcome.playerEvent ?? null,
+      pendingOffers: outcome.friendlyOffers ?? null,
       pendingGrowth,
       tournament,
       // 遠征費などマスで発生した収支。部費は0を下回らせない

@@ -138,6 +138,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 31) {
     data = migrateV30ToV31(data)
   }
+  if (version < 32) {
+    data = migrateV31ToV32(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -784,6 +787,16 @@ function migrateV29ToV30(raw: Record<string, unknown>): Record<string, unknown> 
 function migrateV30ToV31(raw: Record<string, unknown>): Record<string, unknown> {
   if (!isRecord(raw.matchState)) return { ...raw, version: 31 }
   return { ...raw, version: 31, matchState: { ...raw.matchState, mercy: true } }
+}
+
+/**
+ * v31 → v32
+ *  - 練習試合の相手候補（pendingOffers）を追加
+ *
+ * 途中のセーブは相手選び中ではありえないので null で足すだけでよい。
+ */
+function migrateV31ToV32(raw: Record<string, unknown>): Record<string, unknown> {
+  return { ...raw, version: 32, pendingOffers: null }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

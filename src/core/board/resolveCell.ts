@@ -4,7 +4,8 @@ import type { Rng } from '@/core/rng/random'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import { clamp, raiseAbility } from '@/core/player/growth'
 import { overallRating } from '@/core/player/rating'
-import { pickOpponentName } from '@/core/match/opponent'
+import { createFriendlyOffers } from '@/core/match/friendlyOffers'
+import type { FriendlyOffer } from '@/core/match/friendlyOffers'
 import { attemptTraining, removeRedSkill } from '@/core/skill/grantSkill'
 import { eventText, findPlayerEvent, pickPlayerEvent } from '@/core/event/playerEvents'
 import type { PendingPlayerEvent } from '@/core/event/playerEvents'
@@ -17,11 +18,7 @@ import type { Lineup } from '@/core/types/lineup'
 import type { PendingMatchSetup } from '@/core/types/match'
 import type { GrowableKey, Motivation, Player } from '@/core/types/player'
 import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
-import { REGIONS, travelDistance } from '@/core/types/region'
 import type { Region } from '@/core/types/region'
-import { FRIENDLY_TRAVEL_MAX_DISTANCE, friendlyTravelCost } from '@/core/shop/travel'
-import { formatFunds } from '@/core/shop/funds'
-import { pickRivalFor, rivalsIn } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 
 export type CellOutcome = {
@@ -37,6 +34,8 @@ export type CellOutcome = {
   fork?: boolean
   /** 個人イベントに止まった。UI で選択肢を選ばせる */
   playerEvent?: PendingPlayerEvent
+  /** 練習試合の相手候補。UI で選ばせる（断ることもできる） */
+  friendlyOffers?: FriendlyOffer[]
   /** 部費の増減。遠征費など。省略時は0 */
   fundsDelta?: number
   /** 評判の増減。省略時は0 */
@@ -58,6 +57,8 @@ export type CellContext = {
    * 地元開催なら自県の学校、遠征なら行き先の県の学校。
    */
   rivals?: RivalSchool[]
+  /** 候補の id を採番するための通し番号 */
+  serial?: number
 }
 
 /** 黄マスで得られる練習効率バフの候補 */
@@ -439,113 +440,35 @@ function resolveRest(players: Player[]): CellOutcome {
   }
 }
 
-/** 練習試合が他県への遠征になる確率 */
-const AWAY_MATCH_CHANCE = 0.4
-
-/** 遠征先の相手の強さの上乗せ。わざわざ遠くまで行くのは格上と戦うため */
-const AWAY_OPPONENT_BONUS = 8
-
 /**
  * 練習試合マス。
- * ここでは試合を丸ごとシミュレートするだけで、成績の反映は
- * 観戦終了後（gameEngine の finishMatch）に行う。
  *
- * ときどき他県への遠征になる。遠征費がかかる代わりに相手が格上で、
- * 他県まで出向くこと自体が学校の知名度になる（評判 +1）。
- * 部費が足りなければ招待を断り、地元開催に切り替える。
+ * **ここでは相手を決めない。** 候補を出すところまでで、
+ * 誰とやるか（そもそもやるか）はプレイヤーが選ぶ（`matchOffer` フェーズ）。
+ * 以前は止まった瞬間に相手も遠征先も勝手に決まっていて、
+ * 遠征費が引かれたことに後から気づくこともあった。
  */
 function resolveFriendlyMatch(rng: Rng, context: CellContext): CellOutcome {
-  const away = pickAwayTrip(rng, context)
-
-  // 練習試合の相手はこちらの実力に合わせる。
-  // 絶対値で固定すると、チームが伸びても衰えても試合が一方的になる
-  const base =
-    relativeStrength(context.players) + rng.int(-8, 8) + (away ? AWAY_OPPONENT_BONUS : 0)
-
-  // 相手はその土地のライバル校から引く。地元なら自県、遠征なら行き先の県。
-  // 学校が置かれていない県へ行った場合だけ、使い捨ての名前になる
-  const there = away?.region.id ?? context.region?.id
-  const rival = there ? pickRivalFor(rng, rivalsIn(context.rivals ?? [], there), base) : null
-  const opponentName = rival?.name ?? pickOpponentName(rng)
-  const opponentStrength = rival?.strength ?? base
-
-  if (!away) {
-    const events: GameEvent[] = [
-      { type: 'message', text: `${opponentName}と練習試合を行う`, tone: 'normal' },
-    ]
-    if (away === null) {
-      events.push({ type: 'message', text: '遠征費が足りず、他県への遠征は見送った', tone: 'bad' })
-    }
+  const region = context.region
+  if (!region) {
     return {
       players: context.players,
-      events,
-      matchSetup: {
-        kind: 'friendly',
-        opponentName,
-        ...(rival ? { opponentSchoolId: rival.id } : {}),
-        opponentStrength,
-      },
+      events: [{ type: 'message', text: '練習試合の相手が見つからなかった', tone: 'normal' }],
     }
   }
+
+  const { offers } = createFriendlyOffers(rng, {
+    strength: relativeStrength(context.players),
+    region,
+    rivals: context.rivals ?? [],
+    serial: context.serial ?? 0,
+  })
 
   return {
     players: context.players,
-    events: [
-      {
-        type: 'message',
-        text: `${away.region.name}へ遠征し、${opponentName}と練習試合を行う`,
-        tone: 'normal',
-      },
-      {
-        type: 'message',
-        text: `遠征費 ${formatFunds(away.cost)} がかかった`,
-        tone: 'bad',
-      },
-    ],
-    matchSetup: {
-      kind: 'friendly',
-      opponentName,
-      ...(rival ? { opponentSchoolId: rival.id } : {}),
-      opponentStrength,
-      awayRegionName: away.region.name,
-    },
-    fundsDelta: -away.cost,
-    reputationDelta: 1,
+    events: [{ type: 'message', text: '練習試合の相手を選ぼう', tone: 'normal' }],
+    friendlyOffers: offers,
   }
-}
-
-/**
- * 遠征する場合の行き先と費用を決める。
- *
- * - `undefined` … 地元開催（遠征が起きなかった）
- * - `null` … 遠征のはずだったが部費が足りず断った
- */
-function pickAwayTrip(
-  rng: Rng,
-  context: CellContext,
-): { region: Region; cost: number } | null | undefined {
-  const home = context.region
-  if (!home || !rng.chance(AWAY_MATCH_CHANCE)) return undefined
-
-  // 練習試合で飛行機には乗らない。日帰りできる範囲の地区だけを候補にする
-  const candidates = REGIONS.filter((region) => {
-    const distance = travelDistance(home, region)
-    return distance > 0 && distance <= FRIENDLY_TRAVEL_MAX_DISTANCE
-  })
-  if (candidates.length === 0) return undefined
-
-  // **学校を置いてある県を優先する。** 縁のある相手と何度も当たるほうが、
-  // 毎回知らない名前が出るより遠征に意味が出る
-  const known = candidates.filter(
-    (region) => rivalsIn(context.rivals ?? [], region.id).length > 0,
-  )
-  const region = rng.pick(known.length > 0 ? known : candidates)
-  const cost = friendlyTravelCost(travelDistance(home, region))
-
-  // 払えないなら断る（借金は作らない）
-  if ((context.funds ?? 0) < cost) return null
-
-  return { region, cost }
 }
 
 /**

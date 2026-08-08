@@ -3,6 +3,7 @@ import { HomeScreen } from '@/ui/screens/HomeScreen'
 import { LineupScreen } from '@/ui/screens/LineupScreen'
 import { MatchScreen } from '@/ui/screens/MatchScreen'
 import { PreMatchScreen } from '@/ui/screens/PreMatchScreen'
+import { MatchOfferScreen } from '@/ui/screens/MatchOfferScreen'
 import { PlayerDetailScreen } from '@/ui/screens/PlayerDetailScreen'
 import { AlumniScreen } from '@/ui/screens/AlumniScreen'
 import { CampScreen } from '@/ui/screens/CampScreen'
@@ -46,6 +47,9 @@ function Screen() {
   // ゲーム開始前はタイトルか新規作成
   if (screen === 'newGame') return <NewGameScreen />
   if (!game || screen === 'title') return <TitleScreen />
+
+  // 練習試合は相手を選ぶところから。断ることもできる
+  if (game.phase === 'matchOffer' && game.pendingOffers) return <MatchOfferScreen />
 
   // 試合中は他の画面に移動できないようにする。
   // 観戦を中断したまま別画面へ行くと、結果が未反映のまま取り残されるため

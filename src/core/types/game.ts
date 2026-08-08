@@ -24,6 +24,7 @@ import type { UniformId } from '@/core/team/uniforms'
 import type { Tournament } from './tournament'
 import type { TeamManager } from '@/core/staff/managers'
 import type { PendingPlayerEvent } from '@/core/event/playerEvents'
+import type { FriendlyOffer } from '@/core/match/friendlyOffers'
 
 /**
  * セーブデータのバージョン。
@@ -69,8 +70,9 @@ import type { PendingPlayerEvent } from '@/core/event/playerEvents'
  *            マスの効果が始まる前に、その日の成長を必ず見せる。
  * v30 → v31: MatchState に mercy（コールドゲームの有無）を追加。
  *            全国大会だけコールドが無い。
+ * v31 → v32: 練習試合の相手を選べるようにした（pendingOffers）。
  */
-export const SAVE_VERSION = 31
+export const SAVE_VERSION = 32
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
@@ -85,6 +87,7 @@ export type Phase =
   | 'tournament' // 大会の進行中（次の試合を待っている）
   | 'camp' // 合宿の方針選択
   | 'growthReport' // その日の成長の報告（マスの効果が始まる前に挟む）
+  | 'matchOffer' // 練習試合の相手選び（断ることもできる）
   | 'playerEvent' // 部員1人に起きた出来事の選択
   | 'fork' // ルート分岐の選択
 
@@ -207,6 +210,11 @@ export type GameState = {
    * `nextPhase` は報告を閉じたあとに進むフェーズ。
    */
   pendingGrowth: PendingGrowth | null
+  /**
+   * 練習試合の相手候補。選ぶまで試合は始まらない。
+   * **県内の候補が必ず1つ入る**ので、部費が無くても断らずに戦える。
+   */
+  pendingOffers: FriendlyOffer[] | null
   /** 学校の評判 0〜100。勝つほど上がり、新入生の質と人数を決める */
   reputation: number
   /** OB名鑑。卒業していった選手の記録（新しい順） */
@@ -277,6 +285,8 @@ export type GameCommand =
   | { type: 'choosePlayerEventChoice'; choiceId: string }
   /** その日の成長の報告を閉じて、止まったマスの効果へ進む */
   | { type: 'closeGrowthReport' }
+  /** 練習試合の相手を選ぶ。null なら試合を行わない */
+  | { type: 'chooseFriendlyMatch'; offerId: string | null }
   /** ショップでアイテムを買う（買った瞬間に効果が出る） */
   | { type: 'buyItem'; itemId: string }
   /** 選手ごとの練習方針を決める（コンバートもここで指示する） */

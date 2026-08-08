@@ -72,6 +72,19 @@ function stepCard(state: GameState, cardId?: string): GameState {
     : next
 }
 
+/**
+ * 練習試合の相手選びまで来ていたら、**県内（遠征費0）の相手**を選ぶ。
+ * 相手を選ぶまで試合は始まらないので、試合を調べるテストはこれを通す。
+ */
+function acceptFriendly(state: GameState): GameState {
+  if (state.phase !== 'matchOffer' || !state.pendingOffers) return state
+  const home = state.pendingOffers.find((offer) => offer.travelCost === 0)
+  return applyCommand(state, {
+    type: 'chooseFriendlyMatch',
+    offerId: (home ?? state.pendingOffers[0]).id,
+  }).state
+}
+
 describe('createInitialState', () => {
   it('1年目4月・新入生の入部から始まる', () => {
     const state = createInitialState({ seed: 1 })
@@ -1201,6 +1214,110 @@ describe('練習方針とコンバート', () => {
   })
 })
 
+describe('練習試合の相手選び', () => {
+  /** 練習試合マスに止まり、成長の報告を閉じたところまで進める */
+  function reachOffer(seed: number): GameState {
+    const base = startedGame({ seed })
+    const state: GameState = {
+      ...base,
+      board: base.board.map((_cell, index) =>
+        index === 3 ? { index, kind: 'match' as const } : { index, kind: 'blank' as const },
+      ),
+      hand: base.hand.map((card) => ({ ...card, number: 3 as const, kind: 'batting' as const })),
+      boardPosition: 0,
+      funds: 500_000,
+    }
+    return stepCard(state)
+  }
+
+  it('候補が3つ出て、まだ試合は始まっていない', () => {
+    const state = reachOffer(9101)
+    expect(state.phase).toBe('matchOffer')
+    expect(state.pendingOffers).toHaveLength(3)
+    expect(state.pendingSetup).toBeNull()
+  })
+
+  it('県内（遠征費0）の候補が必ず入っている', () => {
+    // 部費が無くても断らずに戦えるようにするための保証
+    for (let seed = 9200; seed < 9240; seed++) {
+      const state = reachOffer(seed)
+      expect(state.pendingOffers!.some((offer) => offer.travelCost === 0)).toBe(true)
+    }
+  })
+
+  it('選ぶとスタメン確認へ進む', () => {
+    const state = reachOffer(9102)
+    const offer = state.pendingOffers!.find((entry) => entry.travelCost === 0)!
+    const next = applyCommand(state, {
+      type: 'chooseFriendlyMatch',
+      offerId: offer.id,
+    }).state
+
+    expect(next.phase).toBe('lineupCheck')
+    expect(next.pendingOffers).toBeNull()
+    expect(next.pendingSetup!.opponentName).toBe(offer.opponentName)
+    // 県内なので部費は減らない
+    expect(next.funds).toBe(state.funds)
+  })
+
+  it('遠征を選ぶと、そのときに初めて遠征費が引かれる', () => {
+    for (let seed = 9300; seed < 9340; seed++) {
+      const state = reachOffer(seed)
+      const away = state.pendingOffers!.find((entry) => entry.travelCost > 0)
+      if (!away) continue
+
+      const next = applyCommand(state, {
+        type: 'chooseFriendlyMatch',
+        offerId: away.id,
+      }).state
+
+      expect(next.funds).toBe(state.funds - away.travelCost)
+      expect(next.pendingSetup!.awayRegionName).toBe(away.regionName)
+      // 他県まで出向くこと自体が知名度になる
+      expect(next.reputation).toBeGreaterThan(state.reputation)
+      return
+    }
+    throw new Error('遠征の候補が出なかった')
+  })
+
+  it('部費が足りない候補は選べない', () => {
+    for (let seed = 9400; seed < 9440; seed++) {
+      const rich = reachOffer(seed)
+      const away = rich.pendingOffers!.find((entry) => entry.travelCost > 0)
+      if (!away) continue
+
+      const broke: GameState = { ...rich, funds: 0 }
+      expect(
+        applyCommand(broke, { type: 'chooseFriendlyMatch', offerId: away.id }).state,
+      ).toBe(broke)
+      return
+    }
+    throw new Error('遠征の候補が出なかった')
+  })
+
+  it('試合を行わないことも選べる', () => {
+    const state = reachOffer(9103)
+    const next = applyCommand(state, { type: 'chooseFriendlyMatch', offerId: null }).state
+
+    expect(next.phase).toBe('cardSelect')
+    expect(next.pendingOffers).toBeNull()
+    expect(next.pendingSetup).toBeNull()
+    expect(next.funds).toBe(state.funds)
+  })
+
+  it('選ぶまでカードを選べない', () => {
+    const state = reachOffer(9104)
+    expect(applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state).toBe(
+      state,
+    )
+  })
+
+  it('相手選びのままセーブできる形を保つ', () => {
+    const state = reachOffer(9105)
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state)
+  })
+})
+
 describe('試合前のスタメン確認', () => {
   it('練習試合マスに止まると、まず確認画面になる（まだ試合をしていない）', () => {
     const base = startedGame({ seed: 801 })
@@ -1213,7 +1330,7 @@ describe('試合前のスタメン確認', () => {
       boardPosition: 0,
     }
 
-    const next = stepCard(state)
+    const next = acceptFriendly(stepCard(state))
 
     expect(next.phase).toBe('lineupCheck')
     expect(next.pendingSetup).not.toBeNull()
@@ -1232,7 +1349,7 @@ describe('試合前のスタメン確認', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    const checking = stepCard(before)
+    const checking = acceptFriendly(stepCard(before))
 
     // 1番と2番を入れ替えてから始める
     const slots = [...checking.lineup.slots]
@@ -1256,7 +1373,7 @@ describe('試合前のスタメン確認', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    const checking = stepCard(state)
+    const checking = acceptFriendly(stepCard(state))
     const playing = runMatch(checking)
 
     expect(playing.pendingMatch!.opponentName).toBe(checking.pendingSetup!.opponentName)
@@ -1842,7 +1959,7 @@ describe('投手の疲労', () => {
       hand: base.hand.map((card) => ({ ...card, number: 3 as const })),
       boardPosition: 0,
     }
-    const stopped = stepCard(state)
+    const stopped = acceptFriendly(stepCard(state))
     return applyCommand(runMatch(stopped), { type: 'finishMatch' }).state
   }
 
@@ -1946,12 +2063,12 @@ describe('成長の報告', () => {
     // これが無いと、練習の結果を見る前に試合の画面へ飛んでしまう
     const next = stopOn('match', 903)
     expect(next.phase).toBe('growthReport')
-    expect(next.pendingGrowth!.nextPhase).toBe('lineupCheck')
-    // 試合の準備そのものはもう出来ている（閉じればすぐ確認画面）
-    expect(next.pendingSetup).not.toBeNull()
+    expect(next.pendingGrowth!.nextPhase).toBe('matchOffer')
+    // 相手候補はもう出来ている（閉じればすぐ相手選び）
+    expect(next.pendingOffers).not.toBeNull()
 
     const closed = applyCommand(next, { type: 'closeGrowthReport' }).state
-    expect(closed.phase).toBe('lineupCheck')
+    expect(closed.phase).toBe('matchOffer')
   })
 
   it('分岐マスでも、道を選ぶ前に報告が挟まる', () => {
