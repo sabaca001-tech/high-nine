@@ -10,6 +10,8 @@ import type { Motivation, Player } from '@/core/types/player'
 import type { UniformId } from '@/core/team/uniforms'
 import { AbilityRadar } from './AbilityRadar'
 import { AptitudeDiamond } from './AptitudeDiamond'
+import { PitchChart } from './PitchChart'
+import { PitcherStats } from './PitcherStats'
 import { PlayerPortrait } from './PlayerPortrait'
 import { plateGradient, rankColorOf, teamCapColor } from '@/ui/theme/playerColors'
 import styles from './PlayerCard.module.css'
@@ -131,16 +133,40 @@ export function PlayerCard({
         <p className={styles.focus}>{focusLabel(player.focus, ABILITY_LABELS)}</p>
       )}
 
-      <div className={styles.charts}>
-        <span className={styles.chartBox}>
-          <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
-          <span className={styles.chartCaption}>守備適性</span>
-        </span>
-        <span className={styles.chartBox}>
-          <AbilityRadar player={player} />
-          <span className={styles.chartCaption}>能力</span>
-        </span>
-      </div>
+      {/*
+        **投手には野手のレーダーを使わない。**
+        六角形に6軸を詰めると、150pxのカードではラベルが潰れて重なるうえ、
+        形が読めても球速が141km/hなのか135km/hなのか分からなかった。
+        投手は数値4つと持ち球で判断する。
+      */}
+      {player.pitching ? (
+        <>
+          <div className={styles.pitchStats}>
+            <PitcherStats pitching={player.pitching} compact />
+          </div>
+          <div className={styles.charts}>
+            <span className={styles.chartBox}>
+              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+              <span className={styles.chartCaption}>守備適性</span>
+            </span>
+            <span className={styles.chartBox}>
+              <PitchChart pitches={player.pitching.pitches} labels={false} compact />
+              <span className={styles.chartCaption}>持ち球</span>
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className={styles.charts}>
+          <span className={styles.chartBox}>
+            <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+            <span className={styles.chartCaption}>守備適性</span>
+          </span>
+          <span className={styles.chartBox}>
+            <AbilityRadar player={player} />
+            <span className={styles.chartCaption}>能力</span>
+          </span>
+        </div>
+      )}
 
       {footer}
     </>

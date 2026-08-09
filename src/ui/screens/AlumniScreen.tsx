@@ -94,15 +94,20 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
       className={styles.card}
       style={{ '--status-color': STATUS_COLOR[alumnus.status] } as CSSProperties}
     >
+      {/*
+        **1行に詰め込まない。** 卒業年・守備位置・実力・所属を1文に並べていたので、
+        375pxでは球団名が「横浜マリ／ンスターズ」のように途中で改行していた。
+        数値の行と所属の行に分け、どちらも折り返さない。
+      */}
       <div className={styles.head}>
         <PlayerPortrait playerId={alumnus.id} size={38} cap capColor={capColor} />
-        <span>
+        <span className={styles.who}>
           <span className={styles.name}>{alumnus.name}</span>
           <span className={styles.sub}>
-            {alumnus.year}年目卒 / {alumnus.position} / 高校時 {alumnus.rating} → プロ{' '}
+            {alumnus.year}年目卒 / {alumnus.position} / 高校{alumnus.rating} → プロ
             {alumnus.ability}
-            {alumnus.team && ` / ${alumnus.team}`}
           </span>
+          {alumnus.team && <span className={styles.team}>{alumnus.team}</span>}
         </span>
         <span className={styles.status}>{CAREER_STATUS_LABELS[alumnus.status]}</span>
       </div>

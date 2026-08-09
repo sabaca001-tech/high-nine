@@ -24,11 +24,19 @@ export function PlayerListScreen() {
   return (
     <AppLayout title="部員一覧" subtitle={`${game.players.length}人`} scrollable>
       <div className={styles.links}>
+        {/*
+          **折り返させない。** 「OB名鑑（プロ入り 9人） ▶」は
+          2列に並べた幅（約180px）に収まらず、「9／人）▶」で改行していた。
+          人数は別の要素にして、名前だけを本文に残す。
+        */}
         <button type="button" className={styles.alumniLink} onClick={() => setScreen('alumni')}>
-          OB名鑑（プロ入り {game.graduates.filter(isInHallOfFame).length}人） ▶
+          OB名鑑
+          <span className={styles.linkCount}>{game.graduates.filter(isInHallOfFame).length}人</span>
+          <span className={styles.linkArrow}>▶</span>
         </button>
         <button type="button" className={styles.alumniLink} onClick={() => setScreen('records')}>
-          歴代記録 ▶
+          歴代記録
+          <span className={styles.linkArrow}>▶</span>
         </button>
       </div>
 

@@ -78,10 +78,20 @@
   text-overflow: ellipsis;
 }
 
+/*
+ * 学年・ポジション・入部経路。
+ * **折り返さない。** 「スカウト」の印が入ると幅を超えて
+ * 「スカ／ウト」のように途中で改行されていた（名前の下は約90px）。
+ */
 .sub {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
   font-size: 10px;
   opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .rank {
@@ -193,6 +203,11 @@
   color: var(--text-dim);
 }
 
+/* 投手の4能力。守備適性図の上に、カード幅いっぱいで置く */
+.pitchStats {
+  margin-top: var(--sp-1);
+}
+
 /* 自主練の内容。指定しているときだけ出す */
 .focus {
   margin: var(--sp-1) 0 0;
@@ -209,7 +224,8 @@
  * 出張費を払って追いかけた相手が、入部後は他の新入生と同じ見た目だった。
  */
 .origin {
-  margin-left: 4px;
+  flex: 0 0 auto;
+  margin-left: 1px;
   padding: 0 4px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.45);

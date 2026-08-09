@@ -103,23 +103,31 @@ export function PlayerDetailScreen() {
             )}
           </div>
           <p className={styles.name}>{player.name}</p>
+          {/*
+            **性格名と説明を切り離す。** 1つの文にしていたので
+            「天才肌 — 素質が」で折り返し、性格名の途中で行が変わっていた。
+          */}
           <p className={styles.meta}>
-            {player.personality} — {effectOf(player.personality).summary}
+            <span className={styles.personality}>{player.personality}</span>
+            <span className={styles.personalityNote}>
+              {effectOf(player.personality).summary}
+            </span>
           </p>
           {/*
             伸びやすい能力は選手ごとに違う。ここが見えないと
-            「なぜこの選手だけ伸びないのか」が分からない
+            「なぜこの選手だけ伸びないのか」が分からない。
+            得意と苦手は**それぞれを1つの塊**にして、間でだけ折り返させる
           */}
           <p className={styles.meta}>
             {strongKeys(player).length > 0 && (
-              <>
+              <span className={styles.aptitude}>
                 得意 <span className={styles.strong}>{labelsOf(strongKeys(player))}</span>
-              </>
+              </span>
             )}
             {weakKeys(player).length > 0 && (
-              <>
-                {'　'}苦手 <span className={styles.weak}>{labelsOf(weakKeys(player))}</span>
-              </>
+              <span className={styles.aptitude}>
+                苦手 <span className={styles.weak}>{labelsOf(weakKeys(player))}</span>
+              </span>
             )}
           </p>
         </div>
@@ -185,11 +193,11 @@ function AbilityTab({ player }: { player: Player }) {
         <AbilityRow label={ABILITY_LABELS.meet} value={b.meet} />
         <AbilityRow label={ABILITY_LABELS.power} value={b.power} />
         <AbilityRow label={ABILITY_LABELS.speed} value={b.speed} />
-        {/* 投手の肩力は球速に比例するので、独立して育てられないことを添える */}
+        {/* 投手の肩力は球速に連動するので、独立して育てられないことを添える */}
         <AbilityRow
           label={ABILITY_LABELS.arm}
           value={b.arm}
-          note={player.pitching ? '球速に比例' : undefined}
+          note={player.pitching ? '球速に連動' : undefined}
         />
         <AbilityRow label={ABILITY_LABELS.fielding} value={b.fielding} />
         <AbilityRow label={ABILITY_LABELS.catching} value={b.catching} />
@@ -534,7 +542,7 @@ function TrainingTab({ player }: { player: Player }) {
 function AbilityRow({
   label,
   value,
-  /** 「球速に比例」のような但し書き */
+  /** 「球速に連動」のような但し書き */
   note,
 }: {
   label: string

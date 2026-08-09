@@ -1,6 +1,7 @@
 /**
  * 持ち球の変化方向図。
  * 中心から各方向へ矢印を伸ばし、長さで変化量を表す。
+ * 球種名は図の中に書かず、下に矢印つきで並べる（重なるため）。
  */
 .wrap {
   padding: var(--sp-2) 0;
@@ -9,7 +10,7 @@
 .chart {
   display: block;
   width: 100%;
-  max-width: 280px;
+  max-width: 220px;
   margin: 0 auto;
   overflow: visible;
 }
@@ -35,14 +36,63 @@
   fill: var(--text-main);
 }
 
-.label {
-  font-size: 11px;
-  fill: var(--text-sub);
+/* ── 球種の一覧 ───────────────────────────── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-base);
+  /* 「スローカーブ」で折り返すと読みにくいので、球種ごとに1つの塊にする */
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.glyph {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.pitchName {
+  color: var(--text-main);
 }
 
 .level {
-  fill: var(--accent);
-  font-weight: 700;
+  color: var(--accent);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 幅の狭い枠（スタメン画面の右パネル）。球種の札を詰める */
+.narrow .chart {
+  max-width: 96px;
+}
+
+.narrow .item {
+  padding: 1px 5px;
+  gap: 2px;
+  font-size: 10px;
+}
+
+/* カードの中に置くとき。目盛りごと小さくする */
+.compact {
+  padding: 0;
+}
+
+.compact .chart {
+  max-width: 100%;
 }
 
 .empty {
@@ -50,4 +100,5 @@
   color: var(--text-dim);
   margin: 0;
   padding: var(--sp-2) 0;
+  text-align: center;
 }

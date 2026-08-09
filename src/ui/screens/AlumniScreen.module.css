@@ -53,10 +53,28 @@
   white-space: nowrap;
 }
 
+/* 名前・数値・所属を縦に積む。1行に混ぜると375pxで途中改行する */
+.who {
+  min-width: 0;
+}
+
 .sub {
   display: block;
   font-size: 10px;
   color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status {

@@ -77,9 +77,33 @@
 }
 
 .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
   font-size: var(--fs-xs);
   color: var(--text-sub);
   margin: 0;
+}
+
+/* 性格名は折り返さない。説明だけが行をまたぐ */
+.personality {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.personalityNote {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+/* 得意／苦手はそれぞれ1つの塊。途中で折り返させない */
+.aptitude {
+  white-space: nowrap;
 }
 
 /* 伸びやすい／伸びにくい能力。色で「得か損か」が一目で分かるようにする */
@@ -380,7 +404,7 @@
   white-space: nowrap;
 }
 
-/* 「球速に比例」のような但し書き。ラベルの後ろに小さく添える */
+/* 「球速に連動」のような但し書き。ラベルの後ろに小さく添える */
 .abilityNote {
   margin-left: var(--sp-1);
   font-size: 9px;

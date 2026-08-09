@@ -28,7 +28,7 @@ function axesOf(player: Player): RadarAxis[] {
     const p = player.pitching
     return [
       // 投手は打撃で評価しない。守備位置としての動きを見たいので走力を入れる。
-      // 肩力は球速に比例する（growth.ts の armFromVelocity）ので軸にしない
+      // 肩力は球速に連動する（growth.ts の armFromVelocity）ので軸にしない
       { label: '球速', value: velocityScore(p.velocity) },
       { label: '制球', value: p.control },
       { label: '変化', value: p.breaking },

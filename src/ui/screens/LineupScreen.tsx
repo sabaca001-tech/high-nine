@@ -4,6 +4,8 @@ import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
 import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import { overallRating, toRank, trajectoryArrow } from '@/core/player/rating'
+import { PitchChart } from '@/ui/components/PitchChart'
+import { PitcherStats } from '@/ui/components/PitcherStats'
 import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
 import { skillsOf } from '@/core/skill/skillEffects'
 import {
@@ -478,26 +480,34 @@ function AbilityPanel({ player }: { player: Player }) {
       <Row label="状態" value={MOTIVATION_LABELS[player.motivation]} />
       <Row label="体力" value={`${player.condition}`} />
 
+      {/*
+        **投手には投手の並びを出す。** 打撃6項目まで並べていたので、
+        肝心の球速・変化球より下に押し出されていた。
+        持ち球も、ここで分からないと継投の判断ができない。
+      */}
       {player.pitching ? (
         <>
-          <Row label={ABILITY_LABELS.velocity} value={`${player.pitching.velocity}`} />
-          <Row label={ABILITY_LABELS.control} value={toRank(player.pitching.control)} />
-          <Row label={ABILITY_LABELS.stamina} value={toRank(player.pitching.stamina)} />
-          <Row label={ABILITY_LABELS.breaking} value={toRank(player.pitching.breaking)} />
+          <div className={styles.panelPitching}>
+            <PitcherStats pitching={player.pitching} columns={1} />
+          </div>
+          <PitchChart pitches={player.pitching.pitches} narrow />
+          <Row label={ABILITY_LABELS.fielding} value={toRank(player.batting.fielding)} />
+          <Row label={ABILITY_LABELS.speed} value={toRank(player.batting.speed)} />
         </>
       ) : (
-        <Row
-          label={ABILITY_LABELS.trajectory}
-          value={trajectoryArrow(player.batting.trajectory)}
-        />
+        <>
+          <Row
+            label={ABILITY_LABELS.trajectory}
+            value={trajectoryArrow(player.batting.trajectory)}
+          />
+          <Row label={ABILITY_LABELS.meet} value={toRank(player.batting.meet)} />
+          <Row label={ABILITY_LABELS.power} value={toRank(player.batting.power)} />
+          <Row label={ABILITY_LABELS.speed} value={toRank(player.batting.speed)} />
+          <Row label={ABILITY_LABELS.arm} value={toRank(player.batting.arm)} />
+          <Row label={ABILITY_LABELS.fielding} value={toRank(player.batting.fielding)} />
+          <Row label={ABILITY_LABELS.catching} value={toRank(player.batting.catching)} />
+        </>
       )}
-
-      <Row label={ABILITY_LABELS.meet} value={toRank(player.batting.meet)} />
-      <Row label={ABILITY_LABELS.power} value={toRank(player.batting.power)} />
-      <Row label={ABILITY_LABELS.speed} value={toRank(player.batting.speed)} />
-      <Row label={ABILITY_LABELS.arm} value={toRank(player.batting.arm)} />
-      <Row label={ABILITY_LABELS.fielding} value={toRank(player.batting.fielding)} />
-      <Row label={ABILITY_LABELS.catching} value={toRank(player.batting.catching)} />
 
       <SkillList player={player} />
     </div>

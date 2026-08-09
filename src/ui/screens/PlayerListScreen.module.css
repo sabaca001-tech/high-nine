@@ -96,16 +96,35 @@
 }
 
 .alumniLink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   min-height: var(--tap-min);
   margin-bottom: var(--sp-2);
-  padding: 0 var(--sp-3);
+  padding: 0 var(--sp-2);
   border-radius: var(--radius);
   background: var(--bg-raised);
   color: var(--text-main);
   font-size: var(--fs-sm);
   font-weight: 700;
   text-align: left;
+  white-space: nowrap;
+}
+
+/* 人数は添え物。ここが本文に混ざると折り返しの原因になる */
+.linkCount {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 200, 87, 0.16);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+}
+
+.linkArrow {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
 }
 
 .alumniLink:active {

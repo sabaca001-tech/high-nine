@@ -1,0 +1,63 @@
+/**
+ * 投手の4能力。
+ * 「球速・変化球」で1行、「制球・スタミナ」で1行。
+ */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+
+/* 狭い枠では1列。2列だと「スタミナ」の行が枠から出る */
+.single {
+  grid-template-columns: 1fr;
+}
+
+.cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--bg-base);
+  /* 「スタミナ」で折り返さない。折り返すと行の高さが揃わなくなる */
+  white-space: nowrap;
+}
+
+.label {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+.value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank {
+  font-size: var(--fs-xs);
+}
+
+/* 一覧のカードの中。2列で約140pxに収める */
+.compact .cell {
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.compact .label {
+  font-size: 9px;
+}
+
+.compact .value {
+  font-size: 11px;
+}
+
+.compact .rank {
+  font-size: 9px;
+}

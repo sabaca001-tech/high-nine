@@ -519,3 +519,8 @@
   color: var(--bad);
   font-weight: 800;
 }
+
+/* 投手の4能力。右の枠は狭いので、数値だけを2×2で置く */
+.panelPitching {
+  margin: var(--sp-1) 0;
+}
