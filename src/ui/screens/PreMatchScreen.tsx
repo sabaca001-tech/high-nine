@@ -1,5 +1,6 @@
 import { validateLineup } from '@/core/lineup/autoLineup'
-import { formatRecord, hasMet } from '@/core/rival/rivals'
+import { formatRecord, hasMet, recordOf } from '@/core/rival/rivals'
+import type { RivalRecord } from '@/core/rival/rivals'
 import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { useGameStore } from '@/state/useGameStore'
@@ -61,21 +62,7 @@ export function PreMatchScreen() {
         これまでの対戦。「去年の夏、準決勝で負けた相手」が分かるようにする。
         毎回知らない相手と当たるだけでは、勝ち上がりに物語が乗らない。
       */}
-      {school && hasMet(school.record) && (
-        <p className={styles.history}>
-          通算 {formatRecord(school.record)}
-          {school.record.last && (
-            <span className={styles.last}>
-              前回：{school.record.last.year}年目 {school.record.last.label}で
-              {school.record.last.outcome === 'win'
-                ? '勝利'
-                : school.record.last.outcome === 'lose'
-                  ? '敗戦'
-                  : '引き分け'}
-            </span>
-          )}
-        </p>
-      )}
+      {school && hasMet(recordOf(school)) && <MeetingHistory record={recordOf(school)} />}
 
       {/*
         相手のスタメン。誰を警戒すべきかが分かると、
@@ -108,5 +95,24 @@ export function PreMatchScreen() {
         </button>
       </div>
     </AppLayout>
+  )
+}
+
+/** その学校との通算成績と、前回の顔合わせ */
+function MeetingHistory({ record }: { record: RivalRecord }) {
+  return (
+    <p className={styles.history}>
+      通算 {formatRecord(record)}
+      {record.last && (
+        <span className={styles.last}>
+          前回：{record.last.year}年目 {record.last.label}で
+          {record.last.outcome === 'win'
+            ? '勝利'
+            : record.last.outcome === 'lose'
+              ? '敗戦'
+              : '引き分け'}
+        </span>
+      )}
+    </p>
   )
 }

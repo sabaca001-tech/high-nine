@@ -71,11 +71,14 @@ export type RivalSchool = {
    */
   rosterSeed: number
   /**
-   * 自校との対戦成績。
+   * 自校との対戦成績。**まだ当たっていなければ持たない。**
    * 「去年負けたあの学校」と分かるようにするための記録で、
    * 試合前の確認画面に出す。ゲームの判定には使わない。
+   *
+   * 全校ぶん空の記録を持たせると、658校で17KBがまるごと無駄になる。
+   * 読むときは `recordOf` を通すこと。
    */
-  record: RivalRecord
+  record?: RivalRecord
 }
 
 /** 1校との対戦成績 */
@@ -90,6 +93,14 @@ export type RivalRecord = {
 export function emptyRivalRecord(): RivalRecord {
   return { wins: 0, losses: 0, draws: 0, last: null }
 }
+
+/** その学校との対戦成績。まだ当たっていなければ空の記録を返す */
+export function recordOf(school: RivalSchool): RivalRecord {
+  return school.record ?? EMPTY_RECORD
+}
+
+/** 未対戦のときに返す記録。毎回作らないよう1つだけ持つ */
+const EMPTY_RECORD: RivalRecord = { wins: 0, losses: 0, draws: 0, last: null }
 
 /**
  * 1つの県に置く**注目校**の数。
@@ -111,7 +122,7 @@ export const RIVALS_PER_REGION = 10
  *
  * 名簿は種から作り直すので、増えるのは名前と数値だけ。
  */
-export const NATIONAL_SCHOOLS_PER_REGION = 4
+export const NATIONAL_SCHOOLS_PER_REGION = 16
 
 /**
  * 県外に置く学校の総数。
@@ -147,12 +158,15 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
  * 甲子園に出てくる代表校（各県の最上位）の重みも消える。
  *
  * 先頭が県の代表クラス、後ろほど地元の有力校どまり。
+ * 数が足りないぶんは最後の段を繰り返す。
  */
 const NATIONAL_TRADITION_TIERS: { min: number; max: number }[] = [
   { min: 14, max: 34 }, // 県の代表クラス
-  { min: 6, max: 22 }, // それに続く強豪
-  { min: -2, max: 14 }, // 中堅上位
-  { min: -10, max: 8 }, // 中堅
+  { min: 8, max: 26 }, // それに続く強豪
+  { min: 2, max: 18 }, // 中堅上位
+  { min: -4, max: 12 }, // 中堅
+  { min: -10, max: 6 }, // 中堅下位
+  { min: -16, max: 2 }, // 下位
 ]
 
 /** 1校が抱える注目選手の数 */
@@ -181,13 +195,22 @@ export function createRivals(
   year = 1,
 ): RivalSchool[] {
   const schools: RivalSchool[] = []
-  const names: string[] = []
+  /**
+   * 校名の重複避けは**県ごと**に行う。
+   *
+   * 全国でまとめて避けていた頃は、946校ぶんの名前を
+   * 1426通りの組み合わせから引くことになり、後半で引き当てられなくなっていた。
+   * 違う県に同じ校名があるのは現実にもあることなので、避ける必要が無い。
+   */
+  const namesByRegion = new Map<RegionId, string[]>()
   const playerNames: string[] = []
 
   const add = (id: string, regionId: RegionId, tradition: number, notable: boolean) => {
     // その県らしい地名を混ぜる。どこと戦っているのか実感が湧くように
+    const names = namesByRegion.get(regionId) ?? []
     const name = makeSchoolName(rng, names, regionId)
     names.push(name)
+    namesByRegion.set(regionId, names)
     schools.push({
       id,
       name,
@@ -198,7 +221,6 @@ export function createRivals(
       ...(notable ? { notable: true } : {}),
       stars: notable ? createStars(rng, id, tradition, playerNames, year) : [],
       rosterSeed: rng.int(1, 2_000_000_000),
-      record: emptyRivalRecord(),
     })
   }
 
@@ -469,7 +491,7 @@ export function addResult(
   school: RivalSchool,
   result: { year: number; label: string; outcome: 'win' | 'lose' | 'draw' },
 ): RivalSchool {
-  const record = school.record
+  const record = recordOf(school)
   return {
     ...school,
     record: {

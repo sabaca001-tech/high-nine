@@ -5,6 +5,9 @@ import {
   addStar,
   bestStarRating,
   localRivals,
+  addResult,
+  hasMet,
+  recordOf,
   NATIONAL_RIVALS,
   NATIONAL_SCHOOLS_PER_REGION,
   nationalRepresentatives,
@@ -101,17 +104,29 @@ describe('createRivals', () => {
     }
   })
 
-  it('県外の学校のほうが地力が高い（甲子園に出てくる顔ぶれ）', () => {
+  it('甲子園に出てくる代表校は、県内の平均よりはっきり上', () => {
+    // 県外は1県16校あるので、平均を取ると中堅まで混ざる。
+    // 全国大会に出てくるのは各県の筆頭なので、そこで比べる
     const avg = (list: typeof rivals) =>
       list.reduce((total, school) => total + school.tradition, 0) / list.length
 
-    expect(avg(nationalRivals(rivals, 'kanagawa'))).toBeGreaterThan(
+    expect(avg(nationalRepresentatives(rivals, 'kanagawa'))).toBeGreaterThan(
       avg(localRivals(rivals, 'kanagawa')),
     )
   })
 
-  it('校名が重複しない', () => {
-    expect(new Set(rivals.map((school) => school.name)).size).toBe(rivals.length)
+  it('校名は県の中で重複しない', () => {
+    // **全国では避けない。** 946校ぶんの名前を1426通りから引くと
+    // 後半で引き当てられなくなる。違う県に同じ校名があるのは現実にもある
+    const byRegion = new Map<string, string[]>()
+    for (const school of rivals) {
+      const names = byRegion.get(school.regionId) ?? []
+      names.push(school.name)
+      byRegion.set(school.regionId, names)
+    }
+    for (const names of byRegion.values()) {
+      expect(new Set(names).size).toBe(names.length)
+    }
   })
 
   it('県内にも必ず1校は強豪がいる（目標になる相手を置く）', () => {
@@ -206,5 +221,47 @@ describe('addStar', () => {
 
     expect(after.stars.length).toBe(before.stars.length + 1)
     expect(after.strength).toBeGreaterThan(before.strength)
+  })
+})
+
+describe('他校のデータは年を重ねても増えない', () => {
+  /**
+   * **他校は卒業生を持たない。**
+   * 部員は種から作り直す（`rivalRoster`）ので、
+   * 学校が抱えるのは名前と数値と注目選手2人だけ。
+   * ここが増える構造だと、他校を増やすほどセーブが年々膨らむ。
+   */
+  it('60年進めても学校1つあたりの大きさが変わらない', () => {
+    const rng = createRng(31)
+    let school = createRivals(createRng(5), 'kanagawa')[0]
+    const before = JSON.stringify(school).length
+
+    for (let year = 2; year <= 60; year++) {
+      school = advanceRival(rng, school, year).school
+    }
+
+    expect(JSON.stringify(school).length).toBeLessThan(before * 1.2)
+  })
+
+  it('注目選手は卒業して入れ替わる（溜まらない）', () => {
+    const rng = createRng(32)
+    let school = createRivals(createRng(6), 'kanagawa').find((s) => s.notable)!
+
+    for (let year = 2; year <= 40; year++) {
+      school = advanceRival(rng, school, year).school
+      expect(school.stars.length).toBeLessThanOrEqual(2)
+      for (const star of school.stars) expect(star.grade).toBeLessThanOrEqual(3)
+    }
+  })
+
+  it('未対戦の学校は対戦成績を持たない', () => {
+    // 946校ぶんの空の記録は、それだけで17KBの無駄になる
+    const fresh = createRivals(createRng(9), 'kanagawa')
+    expect(fresh.every((school) => school.record === undefined)).toBe(true)
+    expect(hasMet(recordOf(fresh[0]))).toBe(false)
+
+    const met = addResult(fresh[0], { year: 3, label: '練習試合', outcome: 'win' })
+    expect(hasMet(recordOf(met))).toBe(true)
+    expect(recordOf(met).wins).toBe(1)
   })
 })

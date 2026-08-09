@@ -10,7 +10,13 @@ import { ABILITY_LABELS } from '@/core/types/player'
 import { overallRating, toRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
-import { formatRecord, hasMet, localRivals, nationalRivals } from '@/core/rival/rivals'
+import {
+  formatRecord,
+  hasMet,
+  localRivals,
+  nationalRivals,
+  recordOf,
+} from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import type { ScoutResult } from '@/core/scout/scouting'
 import { TRAIT_LABELS } from '@/core/scout/scoutTraits'
@@ -329,13 +335,13 @@ function RivalsTab() {
   )
   // 上位 LOCAL_PREVIEW 校＋戦ったことのある学校
   const localShown = local.filter(
-    (school, index) => index < LOCAL_PREVIEW || hasMet(school.record),
+    (school, index) => index < LOCAL_PREVIEW || hasMet(recordOf(school)),
   )
   const national = [...nationalRivals(game.rivals, game.regionId)].sort(
     (a, b) => b.strength - a.strength,
   )
   const nationalShown = national.filter(
-    (school, index) => index < NATIONAL_PREVIEW || hasMet(school.record),
+    (school, index) => index < NATIONAL_PREVIEW || hasMet(recordOf(school)),
   )
 
   return (
@@ -524,8 +530,8 @@ function RivalRow({ school, showRegion }: { school: RivalSchool; showRegion?: bo
         <span className={styles.rivalStrength}>戦力 {signed(school.strength)}</span>
       </div>
       <div className={styles.rivalMeta}>
-        {hasMet(school.record) ? (
-          <span className={styles.rivalRecord}>通算 {formatRecord(school.record)}</span>
+        {hasMet(recordOf(school)) ? (
+          <span className={styles.rivalRecord}>通算 {formatRecord(recordOf(school))}</span>
         ) : (
           <span className={styles.rivalNone}>対戦なし</span>
         )}
