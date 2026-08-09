@@ -75,10 +75,18 @@ describe('rivalRoster', () => {
   })
 
   it('注目選手が名簿に入っている', () => {
+    // 開始時（1年目）の注目選手は入学年を持つので、在学中の年で引く
     const star = school.stars[0]
-    const names = rivalRoster(school, star.grade === 1 ? 3 : 3).map((p) => p.name)
-    // 入学年を持たない古い形の注目選手は、記録された学年のまま残る
-    expect(names).toContain(star.name)
+    const year = (star.enrolledYear ?? 1) + (3 - star.grade)
+    expect(rivalRoster(school, year).map((p) => p.name)).toContain(star.name)
+  })
+
+  it('開始時の注目選手も、3年経てば名簿から消える', () => {
+    // 入学年を持たせていなかった頃は、開始時の3年生が
+    // 何年経っても3年生のまま名簿に居座っていた
+    const senior = school.stars.find((s) => s.grade === 3)
+    if (!senior) return
+    expect(rivalRoster(school, 5).map((p) => p.name)).not.toContain(senior.name)
   })
 
   it('スカウトで逃した選手はその学校に在籍し、印が付く', () => {

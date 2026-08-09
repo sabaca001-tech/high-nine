@@ -102,17 +102,24 @@ export function emptyRivalRecord(): RivalRecord {
 export const RIVALS_PER_REGION = 10
 
 /**
- * 県外に置く全国クラスの学校の数。
+ * 県外の**1県あたり**の学校数。
  *
- * 全国大会の相手も使い捨てにしていたので、
- * 「去年あそこに負けた」「今年こそ」という記憶が積み上がらなかった。
+ * 1県1校だった頃は、遠征の練習試合で同じ県へ行くたびに
+ * **必ず同じ学校が出てきた**。その県には1校しか存在しないので当然で、
+ * 「遠征先で新しい相手と当たる」という手応えが出ない。
+ * U18の候補も48校の上位2人しか居なかった。
  *
- * **自県以外の48地区すべてに1校ずつ置く。**
- * 20校だった頃は、U18の代表を全国から30人選ぼうにも
- * 候補になる学校が20校しか存在しなかった。
  * 名簿は種から作り直すので、増えるのは名前と数値だけ。
  */
-export const NATIONAL_RIVALS = REGIONS.length - 1
+export const NATIONAL_SCHOOLS_PER_REGION = 4
+
+/**
+ * 県外に置く学校の総数。
+ *
+ * 全国大会の相手を使い捨てにしていた頃は、
+ * 「去年あそこに負けた」「今年こそ」という記憶が積み上がらなかった。
+ */
+export const NATIONAL_RIVALS = (REGIONS.length - 1) * NATIONAL_SCHOOLS_PER_REGION
 
 /**
  * 県内の学校の地力の分布。
@@ -133,12 +140,20 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
 ]
 
 /**
- * 全国クラスの学校の地力。
- * 県大会を勝ち抜いてきた学校なので、県内の平均よりはっきり上に置く。
- * ただし初出場の学校もいるので下限は低めにしてある。
+ * 県外の学校の地力。
+ *
+ * **1県の中でも序列を付ける。** 全部を「全国クラス」にすると、
+ * どの県へ遠征しても格上ばかりになり、
+ * 甲子園に出てくる代表校（各県の最上位）の重みも消える。
+ *
+ * 先頭が県の代表クラス、後ろほど地元の有力校どまり。
  */
-const NATIONAL_TRADITION_MIN = 8
-const NATIONAL_TRADITION_MAX = 34
+const NATIONAL_TRADITION_TIERS: { min: number; max: number }[] = [
+  { min: 14, max: 34 }, // 県の代表クラス
+  { min: 6, max: 22 }, // それに続く強豪
+  { min: -2, max: 14 }, // 中堅上位
+  { min: -10, max: 8 }, // 中堅
+]
 
 /** 1校が抱える注目選手の数 */
 const STARS_PER_SCHOOL = 2
@@ -159,7 +174,12 @@ const STAR_GROWTH_MAX = 12
  * 県内10校（大会と地元の練習試合の相手）と、
  * 県外の全国クラス20校（全国大会の相手・U18の選考基準）をまとめて返す。
  */
-export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
+export function createRivals(
+  rng: Rng,
+  homeRegionId: RegionId,
+  /** ゲームを始める年。注目選手の入学年を数えるのに使う */
+  year = 1,
+): RivalSchool[] {
   const schools: RivalSchool[] = []
   const names: string[] = []
   const playerNames: string[] = []
@@ -176,7 +196,7 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
       strength: tradition + rng.int(-DRIFT, DRIFT),
       trend: 0,
       ...(notable ? { notable: true } : {}),
-      stars: notable ? createStars(rng, id, tradition, playerNames) : [],
+      stars: notable ? createStars(rng, id, tradition, playerNames, year) : [],
       rosterSeed: rng.int(1, 2_000_000_000),
       record: emptyRivalRecord(),
     })
@@ -201,18 +221,22 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
     add(`rs${index + 1}`, homeRegionId, tradition, index < RIVALS_PER_REGION)
   })
 
-  // 県外の全国クラス。1県に1校ずつ置いて、全国に散らす
-  const elsewhere = REGIONS.filter((region) => region.id !== homeRegionId)
-  const picked = shuffle(rng, elsewhere).slice(0, NATIONAL_RIVALS)
+  // 県外。自県以外のすべての地区に、序列を付けて複数校ずつ置く
+  const elsewhere = shuffle(
+    rng,
+    REGIONS.filter((region) => region.id !== homeRegionId),
+  )
 
-  picked.forEach((region, index) => {
-    add(
-      `rn${index + 1}`,
-      region.id,
-      rng.int(NATIONAL_TRADITION_MIN, NATIONAL_TRADITION_MAX),
-      true,
-    )
-  })
+  let serial = 0
+  for (const region of elsewhere) {
+    for (let rank = 0; rank < NATIONAL_SCHOOLS_PER_REGION; rank++) {
+      const tier = NATIONAL_TRADITION_TIERS[Math.min(rank, NATIONAL_TRADITION_TIERS.length - 1)]
+      serial++
+      // 注目選手を抱えるのは各県の筆頭校だけ。
+      // 全校に置くと、注目選手だけで名簿が数百人ぶんに膨らむ
+      add(`rn${serial}`, region.id, rng.int(tier.min, tier.max), rank === 0)
+    }
+  }
 
   return schools
 }
@@ -228,9 +252,31 @@ export function localRivals(schools: RivalSchool[], regionId: RegionId): RivalSc
   return schools.filter((school) => school.regionId === regionId)
 }
 
-/** 県外の学校。全国大会の相手 */
+/** 県外の学校。遠征の練習試合とU18の候補になる */
 export function nationalRivals(schools: RivalSchool[], regionId: RegionId): RivalSchool[] {
   return schools.filter((school) => school.regionId !== regionId)
+}
+
+/**
+ * 全国大会に出てくる顔ぶれ。**各県から1校ずつ。**
+ *
+ * 甲子園は各県1代表なので、
+ * 県外の学校をそのまま並べると同じ県から何校も出てきてしまう。
+ * その年いちばん戦力の高い学校をその県の代表とする
+ * （戦力は毎年動くので、代表校も入れ替わる）。
+ */
+export function nationalRepresentatives(
+  schools: RivalSchool[],
+  homeRegionId: RegionId,
+): RivalSchool[] {
+  const best = new Map<RegionId, RivalSchool>()
+
+  for (const school of schools) {
+    if (school.regionId === homeRegionId) continue
+    const current = best.get(school.regionId)
+    if (!current || school.strength > current.strength) best.set(school.regionId, school)
+  }
+  return [...best.values()]
 }
 
 /** その県の学校。遠征先で当たる相手を探すのに使う */
@@ -254,12 +300,18 @@ function createStars(
   schoolId: string,
   tradition: number,
   takenNames: string[],
+  year: number,
 ): RivalPlayer[] {
   const stars: RivalPlayer[] = []
 
   for (let i = 0; i < STARS_PER_SCHOOL; i++) {
     const grade = rng.pick<Grade>([1, 2, 3])
-    stars.push(makeStar(rng, `${schoolId}-${i}`, grade, tradition, takenNames))
+    // **入学年を必ず持たせる。** 持たせていなかった頃は
+    // `starGrade` が学年を据え置き、開始時の3年生が
+    // **何年経っても3年生のまま名簿に居座っていた**
+    stars.push(
+      makeStar(rng, `${schoolId}-${i}`, grade, tradition, takenNames, year - (grade - 1)),
+    )
   }
   return stars
 }

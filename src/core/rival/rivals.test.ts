@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import { findRegion } from '@/core/types/region'
+import { findRegion, REGIONS } from '@/core/types/region'
 import {
   addStar,
   bestStarRating,
   localRivals,
   NATIONAL_RIVALS,
+  NATIONAL_SCHOOLS_PER_REGION,
+  nationalRepresentatives,
   nationalRivals,
   upperStarRatingAtRank,
   advanceRival,
@@ -75,10 +77,28 @@ describe('createRivals', () => {
     expect(local.filter((school) => school.tradition >= 18).length).toBeGreaterThanOrEqual(8)
   })
 
-  it('県外の学校は1県に1校まで（全国に散らす）', () => {
+  it('県外は全国に散らし、1県に複数校ずつ置く', () => {
+    // 1県1校だった頃は、遠征で同じ県へ行くたびに必ず同じ学校が出てきた
     const regions = nationalRivals(rivals, 'kanagawa').map((school) => school.regionId)
-    expect(new Set(regions).size).toBe(regions.length)
+    expect(new Set(regions).size).toBe(REGIONS.length - 1)
     expect(regions).not.toContain('kanagawa')
+
+    for (const region of new Set(regions)) {
+      expect(regions.filter((id) => id === region)).toHaveLength(NATIONAL_SCHOOLS_PER_REGION)
+    }
+  })
+
+  it('全国大会に出てくるのは各県から1校だけ', () => {
+    // 甲子園は各県1代表。そのまま並べると同じ県から何校も出てくる
+    const reps = nationalRepresentatives(rivals, 'kanagawa')
+    expect(reps).toHaveLength(REGIONS.length - 1)
+    expect(new Set(reps.map((s) => s.regionId)).size).toBe(reps.length)
+
+    // その年いちばん戦力の高い学校が代表になる
+    for (const rep of reps) {
+      const same = rivals.filter((s) => s.regionId === rep.regionId)
+      expect(rep.strength).toBe(Math.max(...same.map((s) => s.strength)))
+    }
   })
 
   it('県外の学校のほうが地力が高い（甲子園に出てくる顔ぶれ）', () => {

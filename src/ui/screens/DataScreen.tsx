@@ -314,13 +314,15 @@ function FacilityTab() {
   )
 }
 
-/** 一覧に既定で出す県内の校数 */
+/** 一覧に既定で出す校数 */
 const LOCAL_PREVIEW = 20
+const NATIONAL_PREVIEW = 20
 
 /** ライバル校 */
 function RivalsTab() {
   const game = useGameStore((s) => s.game)!
   const [showAll, setShowAll] = useState(false)
+  const [showAllNational, setShowAllNational] = useState(false)
 
   const local = [...localRivals(game.rivals, game.regionId)].sort(
     (a, b) => b.strength - a.strength,
@@ -331,6 +333,9 @@ function RivalsTab() {
   )
   const national = [...nationalRivals(game.rivals, game.regionId)].sort(
     (a, b) => b.strength - a.strength,
+  )
+  const nationalShown = national.filter(
+    (school, index) => index < NATIONAL_PREVIEW || hasMet(school.record),
   )
 
   return (
@@ -351,10 +356,23 @@ function RivalsTab() {
         )}
       </Section>
 
-      <Section title="全国の強豪">
-        {national.map((school) => (
+      {/*
+        県外は全48地区に複数校ずつある。
+        全部並べると数百行になるので、県内と同じく強い順に上位だけ出す
+      */}
+      <Section title={`県外の学校（${national.length}校）`}>
+        {(showAllNational ? national : nationalShown).map((school) => (
           <RivalRow key={school.id} school={school} showRegion />
         ))}
+        {!showAllNational && national.length > nationalShown.length && (
+          <button
+            type="button"
+            className={styles.moreRivals}
+            onClick={() => setShowAllNational(true)}
+          >
+            残り{national.length - nationalShown.length}校を見る
+          </button>
+        )}
       </Section>
     </>
   )

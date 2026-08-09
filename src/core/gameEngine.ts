@@ -48,7 +48,7 @@ import {
   advanceRival,
   createRivals,
   localRivals,
-  nationalRivals,
+  nationalRepresentatives,
   schoolForProspect,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
@@ -218,7 +218,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     pendingMatch: null,
     pendingSetup: null,
     regionId,
-    rivals: createRivals(rng, regionId),
+    rivals: createRivals(rng, regionId, 1),
     u18Squad: null,
     scouting: { ...emptyScouting(), nationalTeam: createNationalTeam(rng, 1) },
     scoutTraits: createTraits(rng),
@@ -1503,9 +1503,11 @@ function bracketFor(rng: Rng, state: GameState, kind: TournamentKind): Bracket {
   const region = findRegion(state.regionId)
   const base = createTournament(kind, region)
 
+  // **全国大会は各県から1校ずつ。** 県外の学校をそのまま並べると、
+  // 同じ県から何校も甲子園に出てくることになる
   const schools = isLocalTournament(kind)
     ? localRivals(state.rivals, state.regionId)
-    : nationalRivals(state.rivals, state.regionId)
+    : nationalRepresentatives(state.rivals, state.regionId)
 
   const pool: BracketTeam[] = schools.map((school) => ({
     schoolId: school.id,

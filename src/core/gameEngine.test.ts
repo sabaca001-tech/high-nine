@@ -1807,14 +1807,17 @@ describe('グラウンド整備', () => {
   })
 
   it('年度を重ねるとマネージャーが入部してくる。役割は重複しない', () => {
-    let state = startedGame({ seed: 206 })
+    // 入部は3年に1人ほどの確率なので、1シードでは出ない年もある
     let sawManager = false
 
-    for (let i = 0; i < 8; i++) {
-      state = applyCommand(playYear(state), { type: 'finishSeason' }).state
-      if (state.managers.length > 0) sawManager = true
-      const roles = state.managers.map((m) => m.roleId)
-      expect(new Set(roles).size).toBe(roles.length)
+    for (const seed of [206, 216, 226]) {
+      let state = startedGame({ seed })
+      for (let i = 0; i < 8; i++) {
+        state = applyCommand(playYear(state), { type: 'finishSeason' }).state
+        if (state.managers.length > 0) sawManager = true
+        const roles = state.managers.map((m) => m.roleId)
+        expect(new Set(roles).size).toBe(roles.length)
+      }
     }
 
     expect(sawManager).toBe(true)
