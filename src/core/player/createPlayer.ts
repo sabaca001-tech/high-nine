@@ -128,8 +128,11 @@ export const GRADE_BASE: Record<Grade, number> = {
  *
  * 学年差（1年→3年で14）より大きく取ることで、
  * 1年の上位が3年の平均に並び、3年の下位が1年の平均まで落ちる。
+ *
+ * **16では足りなくなった。** 能力ごとのばらつき（`ABILITY_SPREAD`）の
+ * 合計を0に揃えたので、総合を動かすのはこの値だけになった。
  */
-const TALENT_SPREAD = 16
+const TALENT_SPREAD = 18
 
 /**
  * 球速（km/h）。素質（base）が速さになる。
@@ -156,8 +159,25 @@ const VELOCITY_INTERCEPT = 115
  * 能力ごとのばらつき幅（±）。
  * こちらは「打撃は良いが守備は苦手」といった凸凹を作るためのもの。
  * 素質の差（`TALENT_SPREAD`）と役割が違う。
+ *
+ * **10では凸凹が足りなかった。** 6項目の平均が素質どおりになるよう
+ * 合計を0に揃えているので、幅を広げても総合は動かない。
+ * 動くのは「何が得意な選手か」の分かりやすさだけ。
  */
-const ABILITY_SPREAD = 10
+const ABILITY_SPREAD = 18
+
+/**
+ * 合計が0になるばらつきを `count` 個作る。
+ *
+ * 素直に `rng.int(-spread, spread)` を並べると、
+ * たまたま全部プラス／全部マイナスに寄って**総合そのものがずれる**。
+ * 平均を引いて中心に戻すことで、凸凹だけを大きくできる。
+ */
+function centeredSpread(rng: Rng, count: number, spread: number): number[] {
+  const raw = Array.from({ length: count }, () => rng.int(-spread, spread))
+  const mean = raw.reduce((sum, value) => sum + value, 0) / count
+  return raw.map((value) => Math.round(value - mean))
+}
 
 /**
  * 本職の投手になる割合。
@@ -216,20 +236,28 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
 
   const base = GRADE_BASE[grade] + talentBonus + talent + (genius ? GENIUS_TALENT_BONUS : 0)
 
-  /** base を中心にばらつかせた能力値を1つ作る */
-  const ability = (): number =>
-    clampAbility(base + rng.int(-ABILITY_SPREAD, ABILITY_SPREAD))
+  /*
+   * 能力ごとのばらつき。
+   *
+   * **合計を0に揃えてある。** 素質どおりの総合になるので、
+   * スカウトの「素質◯◯」と入学後の総合が食い違わない。
+   * 揃えずに振っていた頃は、素質45と書いてあった選手が総合40で入ることがあった。
+   *
+   * 野手6項目・投手3項目をそれぞれ別に揃える。
+   */
+  const battingSpread = centeredSpread(rng, BATTING_KEYS.length, ABILITY_SPREAD)
+  const pitchingSpread = isPitcher ? centeredSpread(rng, 3, ABILITY_SPREAD) : []
 
   const name = pickName(rng, options.takenNames ?? [])
   const position: Position = isPitcher ? 'P' : rng.pick(FIELDER_POSITIONS)
-  const breaking = ability()
+  const breaking = clampAbility(base + (pitchingSpread[2] ?? 0))
 
   // **投手能力を先に決める。** 野手能力の上限に使うため
   const pitching = isPitcher
     ? {
         velocity: velocityFor(rng, base, grade),
-        control: ability(),
-        stamina: ability(),
+        control: clampAbility(base + pitchingSpread[0]),
+        stamina: clampAbility(base + pitchingSpread[1]),
         breaking,
         pitches: rollInitialPitches(rng, breaking),
       }
@@ -243,8 +271,9 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
    * 自動編成が「打てるから」と別のポジションへ回したり、
    * 打線の中軸に据えたりして、**投手を投手として扱えなくなっていた**。
    */
+  let battingIndex = 0
   const fielderAbility = (): number => {
-    if (!pitching) return ability()
+    if (!pitching) return clampAbility(base + battingSpread[battingIndex++])
     const cap = pitchingRating(pitching)
     return clampAbility(rng.int(Math.max(1, Math.round(cap * PITCHER_FIELDING_FLOOR)), cap))
   }
@@ -306,27 +335,34 @@ export function createGrowthAptitude(
   rng: Rng,
   isPitcher: boolean,
 ): Partial<Record<GrowableKey, number>> {
-  // 持っていない能力に得意・苦手を付けても意味が無い。
+  // 持っていない能力に伸び代を付けても意味が無い。
   // **球速も対象に入れる。** 入れていなかった頃は、
   // 誰が投げても球速の伸び方が同じで、「伸び代のある投手」が生まれなかった
   const pool: GrowableKey[] = isPitcher
     ? [...BATTING_KEYS, 'velocity', 'control', 'stamina', 'breaking']
     : [...BATTING_KEYS]
 
-  const shuffled = [...pool]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = rng.int(0, i)
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
+  /*
+   * **選手そのものの伸びやすさ。** 全能力にまとめて掛かる。
+   *
+   * 能力ごとの乱数だけだと、6〜10項目の平均は1.0に寄ってしまい
+   * 「この選手はよく伸びる」が作れない（`TALENT_SPREAD` と同じ話）。
+   * 素質が入学時の能力を決めるのに対して、こちらは3年間の伸びを決める。
+   */
+  const talent = 0.75 + rng.float() * 0.5
 
   const aptitude: Partial<Record<GrowableKey, number>> = {}
-  for (const key of shuffled.slice(0, STRONG_COUNT)) {
-    aptitude[key] = round2(1.25 + rng.float() * 0.35)
+  for (const key of pool) {
+    aptitude[key] = round2(clampAptitude(talent * (KEY_MIN + rng.float() * KEY_RANGE)))
   }
-  for (const key of shuffled.slice(STRONG_COUNT, STRONG_COUNT + WEAK_COUNT)) {
-    // 0.5まで下げると苦手な能力が事実上凍りつき、総合が伸び残る。
-    // 「遅い」であって「動かない」ではない水準にする
-    aptitude[key] = round2(0.6 + rng.float() * 0.2)
+
+  /*
+   * **1つだけ飛び抜けた能力を持つ選手。**
+   * 全部がなだらかに伸びると、3年経っても「何が武器か」が言えない。
+   */
+  if (rng.chance(SPECIALIST_CHANCE)) {
+    const key = rng.pick(pool)
+    aptitude[key] = round2(clampAptitude((aptitude[key] ?? 1) * SPECIALIST_BOOST))
   }
 
   /*
@@ -342,12 +378,31 @@ export function createGrowthAptitude(
   return aptitude
 }
 
+/**
+ * 能力ごとの伸び代の幅。平均が1.0になるように取る。
+ *
+ * **得意2つ・苦手2つ・残りは等倍、という配り方をやめた。**
+ * 半分の能力が「ちょうど1.0」で並ぶので、3年育てると
+ * どの選手も同じような形に落ち着いていた。
+ * いまは全項目に別々の伸び代が付く。
+ */
+const KEY_MIN = 0.55
+const KEY_RANGE = 0.9
+
+/** 伸び代の下限・上限。ここを外すと「まったく動かない」能力ができる */
+const APTITUDE_FLOOR = 0.4
+const APTITUDE_CEILING = 2.4
+
+function clampAptitude(value: number): number {
+  return Math.min(APTITUDE_CEILING, Math.max(APTITUDE_FLOOR, value))
+}
+
+/** 1つの能力だけ飛び抜けて伸びる選手の出現率と、その倍率 */
+const SPECIALIST_CHANCE = 0.3
+const SPECIALIST_BOOST = 1.5
+
 /** 球速の伸び代が飛び抜けている投手の出現率 */
 const LATE_BLOOMER_CHANCE = 0.05
-
-/** 得意・苦手にする能力の数 */
-const STRONG_COUNT = 2
-const WEAK_COUNT = 2
 
 /** 野手も投手も持っている能力 */
 const BATTING_KEYS: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']

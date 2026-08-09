@@ -2192,10 +2192,13 @@ describe('個人イベント', () => {
   it('選ぶと結果が出て、練習フェーズへ戻る', () => {
     const state = reachEvent(303)
     const event = findPlayerEvent(state.pendingEvent!.eventId)!
+    // **払える選択肢を選ぶ。** 先頭が部費の要る選択肢のこともあり、
+    // 残高が足りないと（正しく）弾かれてフェーズが動かない
+    const choice = event.choices.find((c) => (c.cost ?? 0) <= state.funds)!
 
     const { state: next, events } = applyCommand(state, {
       type: 'choosePlayerEventChoice',
-      choiceId: event.choices[0].id,
+      choiceId: choice.id,
     })
 
     expect(next.phase).toBe('cardSelect')
@@ -2792,12 +2795,12 @@ describe('ライバル校', () => {
           // **甲子園は49校。持っている県外の学校（20校）では足りない**ので、
           // 残りはその大会限りの代表校で埋まる。
           // 実在の学校が当たったときだけ、代表県が出ることを確かめる
-          if (!names.includes(setup.opponentName)) continue
-
-          expect(setup.opponentRegionName).toBeTruthy()
-          expect(setup.opponentRegionName).not.toBe('鳥取')
-          found = true
-          break
+          if (names.includes(setup.opponentName)) {
+            expect(setup.opponentRegionName).toBeTruthy()
+            expect(setup.opponentRegionName).not.toBe('鳥取')
+            found = true
+            break
+          }
         }
         state = playStep(state)
       }

@@ -4,7 +4,7 @@ import { ABILITY_MAX, ABILITY_MIN } from '@/core/types/player'
 import type { Grade } from '@/core/types/player'
 import { createInitialRoster, createPlayer } from './createPlayer'
 import { overallRating } from './rating'
-import { pitchingRating } from './rating'
+import { battingRating, pitchingRating } from './rating'
 
 describe('createPlayer', () => {
   it('同じシードなら同じ選手ができる', () => {
@@ -267,5 +267,82 @@ describe('球速の伸び代', () => {
       const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: false })
       expect(player.growthAptitude.velocity).toBeUndefined()
     }
+  })
+})
+
+describe('伸び代の個人差', () => {
+  /**
+   * **得意2つ・苦手2つ・残りは等倍、という配り方をやめた。**
+   * 半分の能力が「ちょうど1.0」で並ぶので、3年育てるとどの選手も
+   * 同じような形に落ち着いていた。
+   */
+  it('すべての能力に別々の伸び代が付く', () => {
+    const rng = createRng(51)
+    for (let i = 0; i < 30; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: false })
+      const values = Object.values(player.growthAptitude) as number[]
+      expect(values).toHaveLength(6)
+      // 全部が同じ値ということは無い
+      expect(new Set(values).size).toBeGreaterThan(3)
+    }
+  })
+
+  it('選手ごとに「よく伸びる／伸びない」の差がある', () => {
+    // 能力ごとの乱数だけだと平均が1.0に寄って、
+    // 「この選手はよく伸びる」が作れない
+    const rng = createRng(52)
+    const means: number[] = []
+    for (let i = 0; i < 200; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: false })
+      const values = Object.values(player.growthAptitude) as number[]
+      means.push(values.reduce((a, b) => a + b, 0) / values.length)
+    }
+    expect(Math.max(...means) - Math.min(...means)).toBeGreaterThan(0.5)
+  })
+
+  it('チーム全体の成長速度は変えない（伸び代の平均は1.0前後）', () => {
+    const rng = createRng(53)
+    const all: number[] = []
+    for (let i = 0; i < 400; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: false })
+      all.push(...(Object.values(player.growthAptitude) as number[]))
+    }
+    const mean = all.reduce((a, b) => a + b, 0) / all.length
+    expect(mean).toBeGreaterThan(0.94)
+    expect(mean).toBeLessThan(1.12)
+  })
+})
+
+describe('入部時の能力の凸凹', () => {
+  it('能力ごとにはっきり差が付く', () => {
+    const rng = createRng(61)
+    const gaps: number[] = []
+    for (let i = 0; i < 200; i++) {
+      const b = createPlayer(rng, { id: `p${i}`, grade: 2, isPitcher: false }).batting
+      const values = [b.meet, b.power, b.speed, b.arm, b.fielding, b.catching]
+      gaps.push(Math.max(...values) - Math.min(...values))
+    }
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length
+    expect(mean).toBeGreaterThan(20)
+  })
+
+  it('凸凹にしても総合は素質どおりになる', () => {
+    // **スカウトの「素質◯◯」と食い違ってはいけない。**
+    // ばらつきの合計を0に揃えているので、平均は素質に一致する
+    const rng = createRng(62)
+    const ratings: number[] = []
+    for (let i = 0; i < 400; i++) {
+      const player = createPlayer(rng, {
+        id: `p${i}`,
+        grade: 1,
+        isPitcher: false,
+        talentBonus: 24,
+        talentSpread: 0,
+      })
+      ratings.push(battingRating(player.batting))
+    }
+    const mean = ratings.reduce((a, b) => a + b, 0) / ratings.length
+    // 素質は GRADE_BASE[1](36) + 24 = 60
+    expect(Math.abs(mean - 60)).toBeLessThan(2)
   })
 })

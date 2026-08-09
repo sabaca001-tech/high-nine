@@ -319,8 +319,8 @@ describe('特殊能力の影響', () => {
     expect(walks('chase-swing')).toBeLessThan(walks(null))
   })
 
-  it('広角打法を持つと長打が増える', () => {
-    /** 全員に特殊能力を付けたチームの長打（二塁打・三塁打・本塁打）を数える */
+  it('広角打法を持つと本塁打が増える', () => {
+    /** 全員に特殊能力を付けたチームの本塁打を数える */
     const longHits = (skill: string | null): number => {
       let total = 0
       for (let seed = 0; seed < 60; seed++) {
@@ -336,17 +336,15 @@ describe('特殊能力の影響', () => {
           opponentStrength: 0,
           kind: 'friendly',
         })
-        total += result.battingLines.reduce(
-          (sum, line) => sum + line.doubles + line.triples + line.homeruns,
-          0,
-        )
+        total += result.battingLines.reduce((sum, line) => sum + line.homeruns, 0)
       }
       return total
     }
 
-    // **得点で測るのはやめた。** 1試合の得点は振れ幅が大きいうえ、
-    // スタメンが1人変わるだけで乱数の並びがずれて逆転する。
-    // 広角打法はパワー+8なので、長打の数で見るほうが素直に効果が出る
+    // **得点でも長打全体でもなく、本塁打で測る。**
+    // 得点は振れ幅が大きく、スタメンが1人変わるだけで逆転する。
+    // 二塁打はパワーに依存しない（`hitType` の `doubleShare` は固定）ので、
+    // 長打全体で見るとパワー+8の効果が二塁打のノイズに埋もれる
     expect(longHits('power-hitter')).toBeGreaterThan(longHits(null))
   })
 })
