@@ -306,9 +306,11 @@ export function createGrowthAptitude(
   rng: Rng,
   isPitcher: boolean,
 ): Partial<Record<GrowableKey, number>> {
-  // 持っていない能力に得意・苦手を付けても意味が無い
+  // 持っていない能力に得意・苦手を付けても意味が無い。
+  // **球速も対象に入れる。** 入れていなかった頃は、
+  // 誰が投げても球速の伸び方が同じで、「伸び代のある投手」が生まれなかった
   const pool: GrowableKey[] = isPitcher
-    ? [...BATTING_KEYS, 'control', 'stamina', 'breaking']
+    ? [...BATTING_KEYS, 'velocity', 'control', 'stamina', 'breaking']
     : [...BATTING_KEYS]
 
   const shuffled = [...pool]
@@ -326,8 +328,22 @@ export function createGrowthAptitude(
     // 「遅い」であって「動かない」ではない水準にする
     aptitude[key] = round2(0.6 + rng.float() * 0.2)
   }
+
+  /*
+   * **稀に、球速だけ飛び抜けて伸びる投手が出る。**
+   * 150km/h はドラフトの分かれ目なので、そこへ届くかどうかが
+   * 入学時の球速だけで決まってしまうと、育てる余地が無い。
+   * 20人に1人、3年で10km/h以上伸びる素材を混ぜる。
+   */
+  if (isPitcher && rng.chance(LATE_BLOOMER_CHANCE)) {
+    aptitude.velocity = round2(1.9 + rng.float() * 0.5)
+  }
+
   return aptitude
 }
+
+/** 球速の伸び代が飛び抜けている投手の出現率 */
+const LATE_BLOOMER_CHANCE = 0.05
 
 /** 得意・苦手にする能力の数 */
 const STRONG_COUNT = 2

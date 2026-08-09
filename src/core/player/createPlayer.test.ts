@@ -235,3 +235,37 @@ describe('投手の野手能力', () => {
     expect(meets.size).toBeGreaterThan(10)
   })
 })
+
+describe('球速の伸び代', () => {
+  it('投手には球速の得意・苦手が付きうる', () => {
+    // 入っていなかった頃は、誰が投げても球速の伸び方が同じで、
+    // 「伸び代のある投手」が生まれなかった
+    const rng = createRng(41)
+    let withVelocity = 0
+    for (let i = 0; i < 200; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: true })
+      if (player.growthAptitude.velocity !== undefined) withVelocity++
+    }
+    expect(withVelocity).toBeGreaterThan(20)
+  })
+
+  it('稀に球速だけ飛び抜けて伸びる投手が出る', () => {
+    // 150km/h はドラフトの分かれ目。入学時の球速だけで決まると育てる余地が無い
+    const rng = createRng(42)
+    let bloomers = 0
+    for (let i = 0; i < 400; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: true })
+      if ((player.growthAptitude.velocity ?? 0) >= 1.9) bloomers++
+    }
+    expect(bloomers).toBeGreaterThan(5)
+    expect(bloomers).toBeLessThan(80)
+  })
+
+  it('野手には球速の伸び代が付かない', () => {
+    const rng = createRng(43)
+    for (let i = 0; i < 50; i++) {
+      const player = createPlayer(rng, { id: `p${i}`, grade: 1, isPitcher: false })
+      expect(player.growthAptitude.velocity).toBeUndefined()
+    }
+  })
+})

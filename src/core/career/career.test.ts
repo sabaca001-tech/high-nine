@@ -16,6 +16,7 @@ import {
   simulateProSeason,
   toProAbility,
   trimGraduates,
+  velocityDraftBonus,
 } from './career'
 
 function base(rating: number, isPitcher = false) {
@@ -512,5 +513,39 @@ describe('経歴と年齢', () => {
       return
     }
     throw new Error('大学へ進むシードが見つからない')
+  })
+})
+
+describe('球速とドラフト', () => {
+  /**
+   * **高卒の投手はまず球速で見られる。**
+   * 球速を無視していた頃は、制球とスタミナだけが良い138km/hの投手が
+   * 毎年のように指名されていた。
+   */
+  it('150km/h が分かれ目', () => {
+    expect(velocityDraftBonus(150)).toBe(0)
+    expect(velocityDraftBonus(145)).toBe(-10)
+    expect(velocityDraftBonus(155)).toBe(10)
+    expect(velocityDraftBonus(undefined)).toBe(0)
+  })
+
+  it('速いほど有利、遅いほど不利（振り切れても止まる）', () => {
+    expect(velocityDraftBonus(120)).toBe(-20)
+    expect(velocityDraftBonus(170)).toBe(16)
+  })
+
+  it('145km/h の投手は、150km/h の投手より高い総合が要る', () => {
+    const chance = (rating: number, velocity: number) => {
+      let pro = 0
+      for (let seed = 1; seed <= 300; seed++) {
+        if (decidePath(createRng(seed), rating, 60, 0, velocity) === 'pro') pro++
+      }
+      return pro / 300
+    }
+    expect(chance(86, 152)).toBeGreaterThan(chance(86, 145))
+    // 145km/h でも、他が突出していれば届く
+    expect(chance(98, 145)).toBeGreaterThan(0)
+    // 140km/h の平凡な投手はまず指名されない
+    expect(chance(80, 140)).toBe(0)
   })
 })

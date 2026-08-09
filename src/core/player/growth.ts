@@ -171,15 +171,22 @@ function motivationMultiplierFor(player: Player): number {
 /**
  * 能力が高いほど伸びにくくする。
  *
- * **総合Sは10年に1人程度**にしたいので、上に行くほど強く鈍らせる。
- * 以前（90以上で0.3）は3年あれば誰でも90に届いてしまい、
- * 「飛び抜けた選手」という感覚が無かった。
+ * **A（80）から上が本当に遠いようにする。**
+ * 球速は 155km/h でようやくA、160でSという世界なのに、
+ * 他の能力は評判が上がったチームなら誰でもA・Sに届いていた。
+ * 「うちの4番はミートもパワーも走力も守備もS」という並びになり、
+ * 能力表が全部同じ色で埋まって、誰が何の選手なのか読めなくなっていた。
+ *
+ * 以前は 80以上で0.28・90以上で0.08。いまはその半分以下まで絞り、
+ * **Bまでは順調に、そこから先は伸ばす能力を選ぶ**形にしてある。
  */
 function diminishingMultiplier(current: number): number {
-  if (current >= 90) return 0.08
-  if (current >= 85) return 0.16
-  if (current >= 80) return 0.28
-  if (current >= 70) return 0.5
+  if (current >= 90) return 0.03
+  if (current >= 85) return 0.07
+  if (current >= 80) return 0.13
+  if (current >= 75) return 0.24
+  if (current >= 70) return 0.38
+  if (current >= 60) return 0.7
   return 1.0
 }
 

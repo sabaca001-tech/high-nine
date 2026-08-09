@@ -2788,7 +2788,12 @@ describe('ライバル校', () => {
           const setup = applyCommand(state, { type: 'playTournamentMatch' }).state
             .pendingSetup!
           const names = nationalRivals(state.rivals, state.regionId).map((s) => s.name)
-          expect(names).toContain(setup.opponentName)
+
+          // **甲子園は49校。持っている県外の学校（20校）では足りない**ので、
+          // 残りはその大会限りの代表校で埋まる。
+          // 実在の学校が当たったときだけ、代表県が出ることを確かめる
+          if (!names.includes(setup.opponentName)) continue
+
           expect(setup.opponentRegionName).toBeTruthy()
           expect(setup.opponentRegionName).not.toBe('鳥取')
           found = true

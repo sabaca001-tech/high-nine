@@ -101,10 +101,13 @@ export function decidePath(
   reputation: number,
   /** U18代表の実績による上乗せ（u18.ts の draftBonus） */
   u18Bonus = 0,
+  /** 投手なら球速(km/h)。野手なら省略 */
+  velocity?: number,
 ): CareerPath {
   // 評判はあくまで「目に留まりやすくなる」程度。実力を覆さない
   const bonus = Math.round((reputation - 20) * 0.05)
-  const score = rating + bonus + u18Bonus + rng.int(-4, 4)
+  const score =
+    rating + bonus + u18Bonus + velocityDraftBonus(velocity) + rng.int(-4, 4)
 
   if (score >= PRO_THRESHOLD) {
     // 水準に届いても指名は確約されない。抜けて上ならほぼ確実
@@ -118,6 +121,28 @@ export function decidePath(
   if (score >= CORPORATE_THRESHOLD) return 'corporate'
   return 'none'
 }
+
+/**
+ * 球速によるドラフトの上下。
+ *
+ * **高卒の投手はまず球速で見られる。** 150km/h に届かない投手は、
+ * 他が全部突出していない限り指名まで行かないのが現実で、
+ * 逆に150km/hを超えると一気に候補に入る。
+ * 球速を無視していた頃は、制球とスタミナだけが良い138km/hの投手が
+ * 毎年のように指名されていた。
+ *
+ *   140km/h → -20 ／ 145 → -10 ／ 150 → ±0 ／ 155 → +10
+ *
+ * 総合の水準（`PRO_THRESHOLD` ＝ 86）と合わせると、
+ * 145km/hの投手は総合96、150km/hなら86で並ぶ。
+ */
+export function velocityDraftBonus(velocity?: number): number {
+  if (velocity === undefined) return 0
+  return clampRange(Math.round((velocity - DRAFT_VELOCITY_LINE) * 2), -20, 16)
+}
+
+/** ここを超えると指名が現実味を帯びる球速(km/h) */
+const DRAFT_VELOCITY_LINE = 150
 
 /**
  * プロ入りしたときに能力をプロの物差しへ置き換える。
@@ -163,7 +188,14 @@ export function createAlumnus(
   reputation: number,
 ): Alumnus {
   const { u18Bonus = 0, ...record } = base
-  const path = decidePath(rng, base.rating, reputation, u18Bonus)
+  // 投手は球速がそのまま指名の分かれ目になる
+  const path = decidePath(
+    rng,
+    base.rating,
+    reputation,
+    u18Bonus,
+    base.isPitcher ? base.finalAbilities?.velocity : undefined,
+  )
 
   // 高校からそのままプロへ行く選手は、この時点でプロの物差しに置き換わる
   const ability = path === 'pro' ? toProAbility(rng, base.rating).ability : base.rating

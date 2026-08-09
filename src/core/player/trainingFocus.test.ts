@@ -8,14 +8,20 @@ import {
   advanceConvert,
   canConvert,
   CONVERT_MAX,
+  CONVERT_PRACTICE_PENALTY,
   CONVERT_STEPS,
   convertiblePositions,
   DEFAULT_FOCUS,
+  FOCUS_BONUS,
   focusLabel,
   focusMultiplier,
   isSameFocus,
+  positionGrowthMultiplier,
   withFocus,
 } from './trainingFocus'
+import { ALL_POSITIONS } from '@/core/lineup/aptitude'
+import { createInitialRoster } from './createPlayer'
+import type { GrowableKey } from '@/core/types/player'
 
 /**
  * テストで使う「進んだ日数」。
@@ -60,10 +66,16 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
 }
 
 describe('focusMultiplier', () => {
-  it('方針が無ければすべて等倍', () => {
+  it('方針が無ければ、本職での重要度で傾く', () => {
+    // **等倍ではない。** すべて同じだけ伸ばしていた頃は、
+    // 3年経つと誰を見ても同じ形のレーダーになっていた
     const player = makePlayer()
-    expect(focusMultiplier(player, 'meet')).toBe(1)
-    expect(focusMultiplier(player, 'power')).toBe(1)
+    expect(focusMultiplier(player, 'meet')).toBe(
+      positionGrowthMultiplier(player.position, 'meet'),
+    )
+    expect(focusMultiplier(player, 'power')).toBe(
+      positionGrowthMultiplier(player.position, 'power'),
+    )
   })
 
   it('能力を指定すると、その能力は伸びやすく他は鈍る', () => {
@@ -204,5 +216,67 @@ describe('focusLabel', () => {
     expect(focusLabel(undefined, labels)).toBe('チーム練習')
     expect(focusLabel({ type: 'ability', key: 'meet' }, labels)).toBe('ミート')
     expect(focusLabel({ type: 'convert', position: 'SS' }, labels)).toBe('SSへ転向')
+  })
+})
+
+describe('positionGrowthMultiplier', () => {
+  /**
+   * **おまかせでも、伸び方は本職で傾く。**
+   * すべて等倍にしていた頃は、3年経つと誰を見ても同じ形のレーダーになっていた。
+   */
+  const BATTING: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
+
+  it('チーム全体の成長量は変えない（各ポジションで平均1.0前後）', () => {
+    for (const position of ALL_POSITIONS) {
+      const keys = position === 'P' ? [...BATTING, 'velocity', 'control', 'stamina', 'breaking'] : BATTING
+      const values = (keys as GrowableKey[]).map((key) =>
+        positionGrowthMultiplier(position, key),
+      )
+      const mean = values.reduce((sum, v) => sum + v, 0) / values.length
+      expect(mean).toBeCloseTo(1, 5)
+    }
+  })
+
+  it('強制ではない（幅は0.7〜1.35に収める）', () => {
+    // ここを広げると「遊撃手だが打てる」が生まれなくなる
+    for (const position of ALL_POSITIONS) {
+      for (const key of BATTING) {
+        const value = positionGrowthMultiplier(position, key)
+        expect(value).toBeGreaterThanOrEqual(0.7)
+        expect(value).toBeLessThanOrEqual(1.35)
+      }
+    }
+  })
+
+  it('本職なりの能力がいちばん伸びる', () => {
+    expect(positionGrowthMultiplier('SS', 'fielding')).toBeGreaterThan(
+      positionGrowthMultiplier('SS', 'power'),
+    )
+    expect(positionGrowthMultiplier('1B', 'power')).toBeGreaterThan(
+      positionGrowthMultiplier('1B', 'speed'),
+    )
+    expect(positionGrowthMultiplier('CF', 'speed')).toBeGreaterThan(
+      positionGrowthMultiplier('CF', 'catching'),
+    )
+    expect(positionGrowthMultiplier('C', 'catching')).toBeGreaterThan(
+      positionGrowthMultiplier('C', 'speed'),
+    )
+    expect(positionGrowthMultiplier('P', 'velocity')).toBeGreaterThan(
+      positionGrowthMultiplier('P', 'meet'),
+    )
+  })
+
+  it('おまかせのときだけ効く（能力指定・コンバートには混ざらない）', () => {
+    const roster = createInitialRoster(createRng(5))
+    const shortstop = { ...roster[0], position: 'SS' as const, focus: undefined }
+    expect(focusMultiplier(shortstop, 'fielding')).toBe(
+      positionGrowthMultiplier('SS', 'fielding'),
+    )
+    expect(focusMultiplier({ ...shortstop, focus: { type: 'ability', key: 'power' } }, 'power')).toBe(
+      FOCUS_BONUS,
+    )
+    expect(
+      focusMultiplier({ ...shortstop, focus: { type: 'convert', position: '2B' } }, 'fielding'),
+    ).toBe(CONVERT_PRACTICE_PENALTY)
   })
 })
