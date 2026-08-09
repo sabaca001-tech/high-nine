@@ -135,6 +135,8 @@ export function TournamentScreen() {
           bracket={tournament.bracket}
           totalRounds={tournament.totalRounds}
           currentRound={Math.min(tournament.round, tournament.totalRounds)}
+          schools={game.rivals}
+          year={game.year}
         />
 
         {over && !tournament.champion && champion && (

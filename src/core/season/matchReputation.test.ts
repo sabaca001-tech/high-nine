@@ -33,10 +33,20 @@ describe('matchReputationDelta', () => {
    */
   const our = OPPONENT_BASE_RATING
 
-  it('互角の基準が createPlayer の GRADE_BASE と揃っている', () => {
-    // 相手は各学年5人ずつ。その平均が「強さ0」の相手の総合になる
+  it('互角の基準は「相手のスタメン9人の平均」', () => {
+    // **部員全体の平均ではない。** 比べる相手は自校の teamRating
+    // （スタメン9人の平均）なので、こちらもスタメンで測らないと格付けがずれる。
+    // 学年の基準より上に来るのは、9人が上位から選ばれるため
     const average = (GRADE_BASE[1] + GRADE_BASE[2] + GRADE_BASE[3]) / 3
-    expect(OPPONENT_BASE_RATING).toBe(Math.round(average))
+    expect(OPPONENT_BASE_RATING).toBeGreaterThan(average)
+    expect(OPPONENT_BASE_RATING).toBeLessThan(average + 10)
+  })
+
+  it('強い学校ほどスタメン平均が上がる（ただし戦力そのままではない）', () => {
+    // 名簿は戦力の一部を素質に足して作る（rivalRoster）ので、
+    // 戦力をそのまま足すと強い学校ほど過大評価になる
+    expect(opponentRating(20)).toBeGreaterThan(opponentRating(0))
+    expect(opponentRating(20) - opponentRating(0)).toBeLessThan(20)
   })
 
   it('引き分けは動かない', () => {
@@ -109,8 +119,9 @@ describe('matchReputationDelta', () => {
 
 describe('matchupLabel', () => {
   it('力の差を言葉にする', () => {
-    expect(matchupLabel(40, 20)).toBe('格上')
-    expect(matchupLabel(40, 0)).toBe('互角')
-    expect(matchupLabel(60, 0)).toBe('格下')
+    const even = opponentRating(0)
+    expect(matchupLabel(even, 30)).toBe('格上')
+    expect(matchupLabel(even, 0)).toBe('互角')
+    expect(matchupLabel(even + 20, 0)).toBe('格下')
   })
 })

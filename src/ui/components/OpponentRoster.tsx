@@ -20,13 +20,25 @@ import styles from './OpponentRoster.module.css'
  * 畳んでおく。毎回開くものではないうえ、
  * 開きっぱなしだと自分のスタメンが画面外へ出てしまう。
  */
-export function OpponentRoster({ school, year }: { school: RivalSchool; year: number }) {
-  const [open, setOpen] = useState(false)
+export function OpponentRoster({
+  school,
+  year,
+  /** 畳んでいるときのボタンの文言。データ画面では「相手の」が付かない */
+  label = '相手のスタメン',
+  /** 最初から開いた状態にする */
+  defaultOpen = false,
+}: {
+  school: RivalSchool
+  year: number
+  label?: string
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
 
   if (!open) {
     return (
       <button type="button" className={styles.toggle} onClick={() => setOpen(true)}>
-        相手のスタメンを見る ▾
+        {label}を見る ▾
       </button>
     )
   }
@@ -38,7 +50,7 @@ export function OpponentRoster({ school, year }: { school: RivalSchool; year: nu
   return (
     <div className={styles.panel}>
       <button type="button" className={styles.toggle} onClick={() => setOpen(false)}>
-        相手のスタメン ▴
+        {label} ▴
       </button>
 
       <div className={styles.list}>

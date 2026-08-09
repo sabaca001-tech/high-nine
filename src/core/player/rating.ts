@@ -21,6 +21,18 @@ const RANK_THRESHOLDS: { rank: Rank; min: number }[] = [
   { rank: 'G', min: 0 },
 ]
 
+/**
+ * 「B(70)」のようなランク付きの表記。
+ *
+ * **プラス・マイナスでは読めない。** 他校の強さを「+15」と出していた頃は、
+ * 自分のチームと比べてどうなのかが分からなかった。
+ * 選手の総合と同じ物差し（ランクと数値）で出せば、そのまま比べられる。
+ */
+export function ratingLabel(rating: number): string {
+  const value = Math.round(rating)
+  return `${toRank(value)}(${value})`
+}
+
 /** 能力値(1〜100) → ランク表記 */
 export function toRank(value: number): Rank {
   for (const { rank, min } of RANK_THRESHOLDS) {

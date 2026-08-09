@@ -75,7 +75,9 @@ describe('simulateGame', () => {
     let bigLeads = 0
 
     for (let seed = 0; seed < 120; seed++) {
-      const result = playNoMercy(seed, -28)
+      // 相手の戦力は素質の55%しか乗らない（rivalRoster と揃えてある）ので、
+      // 大差の試合を作るには戦力を大きく下げる必要がある
+      const result = playNoMercy(seed, -55)
       const lead = Math.abs(result.finalScore.player - result.finalScore.opponent)
       if (lead >= 10) bigLeads += 1
       // 何点離れても9回（以上）まで行う

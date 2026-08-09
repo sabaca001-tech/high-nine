@@ -7,7 +7,8 @@ import { formatInnings } from '@/core/player/careerStats'
 import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
 import type { GrowthRange } from '@/core/player/growthReport'
 import { ABILITY_LABELS } from '@/core/types/player'
-import { overallRating, toRank } from '@/core/player/rating'
+import { overallRating, ratingLabel, toRank } from '@/core/player/rating'
+import { lineupRatingOf } from '@/core/rival/rivalRoster'
 import type { Player } from '@/core/types/player'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import {
@@ -36,6 +37,7 @@ import {
   REPUTATION_GRADE_LABELS,
 } from '@/core/types/season'
 import { findRegion, regionStrength, roundsFor } from '@/core/types/region'
+import { OpponentRoster } from '@/ui/components/OpponentRoster'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -321,6 +323,26 @@ function FacilityTab() {
   )
 }
 
+/**
+ * 出す学校を選んで、**スタメンの平均総合の順**に並べる。
+ *
+ * 選ぶのは戦力順（実測は1校0.2msかかるので、2818校ぶんは走らせない）。
+ * 並べ替えと表示は実測なので、
+ * 一覧の数字と開いたときの9人が食い違わない。
+ */
+function pickRivals(
+  schools: RivalSchool[],
+  preview: number,
+  all: boolean,
+  year: number,
+): { school: RivalSchool; rating: number }[] {
+  return [...schools]
+    .sort((a, b) => b.strength - a.strength)
+    .filter((school, index) => all || index < preview || hasMet(recordOf(school)))
+    .map((school) => ({ school, rating: lineupRatingOf(school, year) }))
+    .sort((a, b) => b.rating - a.rating)
+}
+
 /** 一覧に既定で出す校数 */
 const LOCAL_PREVIEW = 20
 const NATIONAL_PREVIEW = 20
@@ -331,18 +353,24 @@ function RivalsTab() {
   const [showAll, setShowAll] = useState(false)
   const [showAllNational, setShowAllNational] = useState(false)
 
-  const local = [...localRivals(game.rivals, game.regionId)].sort(
-    (a, b) => b.strength - a.strength,
+  /**
+   * 出す学校を選んで、**スタメンの平均総合の順**に並べる。
+   *
+   * 選ぶのは戦力順（実測は1校0.2msかかるので、2818校ぶんは走らせない）。
+   * 並べ替えと表示は実測なので、
+   * 一覧の数字と開いたときの9人が食い違わない。
+   */
+  const localAll = localRivals(game.rivals, game.regionId)
+  const nationalAll = nationalRivals(game.rivals, game.regionId)
+  const { year } = game
+
+  const localShown = useMemo(
+    () => pickRivals(localAll, LOCAL_PREVIEW, showAll, year),
+    [localAll, showAll, year],
   )
-  // 上位 LOCAL_PREVIEW 校＋戦ったことのある学校
-  const localShown = local.filter(
-    (school, index) => index < LOCAL_PREVIEW || hasMet(recordOf(school)),
-  )
-  const national = [...nationalRivals(game.rivals, game.regionId)].sort(
-    (a, b) => b.strength - a.strength,
-  )
-  const nationalShown = national.filter(
-    (school, index) => index < NATIONAL_PREVIEW || hasMet(recordOf(school)),
+  const nationalShown = useMemo(
+    () => pickRivals(nationalAll, NATIONAL_PREVIEW, showAllNational, year),
+    [nationalAll, showAllNational, year],
   )
 
   return (
@@ -352,13 +380,13 @@ function RivalsTab() {
         全部並べると縦に長すぎて他のタブへ戻れなくなるので、
         強い順に上位だけを出し、戦ったことのある学校は必ず混ぜる。
       */}
-      <Section title={`${findRegion(game.regionId).name}の学校（${local.length}校）`}>
-        {(showAll ? local : localShown).map((school) => (
-          <RivalRow key={school.id} school={school} />
+      <Section title={`${findRegion(game.regionId).name}の学校（${localAll.length}校）`}>
+        {localShown.map(({ school, rating }) => (
+          <RivalRow key={school.id} school={school} rating={rating} />
         ))}
-        {!showAll && local.length > localShown.length && (
+        {!showAll && localAll.length > localShown.length && (
           <button type="button" className={styles.moreRivals} onClick={() => setShowAll(true)}>
-            残り{local.length - localShown.length}校を見る
+            残り{localAll.length - localShown.length}校を見る
           </button>
         )}
       </Section>
@@ -367,17 +395,17 @@ function RivalsTab() {
         県外は全48地区に複数校ずつある。
         全部並べると数百行になるので、県内と同じく強い順に上位だけ出す
       */}
-      <Section title={`県外の学校（${national.length}校）`}>
-        {(showAllNational ? national : nationalShown).map((school) => (
-          <RivalRow key={school.id} school={school} showRegion />
+      <Section title={`県外の学校（${nationalAll.length}校）`}>
+        {nationalShown.map(({ school, rating }) => (
+          <RivalRow key={school.id} school={school} rating={rating} showRegion />
         ))}
-        {!showAllNational && national.length > nationalShown.length && (
+        {!showAllNational && nationalAll.length > nationalShown.length && (
           <button
             type="button"
             className={styles.moreRivals}
             onClick={() => setShowAllNational(true)}
           >
-            残り{national.length - nationalShown.length}校を見る
+            残り{nationalAll.length - nationalShown.length}校を見る
           </button>
         )}
       </Section>
@@ -513,21 +541,48 @@ function U18Row({
   )
 }
 
-function RivalRow({ school, showRegion }: { school: RivalSchool; showRegion?: boolean }) {
+function RivalRow({
+  school,
+  rating,
+  showRegion,
+}: {
+  school: RivalSchool
+  /** スタメン9人の平均総合。親でまとめて実測している */
+  rating: number
+  showRegion?: boolean
+}) {
+  const game = useGameStore((s) => s.game)!
+  const [open, setOpen] = useState(false)
   const stars = starsOf(school)
   const best = stars.reduce((top, star) => (star.rating > top.rating ? star : top), stars[0])
 
   return (
     <div className={styles.rival}>
-      <div className={styles.rivalHead}>
+      {/*
+        **学校名をタップするとスタメンが見られる。**
+        戦力の数字だけでは、どんな選手が揃っているのかが分からなかった。
+        名簿は種から作り直すので、ここに出る9人は実際に試合で当たる顔ぶれ。
+      */}
+      <button
+        type="button"
+        className={styles.rivalHead}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
         <span className={styles.rivalName}>
           {school.name}
           {showRegion && (
             <span className={styles.rivalRegion}>{findRegion(school.regionId).name}</span>
           )}
         </span>
-        <span className={styles.rivalStrength}>戦力 {signed(school.strength)}</span>
-      </div>
+        <span
+          className={styles.rivalStrength}
+          style={{ color: rankColorOf(toRank(Math.round(rating))) }}
+        >
+          {ratingLabel(rating)}
+        </span>
+        <span className={styles.rivalCaret}>{open ? '▴' : '▾'}</span>
+      </button>
       <div className={styles.rivalMeta}>
         {hasMet(recordOf(school)) ? (
           <span className={styles.rivalRecord}>通算 {formatRecord(recordOf(school))}</span>
@@ -545,6 +600,10 @@ function RivalRow({ school, showRegion }: { school: RivalSchool; showRegion?: bo
           </span>
         )}
       </div>
+
+      {open && (
+        <OpponentRoster school={school} year={game.year} label="スタメン" defaultOpen />
+      )}
     </div>
   )
 }

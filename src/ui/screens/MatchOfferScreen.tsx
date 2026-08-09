@@ -1,5 +1,7 @@
 import { formatFunds } from '@/core/shop/funds'
-import { teamRating, matchupLabel } from '@/core/season/matchReputation'
+import { teamRating, matchupLabel, opponentRating } from '@/core/season/matchReputation'
+import { ratingLabel } from '@/core/player/rating'
+import { lineupRatingOf } from '@/core/rival/rivalRoster'
 import { useGameStore } from '@/state/useGameStore'
 import { playSound } from '@/ui/sound/sound'
 import styles from './MatchOfferScreen.module.css'
@@ -41,6 +43,13 @@ export function MatchOfferScreen() {
         {game.pendingOffers.map((offer) => {
           const tooExpensive = offer.travelCost > game.funds
           const label = matchupLabel(ourRating, offer.opponentStrength)
+          // 実在の学校なら、実際に出てくるスタメンの平均を出す
+          const school = offer.opponentSchoolId
+            ? game.rivals.find((item) => item.id === offer.opponentSchoolId)
+            : undefined
+          const rating = school
+            ? lineupRatingOf(school, game.year)
+            : opponentRating(offer.opponentStrength)
 
           return (
             <button
@@ -52,6 +61,7 @@ export function MatchOfferScreen() {
             >
               <span className={styles.offerTop}>
                 <span className={styles.name}>{offer.opponentName}</span>
+                <span className={styles.rating}>{ratingLabel(rating)}</span>
                 <span className={`${styles.matchup} ${matchupClass(label)}`}>{label}</span>
               </span>
               <span className={styles.offerBottom}>

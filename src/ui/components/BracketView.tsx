@@ -2,6 +2,10 @@ import { useState } from 'react'
 import type { Bracket, BracketTeam } from '@/core/tournament/bracket'
 import { matchesAt, survivorsAt } from '@/core/tournament/bracket'
 import { roundName } from '@/core/types/tournament'
+import { ratingLabel } from '@/core/player/rating'
+import { opponentRating } from '@/core/season/matchReputation'
+import { lineupRatingOf } from '@/core/rival/rivalRoster'
+import type { RivalSchool } from '@/core/rival/rivals'
 import styles from './BracketView.module.css'
 
 /**
@@ -19,10 +23,15 @@ export function BracketView({
   bracket,
   totalRounds,
   currentRound,
+  schools,
+  year,
 }: {
   bracket: Bracket
   totalRounds: number
   currentRound: number
+  /** 実在の学校。スタメンの平均を実測するのに使う */
+  schools: RivalSchool[]
+  year: number
 }) {
   const [round, setRound] = useState(currentRound)
   if (bracket.slots.length === 0) return null
@@ -30,6 +39,16 @@ export function BracketView({
   const shown = Math.min(round, totalRounds)
   const matches = matchesAt(bracket, shown)
   const decided = bracket.winners.length >= shown
+
+  /**
+   * その相手のスタメン平均総合。
+   * **実在の学校なら実測する。** 甲子園はその大会限りの代表校も混ざるので、
+   * 学校が見つからないときだけ戦力から見込みを立てる。
+   */
+  const rate = (team: BracketTeam): number => {
+    const school = team.schoolId ? schools.find((item) => item.id === team.schoolId) : undefined
+    return school ? lineupRatingOf(school, year) : opponentRating(team.strength)
+  }
 
   return (
     <section className={styles.wrap}>
@@ -55,14 +74,22 @@ export function BracketView({
         <div className={styles.cards}>
           {matches.map((match, index) => (
             <div key={index} className={styles.card}>
-              <Side team={match.left} winner={decided && match.winner === match.left} />
+              <Side
+                team={match.left}
+                winner={decided && match.winner === match.left}
+                rate={rate}
+              />
               <span className={styles.vs}>–</span>
-              <Side team={match.right} winner={decided && match.winner === match.right} />
+              <Side
+                team={match.right}
+                winner={decided && match.winner === match.right}
+                rate={rate}
+              />
             </div>
           ))}
         </div>
       ) : (
-        <SurvivorList bracket={bracket} round={shown} />
+        <SurvivorList bracket={bracket} round={shown} rate={rate} />
       )}
     </section>
   )
@@ -74,7 +101,15 @@ const CARD_LIMIT = 8
 /** 一覧に名前を出す校数。これを超えたぶんは「他◯校」でまとめる */
 const NAME_LIMIT = 24
 
-function Side({ team, winner }: { team: BracketTeam | null; winner: boolean }) {
+function Side({
+  team,
+  winner,
+  rate,
+}: {
+  team: BracketTeam | null
+  winner: boolean
+  rate: (team: BracketTeam) => number
+}) {
   const classNames = [styles.side]
   if (winner) classNames.push(styles.winner)
   if (team?.ours) classNames.push(styles.ours)
@@ -82,12 +117,20 @@ function Side({ team, winner }: { team: BracketTeam | null; winner: boolean }) {
   return (
     <span className={classNames.join(' ')}>
       {team ? team.name : '不戦勝'}
-      {team && <span className={styles.strength}>{formatStrength(team.strength)}</span>}
+      {team && <span className={styles.strength}>{ratingLabel(rate(team))}</span>}
     </span>
   )
 }
 
-function SurvivorList({ bracket, round }: { bracket: Bracket; round: number }) {
+function SurvivorList({
+  bracket,
+  round,
+  rate,
+}: {
+  bracket: Bracket
+  round: number
+  rate: (team: BracketTeam) => number
+}) {
   const survivors = [...survivorsAt(bracket, round)].sort((a, b) => b.strength - a.strength)
   const shown = survivors.slice(0, NAME_LIMIT)
   const rest = survivors.length - shown.length
@@ -102,7 +145,7 @@ function SurvivorList({ bracket, round }: { bracket: Bracket; round: number }) {
             className={team.ours ? `${styles.chip} ${styles.chipOurs}` : styles.chip}
           >
             {team.name}
-            <span className={styles.strength}>{formatStrength(team.strength)}</span>
+            <span className={styles.strength}>{ratingLabel(rate(team))}</span>
           </span>
         ))}
         {rest > 0 && <span className={styles.more}>他{rest}校</span>}
@@ -115,7 +158,4 @@ function SurvivorList({ bracket, round }: { bracket: Bracket; round: number }) {
   )
 }
 
-/** 強さは「互角＝0」の相対値。符号を付けて格を読ませる */
-function formatStrength(strength: number): string {
-  return strength > 0 ? `+${strength}` : `${strength}`
-}
+

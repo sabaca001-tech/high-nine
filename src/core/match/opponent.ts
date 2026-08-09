@@ -2,6 +2,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import { autoLineup } from '@/core/lineup/autoLineup'
+import { ROSTER_TALENT_RATE } from '@/core/rival/rivalRoster'
 import { createPlayer } from '@/core/player/createPlayer'
 import type { Lineup } from '@/core/types/lineup'
 import type { Grade, Player } from '@/core/types/player'
@@ -69,7 +70,10 @@ function createDisposableOpponent(rng: Rng, strength: number, fixedName?: string
           grade,
           // 各学年の1人目だけ投手を確約して、投手が居ない事故を防ぐ
           isPitcher: i === 0 ? true : undefined,
-          talentBonus: strength,
+          // **実在の学校（`rivalRoster`）と同じ物差しで作る。**
+          // そのまま足していた頃は、学校が分からない使い捨ての相手だけが
+          // 一段強く、甲子園の代表校より強い「名も無い相手」が出ていた
+          talentBonus: Math.round(strength * ROSTER_TALENT_RATE),
         }),
       )
     }

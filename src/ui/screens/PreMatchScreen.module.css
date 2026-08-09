@@ -109,3 +109,11 @@
   font-weight: 400;
   color: var(--text-sub);
 }
+
+/* 相手のスタメン平均。言葉（格上／格下）の隣に数字も出す */
+.opponentRating {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+}

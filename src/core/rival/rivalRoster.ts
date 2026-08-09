@@ -18,6 +18,7 @@
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
+import { autoLineup } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
 import type { RivalPlayer, RivalSchool } from './rivals'
 import { starsOf } from './rivals'
@@ -37,7 +38,7 @@ const PER_GRADE = 5
  * 学校の戦力は**層の厚さ**であって、突出した個人の多さではない。
  * 0.55にすると、戦力46の名門でも3年生の上位が総合90前後で止まる。
  */
-const ROSTER_TALENT_RATE = 0.55
+export const ROSTER_TALENT_RATE = 0.55
 
 /** 各学年の何人目までを投手にするか */
 const PITCHERS_PER_GRADE = 2
@@ -191,4 +192,29 @@ function hashId(id: string): number {
     hash = Math.imul(hash, 16777619)
   }
   return hash >>> 0
+}
+
+/**
+ * その学校のスタメン9人の平均総合。
+ *
+ * **戦力（`strength`）をそのまま出すと読めない。**
+ * 「+15」と書かれても、自分のチームと比べてどうなのかが分からなかった。
+ * 選手の総合と同じ物差しで出せば、そのまま比べられる。
+ *
+ * 名簿は種から作り直すので、ここで出る値は
+ * **実際に試合で当たるスタメンの平均**と完全に一致する。
+ * 1校あたり0.2msほどかかるので、画面では `useMemo` で抑えること。
+ */
+export function lineupRatingOf(school: RivalSchool, year: number): number {
+  const roster = rivalRoster(school, year)
+  const lineup = autoLineup(roster)
+  const byId = new Map(roster.map((player) => [player.id, player]))
+
+  const ratings = lineup.slots
+    .map((slot) => byId.get(slot.playerId))
+    .filter((player): player is Player => player !== undefined)
+    .map(overallRating)
+
+  if (ratings.length === 0) return 0
+  return ratings.reduce((sum, value) => sum + value, 0) / ratings.length
 }

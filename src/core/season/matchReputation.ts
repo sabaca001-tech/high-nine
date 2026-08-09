@@ -14,17 +14,27 @@ import type { Lineup } from '@/core/types/lineup'
 import { overallRating } from '@/core/player/rating'
 
 /**
- * 相手チームの平均総合。
+ * 学校の戦力が0（互角）のときの、**スタメン9人の平均総合**。
  *
- * 相手は `createOpponent` が各学年5人ずつ、`GRADE_BASE`（36/44/50）に
- * `opponentStrength` を足して作る。その平均が (36+44+50)/3 ＝ 43 なので、
- * **43 + 強さ** が相手の総合評価になる。
- * ここが `createPlayer` の `GRADE_BASE` と食い違うと格付けがずれる。
+ * 比べる相手は自校の `teamRating`（スタメン9人の平均）なので、
+ * こちらもスタメンで測らないと格付けがずれる。
+ *
+ * 以前は「部員全体の平均（43）＋ 戦力」で見ていた。
+ * 実際の名簿は `rivalRoster` が戦力の55%を素質に足して作るので、
+ * **強い学校ほど過大評価**になっていた
+ * （戦力35の学校を総合78と見ていたが、実際のスタメン平均は68）。
  */
-export const OPPONENT_BASE_RATING = 43
+export const OPPONENT_BASE_RATING = 49.5
 
+/**
+ * 戦力1あたり、スタメン平均がどれだけ上がるか。
+ * 実測値（`rivalRoster` から実際にスタメンを組んで測った）。
+ */
+export const OPPONENT_RATING_RATE = 0.53
+
+/** 相手チームのスタメンの平均総合 */
 export function opponentRating(opponentStrength: number): number {
-  return OPPONENT_BASE_RATING + opponentStrength
+  return OPPONENT_BASE_RATING + opponentStrength * OPPONENT_RATING_RATE
 }
 
 /** 自校の評価。実際に試合に出るスタメンで測る（控えの厚さは勝敗に効かない） */

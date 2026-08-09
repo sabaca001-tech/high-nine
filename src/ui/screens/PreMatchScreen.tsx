@@ -1,7 +1,9 @@
 import { validateLineup } from '@/core/lineup/autoLineup'
 import { formatRecord, hasMet, recordOf } from '@/core/rival/rivals'
 import type { RivalRecord } from '@/core/rival/rivals'
-import { matchupLabel, teamRating } from '@/core/season/matchReputation'
+import { matchupLabel, opponentRating, teamRating } from '@/core/season/matchReputation'
+import { ratingLabel } from '@/core/player/rating'
+import { lineupRatingOf } from '@/core/rival/rivalRoster'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -55,6 +57,12 @@ export function PreMatchScreen() {
         */}
         <span className={styles.matchup}>
           {matchupLabel(teamRating(game.players, game.lineup), setup.opponentStrength)}
+        </span>
+        {/* 言葉だけでなく数字も出す。自分のスタメンと同じ物差しで比べられる */}
+        <span className={styles.opponentRating}>
+          {ratingLabel(
+            school ? lineupRatingOf(school, game.year) : opponentRating(setup.opponentStrength),
+          )}
         </span>
       </div>
 
