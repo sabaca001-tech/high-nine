@@ -424,7 +424,14 @@ function round2(value: number): number {
  * 初期部員を生成する。
  * 各学年8人ずつ（計24人）。投手が最低1人は含まれるようにする。
  * ベンチ入り争いが起きる規模にして、控え選手の育成にも意味が出るようにしている。
+ *
+ * **弱小校の水準で作る**（`INITIAL_TALENT`）。
+ * 素質どおり（0）だと県内のちょうど真ん中に並んでしまい、
+ * 「弱いチームを強くする」という出発点にならなかった。
+ * 評判20の新入生（`talentFromReputation`）と同じ水準に揃えてある。
  */
+export const INITIAL_TALENT = -10
+
 export function createInitialRoster(
   rng: Rng,
   perGrade = 8,
@@ -444,6 +451,10 @@ export function createInitialRoster(
           // 各学年の先頭1人だけ投手を確約する。
           // 2人にしていた頃は投手が多くなりすぎた
           isPitcher: i < 1 ? true : undefined,
+          // **弱小校から始める。** 素質どおり（0）で作っていた頃は、
+          // 初期部員が県内のちょうど真ん中の水準（平均総合43）で、
+          // 「弱いチームを強くする」という出発点になっていなかった
+          talentBonus: INITIAL_TALENT,
           // 在校生は入学年が異なるので、記録の起点は加入月に揃える
           enrolledAt: { year: 1, month: 4 },
           takenNames: players.map((player) => player.name),

@@ -40,23 +40,44 @@ const MAX_RECRUITS = 16
 /**
  * 評判から新入生の実力補正を求める。
  *
- * **初期評判(20)を基準の0にする。** ここをずらすと、何もしていないのに
- * 新入生が毎年弱くなり、チームが年々衰退していく（実際に起きた）。
- * 評判は「上げれば良くなる」ボーナスとして働かせ、罰にはしない。
+ * **初期評判(20)のときが弱小校の水準**（`RECRUIT_BASE_TALENT`）。
+ * ここを0にしていた頃は、無名の弱小校にも県内平均並みの新入生が来ていて、
+ * 「弱いチームを強くする」という出発点にならなかった。
+ *
+ * 評判が下がっても**初期より悪くはならない**ようにしてある。
+ * 下限を切らないと、負けが込んだ年から新入生まで悪くなって立て直せない。
  */
 export function talentFromReputation(reputation: number): number {
-  return Math.round((reputation - REPUTATION_INITIAL) * REPUTATION_TALENT_RATE)
+  const gain = Math.max(0, reputation - REPUTATION_INITIAL) * REPUTATION_TALENT_RATE
+  return Math.round(Math.min(RECRUIT_MAX_TALENT, RECRUIT_BASE_TALENT + gain))
 }
+
+/**
+ * 評判20（弱小校）のときの新入生の実力補正。
+ * 初期部員（`INITIAL_TALENT`）と揃えてある。
+ * ずれていると、1年目の在校生と2年目の新入生で水準が段違いになる。
+ */
+const RECRUIT_BASE_TALENT = -10
+
+/**
+ * 新入生の実力補正の上限。
+ *
+ * **頭打ちが要る。** 評判に比例させ続けると、評判が上限近くで
+ * 新入生が前の代の3年生と同じ能力で入学し、3年かけて育てる意味が薄れる
+ * （実際に起きた）。評判73あたりで上限に届く。
+ */
+const RECRUIT_MAX_TALENT = 14
 
 /**
  * 評判1あたりの実力補正。
  *
- * 0.3にしていたところ、評判が上限近くまで伸びると新入生が
- * **前の代の3年生と同じくらいの能力で入学**してしまい、
- * 3年かけて育てる意味が薄れた（実測で6年後の平均総合が36→56）。
- * 0.18に抑え、評判は「良い素材が来る」程度の効果に留める。
+ * 弱小校の水準（-10）から積み上げ、`RECRUIT_MAX_TALENT` で頭を打つ形。
+ * 評判40で +-0、評判64で +10、評判73以上で上限の +14。
+ *
+ * 0.18で基準を0にしていた頃は、評判20の弱小校にも県内平均並みの
+ * 新入生が来ていて、**弱いチームを強くする出発点にならなかった**。
  */
-const REPUTATION_TALENT_RATE = 0.18
+const REPUTATION_TALENT_RATE = 0.45
 
 /** 評判が高いほど多くの新入生が来る */
 export function recruitCount(reputation: number, remaining: number): number {

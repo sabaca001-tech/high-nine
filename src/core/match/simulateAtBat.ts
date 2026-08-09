@@ -72,7 +72,7 @@ const VELOCITY_WEIGHT = 0.8
  * **`velocityScore` の対応表か `VELOCITY_WEIGHT` を触ったら、ここも測り直す**
  * （`balanceCheck.test.ts` の打率と平均得点を見る）。
  */
-const STUFF_BASELINE = 12
+const STUFF_BASELINE = 6
 
 /**
  * 球速が三振に効く分。球速スコア1点あたりの三振率への加算。

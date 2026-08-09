@@ -2,7 +2,7 @@ import { describe, it } from 'vitest'
 import { createRng } from './rng/random'
 import { autoLineup } from './lineup/autoLineup'
 import { simulateGame } from './match/simulateGame'
-import { createInitialRoster } from './player/createPlayer'
+import { createInitialRoster, INITIAL_TALENT } from './player/createPlayer'
 import { applyCommand } from './gameEngine'
 import { playUntilYearEnd, startedGame } from './autoPlay'
 import { overallRating } from './player/rating'
@@ -74,7 +74,10 @@ describe('バランス確認', () => {
         players,
         lineup: autoLineup(players),
         opponentName: '',
-        opponentStrength: 0,
+        // **自校と同じ水準の相手と当てる。** 初期部員は弱小校の水準
+        // （`INITIAL_TALENT`）で作られるので、strength 0 の相手だと
+        // 一方的な試合になり、打撃と投球の釣り合いが測れない
+        opponentStrength: INITIAL_TALENT,
         kind: 'friendly',
       })
 

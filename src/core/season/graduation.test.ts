@@ -4,6 +4,8 @@ import { createInitialRoster } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
 import type { Grade } from '@/core/types/player'
 import { advanceSeason, recruitCount, talentFromReputation } from './graduation'
+import { GRADE_BASE, INITIAL_TALENT } from '@/core/player/createPlayer'
+import { REPUTATION_INITIAL } from '@/core/types/season'
 
 function run(seed: number, reputation = 20, scoutedPitchers = 0) {
   const players = createInitialRoster(createRng(seed))
@@ -182,5 +184,34 @@ describe('advanceSeason', () => {
         expect(players.filter((p) => p.grade === grade).length).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+describe('弱小校からの出発', () => {
+  /**
+   * **評判20の弱小校に、県内平均並みの新入生は来ない。**
+   * 基準を0にしていた頃は、無名の学校でも中位校と同じ素材が入ってきて、
+   * 「弱いチームを強くする」という出発点にならなかった。
+   */
+  it('評判20（初期）の新入生は初期部員と同じ水準', () => {
+    expect(talentFromReputation(REPUTATION_INITIAL)).toBe(INITIAL_TALENT)
+  })
+
+  it('評判が上がるほど良い新入生が来る', () => {
+    expect(talentFromReputation(40)).toBeGreaterThan(talentFromReputation(20))
+    expect(talentFromReputation(64)).toBeGreaterThan(talentFromReputation(40))
+  })
+
+  it('評判が下がっても初期より悪くはならない', () => {
+    // 下限を切らないと、負けが込んだ年から新入生まで悪くなって立て直せない
+    expect(talentFromReputation(5)).toBe(talentFromReputation(REPUTATION_INITIAL))
+    expect(talentFromReputation(0)).toBe(talentFromReputation(REPUTATION_INITIAL))
+  })
+
+  it('上限がある（前の代の3年生を超える新入生は来ない）', () => {
+    const top = talentFromReputation(100)
+    expect(top).toBe(talentFromReputation(80))
+    // 素質の中心が3年生の基準（GRADE_BASE[3]）を超えない
+    expect(GRADE_BASE[1] + top).toBeLessThanOrEqual(GRADE_BASE[3])
   })
 })

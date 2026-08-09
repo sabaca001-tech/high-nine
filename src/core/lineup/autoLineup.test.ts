@@ -399,11 +399,25 @@ describe('打順の組み方', () => {
   const starters = lineup.slots.map((slot) => byId.get(slot.playerId)!)
 
   it('1番は出塁力と走力の両方が上位', () => {
-    const rank = (score: (p: (typeof starters)[number]) => number, player: (typeof starters)[number]) =>
-      starters.filter((other) => score(other) > score(player)).length
+    // **1チームで測ると乱数の並びがずれただけで落ちる。**
+    // どちらか片方だけ飛び抜けた選手ではなく、両方そこそこ上にいることを、
+    // 複数のチームの平均で見る
+    let total = 0
+    const teams = 20
 
-    // どちらか片方だけ飛び抜けた選手ではなく、両方そこそこ上にいる
-    expect(rank(onBaseScore, at(1)) + rank(runningScore, at(1))).toBeLessThan(7)
+    for (let seed = 60; seed < 60 + teams; seed++) {
+      const team = createInitialRoster(createRng(seed))
+      const order = autoLineup(team)
+      const ids = new Map(team.map((p) => [p.id, p]))
+      const nine = order.slots.map((slot) => ids.get(slot.playerId)!)
+      const leadoff = nine[0]
+      const rank = (score: (p: Player) => number) =>
+        nine.filter((other) => score(other) > score(leadoff)).length
+
+      total += rank(onBaseScore) + rank(runningScore)
+    }
+
+    expect(total / teams).toBeLessThan(5)
   })
 
   it('2番は1番より出塁力が高いか、ほぼ並ぶ', () => {
