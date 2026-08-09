@@ -18,6 +18,8 @@ import type { RegionId } from '@/core/types/region'
 import { useGameStore } from '@/state/useGameStore'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
 import { rankColorOf, teamCapColor } from '@/ui/theme/playerColors'
+import { findManagerRole, managerEffectText } from '@/core/staff/managers'
+import type { TeamManager } from '@/core/staff/managers'
 import styles from './SeasonScreen.module.css'
 
 /**
@@ -73,6 +75,11 @@ export function SeasonScreen() {
               recommended={recommended.has(player.id)}
             />
           ))}
+          {/*
+            **マネージャーも新入部員。** ログに一行流れるだけでは、
+            誰が入ってきたのか・何ができるのかが分からなかった
+          */}
+          {report.joinedManager && <ManagerRow manager={report.joinedManager} />}
         </section>
 
         {/*
@@ -324,6 +331,26 @@ function TeamEditor({
         所在地を変えると、大会の回戦数・遠征費・県内のライバル校が入れ替わります。
         甲子園で当たってきた学校との戦績は残ります。
       </p>
+    </div>
+  )
+}
+
+/** 入部したマネージャー。役割と、その人の効き具合を出す */
+function ManagerRow({ manager }: { manager: TeamManager }) {
+  const role = findManagerRole(manager.roleId)
+  const ability = manager.ability ?? 50
+
+  return (
+    <div className={styles.manager}>
+      <span className={styles.managerBadge}>マネージャー</span>
+      <span className={styles.managerWho}>
+        <span className={styles.managerName}>{manager.name}</span>
+        <span className={styles.managerEffect}>{managerEffectText(manager)}</span>
+      </span>
+      <span className={styles.managerRole}>{role?.label ?? 'マネージャー'}</span>
+      <span className={styles.managerRank} style={{ color: rankColorOf(toRank(ability)) }}>
+        {toRank(ability)}
+      </span>
     </div>
   )
 }

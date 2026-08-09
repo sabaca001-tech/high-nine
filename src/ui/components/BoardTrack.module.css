@@ -115,8 +115,14 @@
   }
 }
 
+/*
+ * **練習マスと良いマスが両方とも緑で見分けられなかった。**
+ * 練習はいちばん多いので落ち着いた深緑にして、
+ * 良いマスは明るい緑のまま残す。
+ */
 .practice {
-  background: linear-gradient(160deg, #8fe08a, var(--field));
+  background: linear-gradient(160deg, #6aa877, #34694a);
+  color: #fff;
 }
 .good {
   background: linear-gradient(160deg, #b6ffd9, var(--good));

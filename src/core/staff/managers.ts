@@ -35,6 +35,35 @@ export type TeamManager = {
   grade: Grade
   /** 入部した年（通算年数） */
   joinedYear: number
+  /**
+   * 能力 1〜100。**役割の効きがこれに比例する。**
+   * 全員が同じ効果だと、入部してくるのが誰でも同じで
+   * 「良いマネージャーが来た」という手応えが出ない。
+   * 古いセーブには無いので省略可（`managerPower` が既定値を使う）。
+   */
+  ability?: number
+}
+
+/** マネージャーの能力の振れ幅。部員の素質と同じく個人差を持たせる */
+const ABILITY_MIN = 25
+const ABILITY_MAX = 90
+
+/** 能力が分からないときの既定値（古いセーブ用） */
+const DEFAULT_ABILITY = 50
+
+/**
+ * その役割の効き具合。
+ * 能力50でちょうど1.0、25で0.75、90で1.4。
+ * 0にはしない（居るのに何も起きないのでは、入部した意味が無い）。
+ */
+export function managerPower(manager: TeamManager): number {
+  return 0.5 + (manager.ability ?? DEFAULT_ABILITY) / 100
+}
+
+/** その役割のマネージャーの効き具合。居なければ0 */
+function powerOf(managers: TeamManager[], roleId: ManagerRoleId): number {
+  const found = managers.find((manager) => manager.roleId === roleId)
+  return found ? managerPower(found) : 0
 }
 
 export const MANAGER_ROLES: ManagerRole[] = [
@@ -114,6 +143,7 @@ export function rollManagerJoin(
       roleId: role.id,
       grade: 1,
       joinedYear: params.year,
+      ability: rng.int(ABILITY_MIN, ABILITY_MAX),
     },
     serial: params.serial + 1,
   }
@@ -162,29 +192,47 @@ export function advanceManagers(
 }
 
 // ── 在籍しているマネージャーによる効果 ────────────────────
-// 役割は重複しないので、居るか居ないかだけを見ればよい
+// 役割は重複しないので、その役割の1人を見ればよい。
+// 効き具合は本人の能力に比例する（`managerPower`）
 
 /** 練習の成長量の倍率 */
 export function managerGrowthBonus(managers: TeamManager[]): number {
-  return hasManagerRole(managers, 'recorder') ? 1.08 : 1
+  return 1 + 0.08 * powerOf(managers, 'recorder')
 }
 
 /** 練習での体力消費の倍率 */
 export function managerConditionCost(managers: TeamManager[]): number {
-  return hasManagerRole(managers, 'nutritionist') ? 0.75 : 1
+  return 1 - 0.25 * powerOf(managers, 'nutritionist')
 }
 
 /** 月替わりの体力回復の上乗せ */
 export function managerRecovery(managers: TeamManager[]): number {
-  return hasManagerRole(managers, 'trainer') ? 15 : 0
+  return Math.round(15 * powerOf(managers, 'trainer'))
 }
 
 /** 試合での守備力の上乗せ */
 export function managerDefenseBonus(managers: TeamManager[]): number {
-  return hasManagerRole(managers, 'analyst') ? 8 : 0
+  return Math.round(8 * powerOf(managers, 'analyst'))
 }
 
 /** 毎月の部費収入の倍率 */
 export function managerFundsRate(managers: TeamManager[]): number {
-  return hasManagerRole(managers, 'chief') ? 1.3 : 1
+  return 1 + 0.3 * powerOf(managers, 'chief')
+}
+
+/** 役割の説明に、その人の効き具合を当てはめた一文 */
+export function managerEffectText(manager: TeamManager): string {
+  const power = managerPower(manager)
+  switch (manager.roleId) {
+    case 'recorder':
+      return `練習の成長量が${(8 * power).toFixed(0)}%上がる`
+    case 'trainer':
+      return `月が変わるときの体力回復が${Math.round(15 * power)}増える`
+    case 'nutritionist':
+      return `練習での体力消費が${(25 * power).toFixed(0)}%減る`
+    case 'analyst':
+      return `試合での守備力が${Math.round(8 * power)}上がる`
+    case 'chief':
+      return `毎月の部費が${(30 * power).toFixed(0)}%増える`
+  }
 }

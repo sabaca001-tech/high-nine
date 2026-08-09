@@ -2223,6 +2223,8 @@ function advanceYear(state: GameState): EngineResult {
     graduates: change.graduates,
     newcomers: change.newcomers,
     recommendedIds: change.recommendedIds,
+    joinedManager: managerChange.joined,
+    graduatedManagers: managerChange.graduated,
     careerNews: change.careerNews,
     scoutResults: scouted.results,
     rivalNews,

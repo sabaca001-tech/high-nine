@@ -233,3 +233,12 @@
   font-size: 9px;
   font-weight: 800;
 }
+
+/* 弾道。守備適性図と高さを揃える */
+.trajectoryBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  color: var(--accent);
+}

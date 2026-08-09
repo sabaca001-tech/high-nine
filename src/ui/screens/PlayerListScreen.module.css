@@ -245,3 +245,68 @@
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--sp-2);
 }
+
+/* マネージャー。選手カードとは形を変えて、別物だと分かるようにする */
+.manager {
+  background: var(--rank-d);
+  color: var(--text-on-accent);
+}
+
+.managerList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.managerRow {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.managerRank {
+  text-align: center;
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.managerWho {
+  min-width: 0;
+}
+
+.managerName {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.managerGrade {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+
+.managerEffect {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.managerRole {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  white-space: nowrap;
+}

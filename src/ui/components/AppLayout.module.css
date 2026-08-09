@@ -1,5 +1,6 @@
 /** ノッチ・ホームバーを避けた縦画面レイアウトの土台 */
 .layout {
+  position: relative;
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -21,13 +22,81 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* 見出し。タップするとタイトルへ戻れる */
 .title {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.title:active {
+  opacity: 0.7;
+}
+
+.titleText {
   font-size: var(--fs-md);
   font-weight: 700;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.titleHint {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* タイトルへ戻る前の確認。誤爆で進行中の画面から飛ばされないように */
+.backSheet {
+  position: absolute;
+  top: 52px;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  z-index: 20;
+  padding: var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.backText {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.backButtons {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.backCancel,
+.backGo {
+  flex: 1 1 0;
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.backCancel {
+  background: var(--bg-raised);
+  color: var(--text-main);
+}
+
+.backGo {
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .subtitle {

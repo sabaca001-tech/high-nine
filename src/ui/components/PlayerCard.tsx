@@ -8,7 +8,8 @@ import {
 import { focusLabel } from '@/core/player/trainingFocus'
 import type { Motivation, Player } from '@/core/types/player'
 import type { UniformId } from '@/core/team/uniforms'
-import { AbilityRadar } from './AbilityRadar'
+import { BatterStats } from './BatterStats'
+import { TrajectoryArrow } from './TrajectoryArrow'
 import { AptitudeDiamond } from './AptitudeDiamond'
 import { PitchChart } from './PitchChart'
 import { PitcherStats } from './PitcherStats'
@@ -156,16 +157,28 @@ export function PlayerCard({
           </div>
         </>
       ) : (
-        <div className={styles.charts}>
-          <span className={styles.chartBox}>
-            <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
-            <span className={styles.chartCaption}>守備適性</span>
-          </span>
-          <span className={styles.chartBox}>
-            <AbilityRadar player={player} />
-            <span className={styles.chartCaption}>能力</span>
-          </span>
-        </div>
+        <>
+          {/*
+            **六角形のレーダーをやめた。** 形は打撃型か守備型かを伝えるが、
+            ミートがA(83)なのかB(75)なのかは読めない。
+            一覧で比べるときに知りたいのはその数字のほうで、投手とも揃う
+          */}
+          <div className={styles.pitchStats}>
+            <BatterStats batting={player.batting} compact />
+          </div>
+          <div className={styles.charts}>
+            <span className={styles.chartBox}>
+              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+              <span className={styles.chartCaption}>守備適性</span>
+            </span>
+            <span className={styles.chartBox}>
+              <span className={styles.trajectoryBox}>
+                <TrajectoryArrow trajectory={player.batting.trajectory} size={26} />
+              </span>
+              <span className={styles.chartCaption}>弾道</span>
+            </span>
+          </div>
+        </>
       )}
 
       {footer}

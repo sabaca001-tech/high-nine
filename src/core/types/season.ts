@@ -20,6 +20,14 @@ export type SeasonReport = {
   newcomers: Player[]
   /** 推薦で入った逸材のid */
   recommendedIds: string[]
+  /**
+   * 入部したマネージャー。いなければ null。
+   * **新入生と一緒に出す。** ログに一行流れるだけでは、
+   * 誰が入ってきたのか・何ができるのかが分からなかった。
+   */
+  joinedManager?: import('@/core/staff/managers').TeamManager | null
+  /** 卒業したマネージャー */
+  graduatedManagers?: import('@/core/staff/managers').TeamManager[]
   /** スカウトの結末。獲れた選手と、逃した選手の進学先 */
   scoutResults: import('@/core/scout/scouting').ScoutResult[]
   /** 県内のライバル校の動き */

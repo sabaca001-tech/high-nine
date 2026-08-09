@@ -5,8 +5,10 @@ import {
   findManagerRole,
   managerConditionCost,
   managerDefenseBonus,
+  managerEffectText,
   managerFundsRate,
   managerGrowthBonus,
+  managerPower,
   managerRecovery,
   MANAGER_JOIN_CHANCE,
   MANAGER_ROLES,
@@ -204,5 +206,77 @@ describe('マネージャーの効果', () => {
     const both = [manager('recorder'), manager('chief')]
     expect(managerGrowthBonus(both)).toBeGreaterThan(1)
     expect(managerFundsRate(both)).toBeGreaterThan(1)
+  })
+})
+
+describe('マネージャーの能力', () => {
+  /**
+   * **全員が同じ効果だと、誰が入ってきても同じ。**
+   * 「良いマネージャーが来た」という手応えが出ない。
+   */
+  it('入部するたびに能力が変わる', () => {
+    const rng = createRng(91)
+    const abilities = new Set<number>()
+
+    for (let i = 0; i < 40; i++) {
+      const join = rollManagerJoin(rng, {
+        managers: [],
+        year: 2 + i,
+        serial: i,
+        takenNames: [],
+      })
+      if (join) abilities.add(join.manager.ability ?? 0)
+    }
+    expect(abilities.size).toBeGreaterThan(5)
+  })
+
+  it('能力が高いほど効きが大きい', () => {
+    const make = (ability: number): TeamManager => ({
+      id: 'm',
+      name: 'テスト',
+      roleId: 'trainer',
+      grade: 1,
+      joinedYear: 1,
+      ability,
+    })
+    expect(managerRecovery([make(90)])).toBeGreaterThan(managerRecovery([make(25)]))
+    expect(managerPower(make(50))).toBe(1)
+  })
+
+  it('居るのに何も起きない、にはならない', () => {
+    const weak: TeamManager = {
+      id: 'm',
+      name: 'テスト',
+      roleId: 'recorder',
+      grade: 1,
+      joinedYear: 1,
+      ability: 1,
+    }
+    expect(managerGrowthBonus([weak])).toBeGreaterThan(1)
+  })
+
+  it('古いセーブ（能力なし）はこれまでと同じ効き', () => {
+    // 途中で効果が変わると、部費や体力回復の計算が急に動いて驚く
+    const legacy: TeamManager = {
+      id: 'm',
+      name: 'テスト',
+      roleId: 'chief',
+      grade: 2,
+      joinedYear: 1,
+    }
+    expect(managerPower(legacy)).toBe(1)
+    expect(managerFundsRate([legacy])).toBeCloseTo(1.3, 5)
+  })
+
+  it('効果の説明にその人の数字が入る', () => {
+    const manager: TeamManager = {
+      id: 'm',
+      name: 'テスト',
+      roleId: 'chief',
+      grade: 1,
+      joinedYear: 1,
+      ability: 90,
+    }
+    expect(managerEffectText(manager)).toContain('42%')
   })
 })

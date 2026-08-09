@@ -156,6 +156,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 37) {
     data = migrateV36ToV37(data)
   }
+  if (version < 38) {
+    data = migrateV37ToV38(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -927,6 +930,22 @@ function migrateV35ToV36(raw: Record<string, unknown>): Record<string, unknown> 
  */
 function migrateV36ToV37(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, version: 37, u18Squad: raw.u18Squad ?? null }
+}
+
+/**
+ * v37 → v38
+ *  - マネージャーに ability（能力）を追加。役割の効きがこれに比例する
+ *
+ * すでに在籍しているマネージャーは、それまでの効き具合（能力50相当）を保つ。
+ * 途中で効果が変わると、部費や体力回復の計算が急に動いて驚く。
+ */
+function migrateV37ToV38(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.managers)) return { ...raw, version: 38 }
+
+  const managers = raw.managers.map((value) =>
+    isRecord(value) && value.ability === undefined ? { ...value, ability: 50 } : value,
+  )
+  return { ...raw, version: 38, managers }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

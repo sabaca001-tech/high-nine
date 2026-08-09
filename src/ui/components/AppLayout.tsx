@@ -13,6 +13,9 @@ type Props = {
   children: ReactNode
 }
 
+/** 見出しをタップしてタイトルへ戻る前の確認 */
+const BACK_CONFIRM = 'タイトル画面に戻りますか？（進行は自動で保存されています）'
+
 const NAV_ITEMS: { screen: Screen; icon: string; label: string }[] = [
   { screen: 'home', icon: '⚾️', label: '練習' },
   { screen: 'lineup', icon: '📋', label: 'スタメン' },
@@ -47,14 +50,54 @@ function SoundToggle() {
 export function AppLayout({ title, subtitle, scrollable = false, children }: Props) {
   const screen = useGameStore((s) => s.screen)
   const setScreen = useGameStore((s) => s.setScreen)
+  const backToTitle = useGameStore((s) => s.backToTitle)
+  const [askingBack, setAskingBack] = useState(false)
 
   return (
     <div className={styles.layout}>
       <header className={styles.header}>
-        <h1 className={styles.title}>{title}</h1>
+        {/*
+          **見出しからタイトルへ戻れる。** 戻る導線がどこにも無く、
+          別の学校で始めたいときにタブを閉じるしかなかった。
+          誤爆すると進行中の画面から飛ばされるので、一度だけ確認する
+        */}
+        <button
+          type="button"
+          className={styles.title}
+          onClick={() => setAskingBack(true)}
+          aria-label={`${title}｜タイトル画面へ戻る`}
+        >
+          <h1 className={styles.titleText}>{title}</h1>
+          <span className={styles.titleHint}>▾</span>
+        </button>
         {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
         <SoundToggle />
       </header>
+
+      {askingBack && (
+        <div className={styles.backSheet}>
+          <p className={styles.backText}>{BACK_CONFIRM}</p>
+          <div className={styles.backButtons}>
+            <button
+              type="button"
+              className={styles.backCancel}
+              onClick={() => setAskingBack(false)}
+            >
+              続ける
+            </button>
+            <button
+              type="button"
+              className={styles.backGo}
+              onClick={() => {
+                setAskingBack(false)
+                backToTitle()
+              }}
+            >
+              タイトルへ
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className={scrollable ? `${styles.body} ${styles.scrollBody}` : styles.body}>
         {children}

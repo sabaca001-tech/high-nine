@@ -2,16 +2,18 @@
 
 /**
  * マスの種別。
- * 本家の色分け（青=良/赤=悪/白=ランダム/緑=回復/黄=練習効率）を踏襲している。
- * 詳細は docs/game-design.md §2 を参照。
+ *
+ * **色名で呼ぶのをやめた。** マスに「緑」と書いてあるのに水色、
+ * 「青」と書いてあるのに緑、という食い違いが起きていた。
+ * 色は色で分け、書く文字は**何が起きるか**にする。
  */
 export type CellKind =
   | 'practice' // 練: 選んだカードの練習内容で成長
-  | 'good' // 青: 良いイベント
-  | 'bad' // 赤: 悪いイベント
-  | 'random' // 白: 良いことも悪いことも起こる
-  | 'rest' // 緑: 体力が大きく回復
-  | 'boost' // 黄: 練習効率アップ
+  | 'good' // 良: 良いイベント
+  | 'bad' // 悪: 悪いイベント
+  | 'random' // ？: 良いことも悪いことも起こる
+  | 'rest' // 休: 体力が大きく回復
+  | 'boost' // 効: 練習効率アップ
   | 'training' // 特: 特訓（特殊能力の取得に挑戦）
   | 'event' // 人: 部員1人に起きる出来事。監督が選ぶ
   | 'alumni' // OB: 卒業生の訪問
@@ -43,11 +45,11 @@ export const CELL_LABELS: Record<CellKind, string> = {
 /** マスに表示する短い記号 */
 export const CELL_MARKS: Record<CellKind, string> = {
   practice: '練',
-  good: '青',
-  bad: '赤',
-  random: '白',
-  rest: '緑',
-  boost: '黄',
+  good: '良',
+  bad: '悪',
+  random: '？',
+  rest: '休',
+  boost: '効',
   training: '特',
   event: '人',
   alumni: 'OB',

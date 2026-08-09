@@ -6,6 +6,10 @@ import { isInHallOfFame } from '@/core/types/career'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerCard } from '@/ui/components/PlayerCard'
+import { findManagerRole, managerEffectText } from '@/core/staff/managers'
+import type { TeamManager } from '@/core/staff/managers'
+import { toRank } from '@/core/player/rating'
+import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './PlayerListScreen.module.css'
 
 export function PlayerListScreen() {
@@ -58,6 +62,31 @@ export function PlayerListScreen() {
           note="指導が行き届かず、練習の伸びは75%"
         />
       )}
+
+      {/*
+        **マネージャーも部員。** 一覧のどこにも出てこないので、
+        誰が居て何が効いているのかを確かめる場所が無かった
+      */}
+      <section>
+        <h2 className={styles.gradeHeading}>
+          <span className={`${styles.gradeBadge} ${styles.manager}`}>マネージャー</span>
+          <span className={styles.rule} />
+          <span>{game.managers.length}人</span>
+        </h2>
+        {game.managers.length === 0 ? (
+          <p className={styles.sectionNote}>
+            まだ居ません。年度が替わるときに、3年に1人ほどの割合で入部してきます
+          </p>
+        ) : (
+          <div className={styles.managerList}>
+            {[...game.managers]
+              .sort((a, b) => b.grade - a.grade)
+              .map((manager) => (
+                <ManagerRow key={manager.id} manager={manager} />
+              ))}
+          </div>
+        )}
+      </section>
     </AppLayout>
   )
 }
@@ -97,5 +126,27 @@ function Section({
         ))}
       </div>
     </section>
+  )
+}
+
+/** マネージャー1人。役割と、その人の効き具合を出す */
+function ManagerRow({ manager }: { manager: TeamManager }) {
+  const role = findManagerRole(manager.roleId)
+  const ability = manager.ability ?? 50
+
+  return (
+    <div className={styles.managerRow}>
+      <span className={styles.managerRank} style={{ color: rankColorOf(toRank(ability)) }}>
+        {toRank(ability)}
+      </span>
+      <span className={styles.managerWho}>
+        <span className={styles.managerName}>
+          {manager.name}
+          <span className={styles.managerGrade}>{manager.grade}年</span>
+        </span>
+        <span className={styles.managerEffect}>{managerEffectText(manager)}</span>
+      </span>
+      <span className={styles.managerRole}>{role?.label ?? 'マネージャー'}</span>
+    </div>
   )
 }

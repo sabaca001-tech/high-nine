@@ -298,3 +298,59 @@
   color: var(--text-dim);
   line-height: 1.6;
 }
+
+/* 入部したマネージャー。新入生の一覧に混ぜて出す */
+.manager {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  margin-top: var(--sp-1);
+  border-radius: var(--radius);
+  background: var(--bg-base);
+  border: 1px solid var(--line);
+}
+
+.managerBadge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--rank-d);
+  color: var(--text-on-accent);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.managerWho {
+  min-width: 0;
+}
+
+.managerName {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.managerEffect {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.managerRole {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.managerRank {
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
