@@ -129,7 +129,45 @@ export const ABILITY_MAX = 100
  * 他の能力と違って1〜100ではないので、専用の範囲で丸める。
  */
 export const VELOCITY_MIN = 100
-export const VELOCITY_MAX = 158
+
+/**
+ * 球速の上限。
+ *
+ * **160km/h を出せる余地を残す。** 158で止めていた頃は
+ * ランクの最高（S＝160km/h以上）に構造上どうやっても届かなかった。
+ * 届かない最高ランクは、無いのと同じ。
+ */
+export const VELOCITY_MAX = 165
+
+/**
+ * 球速と 0〜100 の尺度の対応表。
+ *
+ * **ランクの境界（`rating.ts` の `RANK_THRESHOLDS`）にぴったり合わせてある。**
+ * こうしておくと `toRank(velocityScore(v))` がそのまま球速のランクになり、
+ * 画面に出るランクと判定に使う値がずれない。
+ *
+ *   130km/h → F ／ 135 → E ／ 140 → D ／ 145 → C
+ *   150 → B ／ 155 → A ／ 160 → S
+ *
+ * **他の投手能力より S が遠い。** 変化球やスタミナは練習で90まで届くが、
+ * 160km/h は高校生ではまず出ない。そのぶん1ランクの重みを大きくしてある
+ * （`simulateAtBat` の `VELOCITY_WEIGHT` と `VELOCITY_STRIKEOUT_RATE`）。
+ *
+ * 以前は 115km/h で0・150km/h で100 の直線だった。
+ * 140km/h が71（B相当）になり、**平凡な速球が良い球に見えていた**。
+ */
+const VELOCITY_ANCHORS: { km: number; score: number }[] = [
+  { km: VELOCITY_MIN, score: 0 },
+  { km: 125, score: 10 },
+  { km: 130, score: 25 }, // F
+  { km: 135, score: 40 }, // E
+  { km: 140, score: 50 }, // D
+  { km: 145, score: 60 }, // C
+  { km: 150, score: 70 }, // B
+  { km: 155, score: 80 }, // A
+  { km: 160, score: 90 }, // S
+  { km: VELOCITY_MAX, score: 100 },
+]
 
 /**
  * 球速を他の能力と同じ 0〜100 の尺度に直す。
@@ -139,18 +177,21 @@ export const VELOCITY_MAX = 158
  * それぞれ別の式を持っていて、同じ球速が画面と判定で違う意味になっていた。
  */
 export function velocityScore(velocity: number): number {
-  return Math.min(100, Math.max(0, ((velocity - VELOCITY_BASE) / VELOCITY_RANGE) * 100))
-}
+  const first = VELOCITY_ANCHORS[0]
+  const last = VELOCITY_ANCHORS[VELOCITY_ANCHORS.length - 1]
+  if (velocity <= first.km) return first.score
+  if (velocity >= last.km) return last.score
 
-/**
- * 球速の尺度。115km/h で0、150km/h で100。
- *
- * 上を160に取っていた頃は、実際に出る球速（120〜148）が
- * 0〜73にしか広がらず、**球速の良し悪しが数字に出なかった**。
- * 高校生が実際に投げる帯に合わせて詰めてある。
- */
-const VELOCITY_BASE = 115
-const VELOCITY_RANGE = 35
+  for (let i = 1; i < VELOCITY_ANCHORS.length; i++) {
+    const to = VELOCITY_ANCHORS[i]
+    if (velocity > to.km) continue
+
+    const from = VELOCITY_ANCHORS[i - 1]
+    const ratio = (velocity - from.km) / (to.km - from.km)
+    return from.score + (to.score - from.score) * ratio
+  }
+  return last.score
+}
 
 /**
  * やる気。-2(絶不調) 〜 +2(絶好調)。

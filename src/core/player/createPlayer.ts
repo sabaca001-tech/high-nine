@@ -134,14 +134,23 @@ const TALENT_SPREAD = 16
 /**
  * 球速（km/h）。素質（base）が速さになる。
  *
- * **実際の高校生の帯に収める。** `velocityScore` の逆算で置いていた頃は
- * 素質の高い3年生が154km/hに達し、プロでも稀な球速になっていた。
- *  平均的な1年（base36）で129km/h、平均的な3年（base50）で139km/h、
- *  素質に恵まれた3年（base66）で147km/h。
+ * **`velocityScore` の刻みに合わせて置く。**
+ * 実際に投げる帯では 5km/h ＝ 10点なので、素質1点 ＝ 0.5km/h。
+ * 切片は「素質どおりの点数になる」ように取ってあり、
+ * 素質60の投手は球速145km/h（＝60点、C）になる。
+ *
+ * 110を切片にしていた頃は、同じ素質でも球速だけが8点ほど低く出て、
+ * **投手の総合が野手より一律に低くなっていた**（実測で投手48・野手55）。
+ *
+ *  平均的な1年（base36）で134km/h、平均的な3年（base50）で141km/h、
+ *  素質に恵まれた3年（base66）で149km/h。
  */
 function velocityFor(rng: Rng, base: number, grade: Grade): number {
-  return Math.round(110 + clampAbility(base) * 0.5 + grade * 1.2 + rng.int(-3, 3))
+  return Math.round(VELOCITY_INTERCEPT + clampAbility(base) * 0.5 + grade * 1.2 + rng.int(-3, 3))
 }
+
+/** 素質0のときの球速。`velocityScore` の対応表から逆算した値 */
+const VELOCITY_INTERCEPT = 115
 
 /**
  * 能力ごとのばらつき幅（±）。

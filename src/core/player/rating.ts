@@ -30,6 +30,18 @@ export function toRank(value: number): Rank {
 }
 
 /**
+ * 球速のランク。
+ *
+ * **他の能力と同じ物差しで色を付けるための関数。**
+ * 球速だけ km/h の実数値なので、そのままではランクの色が付けられなかった。
+ * `velocityScore` の対応表がランクの境界に合わせてあるので、
+ * ここは素直に通すだけでよい（130でF、140でD、160でS）。
+ */
+export function velocityRank(velocity: number): Rank {
+  return toRank(velocityScore(velocity))
+}
+
+/**
  * 弾道(1〜4)を**打球の角度**で表す（水平からの度数）。
  *
  * 星（★★☆☆）にしていた頃は、他の能力と同じ「多いほど良い」に見えたが、
@@ -72,9 +84,27 @@ export function pitchingRating(p: PitchingAbilities): number {
   // 球速の尺度は types/player.ts に一本化してある。
   // 判定（simulateAtBat）と総合で別々の式を持つと、同じ球速が違う意味になる
   return Math.round(
-    velocityScore(p.velocity) * 0.4 + p.control * 0.22 + p.stamina * 0.16 + p.breaking * 0.22,
+    velocityScore(p.velocity) * VELOCITY_SHARE +
+      p.control * 0.26 +
+      p.stamina * 0.18 +
+      p.breaking * 0.26,
   )
 }
+
+/**
+ * 総合に占める球速の比重。
+ *
+ * **0.4 では投手だけ総合が沈んだ。** 球速の尺度をランクに合わせ直したので、
+ * 実際に高校生が投げる帯（135〜148km/h）は40〜66にしか広がらない。
+ * 変化球やスタミナが70〜90まで届くのに対して球速だけ低い帯にいるため、
+ * 比重が大きいほど投手の総合が野手より一律に低く出る
+ * （実測で投手50・野手60）。総合はベンチ入りやドラフトで
+ * **野手と横並びに比べる値**なので、ここが偏ってはいけない。
+ *
+ * 「球速の重みを上げる」のは総合ではなく**試合の判定**のほう
+ * （`simulateAtBat` の `VELOCITY_WEIGHT` と `VELOCITY_STRIKEOUT_RATE`）。
+ */
+const VELOCITY_SHARE = 0.3
 
 /** 野手としての総合(1〜100) */
 export function battingRating(b: BattingAbilities): number {

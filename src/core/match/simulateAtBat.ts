@@ -53,22 +53,36 @@ function trustFactor(trust: number): number {
  *
  * 0.55にしていた頃は、球速が伸びても打たれ方がほとんど変わらず、
  * **球速を上げる意味が薄かった**。速球はそれだけで打者を差し込む。
+ *
+ * **球速は他の投手能力よりランクが遠い。** 変化球やスタミナは練習で90まで
+ * 届くが、160km/h（S）は高校生ではまず出ない。
+ * 同じ「B」でも球速のBのほうが価値が高いので、1ランクの重みを大きく取る
+ * （球速1ランク＝球威8点、変化球1ランク＝球威2点）。
  */
-const VELOCITY_WEIGHT = 0.7
+const VELOCITY_WEIGHT = 0.8
 
 /**
  * 球威の基準合わせ。
  *
- * 球速の尺度を実際に出る帯（115〜150km/h）に詰めたので、
- * **同じ投手の球速スコアが12ほど上がった**。比重も0.7に上げたぶんと合わせて
- * `stuff` が押し上がり、投手全体が一律に強くなって
- * 打率が .28 → .24 まで落ちていた。
+ * 球速の尺度をランクの境界に合わせ直したので（140km/h が71→50）、
+ * **同じ投手の球速スコアが20ほど下がった**。そのままだと投手が一律に弱くなり、
+ * 打率が跳ね上がる。尺度を変えたぶんをここで戻す。
  *
- * 狙いは「球速の重要度を上げる」ことで、投手の底上げではない。
- * 尺度を変えたぶんをここで戻す。
- * **`velocityScore` の範囲か `VELOCITY_WEIGHT` を触ったら、ここも測り直す。**
+ * 狙いは「球速の重要度を上げる」ことで、投手全体の底上げ／引き下げではない。
+ * **`velocityScore` の対応表か `VELOCITY_WEIGHT` を触ったら、ここも測り直す**
+ * （`balanceCheck.test.ts` の打率と平均得点を見る）。
  */
 const STUFF_BASELINE = 13
+
+/**
+ * 球速が三振に効く分。球速スコア1点あたりの三振率への加算。
+ *
+ * **球威（`stuff`）だけでは球速の価値を出し切れない。**
+ * 球威は変化球と平均されるので、球速を上げても打たれ方が少し変わるだけだった。
+ * 速球そのものが空振りを取るぶんを別に足す。
+ * 球速スコア50（140km/h）で+2.0%、90（160km/h）で+3.6%。
+ */
+const VELOCITY_STRIKEOUT_RATE = 0.0004
 
 /**
  * 「消耗している」とみなすスタミナ係数。
@@ -160,7 +174,14 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   if (rng.chance(walkRate)) return 'walk'
 
   // ── 三振 ──────────────────────────────
-  const strikeoutRate = clamp(0.16 + (stuff - contact) / 420 + strikeoutBonus, 0.03, 0.5)
+  const strikeoutRate = clamp(
+    0.16 +
+      (stuff - contact) / 420 +
+      strikeoutBonus +
+      (pitching ? velocityScore(pitching.velocity) * VELOCITY_STRIKEOUT_RATE : 0),
+    0.03,
+    0.5,
+  )
   if (rng.chance(strikeoutRate)) return 'strikeout'
 
   // ── 打球が飛んだ場合 ──────────────────

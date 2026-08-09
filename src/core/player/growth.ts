@@ -44,7 +44,8 @@ const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
  * 使う動きが違うので、連動はさせつつ幅は圧縮し、
  * **選手ごとの個体差（`ARM_SPREAD`）を上に乗せる**形にした。
  *
- * 125km/h で58・135km/h で71・142km/h で80・148km/h で87 が目安。
+ * **球速の尺度を組み直したので、係数も測り直した。**
+ * 130km/h で64・140km/h で78・148km/h で86 が目安。
  */
 export function armFromVelocity(velocity: number): number {
   return Math.round(
@@ -52,8 +53,8 @@ export function armFromVelocity(velocity: number): number {
   )
 }
 
-const ARM_BASE = 45
-const ARM_RATE = 0.45
+const ARM_BASE = 50
+const ARM_RATE = 0.55
 
 /** 生成時に肩力へ乗せる個体差（±）。「球速の割に肩が強い／弱い」を作る */
 export const ARM_SPREAD = 8
@@ -75,10 +76,13 @@ export function armAfterVelocityChange(arm: number, before: number, after: numbe
  *
  * カード定義の `amount` は1〜100の能力を想定した値なので、
  * そのまま km/h に足すと球速だけ極端に伸びる。
- * 100点ぶんの尺度が35km/h（`velocityScore`）なので 0.35 が等価。
- * そこから**少し多めに**して、球速が伸びる手応えを出している。
+ *
+ * **`velocityScore` の刻みに合わせる。** 実際に投げる帯（130〜160km/h）では
+ * 5km/h ＝ 10点なので、1点 ＝ 0.5km/h が等価。
+ * そこから少し多めにして、球速が伸びる手応えを出している。
+ * （0.45 のままだと、尺度を詰めたぶん球速だけ伸びが鈍っていた）
  */
-const VELOCITY_GAIN_RATE = 0.45
+const VELOCITY_GAIN_RATE = 0.55
 
 /**
  * **1日（1マス）ぶんの練習の倍率。**

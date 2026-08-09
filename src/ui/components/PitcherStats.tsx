@@ -1,4 +1,5 @@
-import { toRank } from '@/core/player/rating'
+import { toRank, velocityRank } from '@/core/player/rating'
+import type { Rank } from '@/core/player/rating'
 import type { PitchingAbilities } from '@/core/types/player'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './PitcherStats.module.css'
@@ -36,8 +37,13 @@ export function PitcherStats({
 
   return (
     <div className={className}>
-      {/* 球速だけは km/h の実数値。ランク表記にすると速さの実感が消える */}
-      <Cell label="球速" text={`${pitching.velocity}`} color="var(--accent)" />
+      {/*
+        球速は km/h の実数値のまま出す（ランクだけにすると速さの実感が消える）。
+        ただし**色とランクは他の能力と揃える**。
+        揃っていなかった頃は、球速だけが常に同じ色で
+        「速いのか遅いのか」が一覧では読めなかった
+      */}
+      <Cell label="球速" text={`${pitching.velocity}`} rank={velocityRank(pitching.velocity)} />
       <Cell label="変化" value={pitching.breaking} />
       <Cell label="制球" value={pitching.control} />
       <Cell label="スタミナ" value={pitching.stamina} />
@@ -49,19 +55,20 @@ function Cell({
   label,
   value,
   text,
-  color,
+  /** 数値からは決まらないランク（球速）。省略時は value から出す */
+  rank: given,
 }: {
   label: string
   value?: number
   text?: string
-  color?: string
+  rank?: Rank
 }) {
-  const rank = value === undefined ? null : toRank(value)
+  const rank = given ?? (value === undefined ? null : toRank(value))
 
   return (
     <span className={styles.cell}>
       <span className={styles.label}>{label}</span>
-      <span className={styles.value} style={{ color: color ?? rankColorOf(rank ?? 'G') }}>
+      <span className={styles.value} style={{ color: rankColorOf(rank ?? 'G') }}>
         {rank && <span className={styles.rank}>{rank}</span>}
         {text ?? value}
       </span>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
-import { overallRating, toRank, trajectoryAngle } from './rating'
+import { overallRating, toRank, trajectoryAngle, velocityRank } from './rating'
+import { velocityScore, VELOCITY_MAX } from '@/core/types/player'
 
 describe('toRank', () => {
   it('境界値が正しくランク分けされる', () => {
@@ -63,5 +64,47 @@ describe('overallRating', () => {
     const weak = createPlayer(rng, { id: 'weak', grade: 1, isPitcher: false, talentBonus: -15 })
     const strong = createPlayer(rng, { id: 'strong', grade: 3, isPitcher: false, talentBonus: 30 })
     expect(overallRating(strong)).toBeGreaterThan(overallRating(weak))
+  })
+})
+
+describe('velocityRank', () => {
+  /**
+   * **球速のランクは他の能力より遠い。**
+   * 変化球やスタミナは練習で90まで届くが、160km/h（S）は高校生ではまず出ない。
+   */
+  it('5km/h ごとに1ランク上がる', () => {
+    expect(velocityRank(129)).toBe('G')
+    expect(velocityRank(130)).toBe('F')
+    expect(velocityRank(135)).toBe('E')
+    expect(velocityRank(140)).toBe('D')
+    expect(velocityRank(145)).toBe('C')
+    expect(velocityRank(150)).toBe('B')
+    expect(velocityRank(155)).toBe('A')
+    expect(velocityRank(160)).toBe('S')
+  })
+
+  it('境界の1km/h手前は下のランクのまま', () => {
+    for (const km of [134, 139, 144, 149, 154, 159]) {
+      expect(velocityRank(km)).not.toBe(velocityRank(km + 1))
+    }
+  })
+
+  it('表示のランクと尺度が一致する（画面と判定でずれない）', () => {
+    for (let km = 100; km <= 170; km++) {
+      expect(velocityRank(km)).toBe(toRank(velocityScore(km)))
+    }
+  })
+
+  it('球速が上がるほど尺度も上がる', () => {
+    for (let km = 100; km < 170; km++) {
+      expect(velocityScore(km + 1)).toBeGreaterThanOrEqual(velocityScore(km))
+    }
+    expect(velocityScore(200)).toBe(100)
+    expect(velocityScore(50)).toBe(0)
+  })
+
+  it('上限まで育てればSに届く', () => {
+    // 届かない最高ランクは、無いのと同じ
+    expect(velocityRank(VELOCITY_MAX)).toBe('S')
   })
 })

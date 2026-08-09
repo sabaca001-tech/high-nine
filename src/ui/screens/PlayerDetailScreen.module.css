@@ -228,12 +228,6 @@
   color: var(--text-sub);
 }
 
-.velocity {
-  font-weight: 800;
-  font-size: var(--fs-lg);
-  color: var(--accent);
-}
-
 .empty {
   font-size: var(--fs-xs);
   color: var(--text-dim);

@@ -13,11 +13,18 @@ import type { TrainingFocus } from '@/core/player/trainingFocus'
 import { effectOf } from '@/core/player/personality'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
-import { overallRating, toRank, TRAJECTORY_LABELS } from '@/core/player/rating'
+import { overallRating, toRank, TRAJECTORY_LABELS, velocityRank } from '@/core/player/rating'
+import type { Rank } from '@/core/player/rating'
 import { TrajectoryArrow } from '@/ui/components/TrajectoryArrow'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { Skill, SkillRank } from '@/core/types/skill'
-import { ABILITY_LABELS, MOTIVATION_LABELS, POSITION_LABELS, snapshotOf } from '@/core/types/player'
+import {
+  ABILITY_LABELS,
+  MOTIVATION_LABELS,
+  POSITION_LABELS,
+  snapshotOf,
+  velocityScore,
+} from '@/core/types/player'
 import type { AbilitySnapshot, GrowableKey, Player } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -169,10 +176,18 @@ function AbilityTab({ player }: { player: Player }) {
       {player.pitching && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>投手能力</h2>
-          <div className={styles.statusRow}>
-            <span className={styles.statusLabel}>{ABILITY_LABELS.velocity}</span>
-            <span className={styles.velocity}>{player.pitching.velocity} km/h</span>
-          </div>
+          {/*
+            球速も他の能力と同じ並びで出す。**色とランクを揃える。**
+            揃っていなかった頃は、球速だけが常に同じ色で
+            「速いのか遅いのか」がここでは読めなかった。
+            ゲージは km/h ではなく尺度（velocityScore）で伸ばす
+          */}
+          <AbilityRow
+            label={ABILITY_LABELS.velocity}
+            value={velocityScore(player.pitching.velocity)}
+            display={`${player.pitching.velocity} km/h`}
+            rank={velocityRank(player.pitching.velocity)}
+          />
           <AbilityRow label={ABILITY_LABELS.control} value={player.pitching.control} />
           <AbilityRow label={ABILITY_LABELS.stamina} value={player.pitching.stamina} />
           <AbilityRow label={ABILITY_LABELS.breaking} value={player.pitching.breaking} />
@@ -545,12 +560,18 @@ function AbilityRow({
   value,
   /** 「球速に連動」のような但し書き */
   note,
+  display,
+  rank: given,
 }: {
   label: string
   value: number
   note?: string
+  /** 数値の代わりに出す文字（球速の「140 km/h」など） */
+  display?: string
+  /** value からは決まらないランク（球速）。省略時は value から出す */
+  rank?: Rank
 }) {
-  const rank = toRank(value)
+  const rank = given ?? toRank(value)
   const color = rankColorOf(rank)
 
   return (
@@ -565,7 +586,7 @@ function AbilityRow({
       <div className={styles.abilityTrack}>
         <div className={styles.abilityFill} style={{ width: `${value}%`, background: color }} />
       </div>
-      <span className={styles.abilityValue}>{value}</span>
+      <span className={styles.abilityValue}>{display ?? Math.round(value)}</span>
     </div>
   )
 }

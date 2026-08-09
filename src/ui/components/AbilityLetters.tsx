@@ -1,4 +1,4 @@
-import { toRank } from '@/core/player/rating'
+import { toRank, velocityRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './AbilityLetters.module.css'
@@ -38,7 +38,11 @@ export function AbilityLetters({ player, compact = false }: Props) {
       {player.isPitcher && player.pitching && (
         <span className={styles.cell}>
           <span className={styles.label}>球</span>
-          <span className={styles.rank} style={{ color: 'var(--accent)' }}>
+          {/* 球速も他の能力と同じ色分けにする */}
+          <span
+            className={styles.rank}
+            style={{ color: rankColorOf(velocityRank(player.pitching.velocity)) }}
+          >
             {player.pitching.velocity}
           </span>
         </span>
