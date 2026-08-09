@@ -18,6 +18,16 @@ import type { GameState } from './types/game'
  * 注意: カードは常に手札の先頭を選ぶ「無戦略プレイ」なので、
  *       実際のプレイヤーの成長はこれより速くなる。ここでの数値は下限の目安。
  */
+/**
+ * 診断のタイムアウト。
+ *
+ * **既定（5秒）では足りない。** 他校が2818校あるので、
+ * `startedGame` で1ゲーム作るだけで時間がかかり、
+ * 数年ぶんの進行を回す診断は境界を超える。
+ * CI は `npm run test`（既定のタイムアウト）で走るので、必ず明示すること。
+ */
+const DIAG_TIMEOUT = 300_000
+
 describe('バランス確認', () => {
   it('3年分の推移を出力する（常に成功する診断用）', () => {
     let state = startedGame({ seed: 20260801 })
@@ -53,7 +63,7 @@ describe('バランス確認', () => {
     }
 
     console.log(`1年あたりのカード使用枚数: ${(cardsUsed / YEARS).toFixed(1)}`)
-  })
+  }, DIAG_TIMEOUT)
 
   it('試合の平均スコアと成績を出力する（常に成功する診断用）', () => {
     const trials = 200
@@ -106,5 +116,5 @@ describe('バランス確認', () => {
         `本塁打${(homeruns / trials).toFixed(2)} 三振${(strikeouts / trials).toFixed(1)} ` +
         `四球${(walks / trials).toFixed(1)}`,
     )
-  })
+  }, DIAG_TIMEOUT)
 })
