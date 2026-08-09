@@ -17,7 +17,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import { clamp, raiseAbility, raiseTrajectory, TRAJECTORY_MAX } from '@/core/player/growth'
-import { trajectoryArrow } from '@/core/player/rating'
+import { TRAJECTORY_LABELS } from '@/core/player/rating'
 import { grantSkill } from '@/core/skill/grantSkill'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { EventTone } from '@/core/types/event'
@@ -385,9 +385,9 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
             const { player: raised, change } = raiseTrajectory(meet.player, 1)
             return {
               player: raised,
-              text: `${player.name}の打球が上がるようになった（弾道 ${trajectoryArrow(
-                player.batting.trajectory,
-              )} → ${trajectoryArrow(raised.batting.trajectory)}）`,
+              text: `${player.name}の打球が上がるようになった（弾道 ${
+                TRAJECTORY_LABELS[player.batting.trajectory]
+              } → ${TRAJECTORY_LABELS[raised.batting.trajectory]}）`,
               tone: 'good',
               changes: change ? [...meet.changes, change] : meet.changes,
             }
@@ -410,9 +410,9 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
           return {
             player: lowered,
             text: change
-              ? `${player.name}は線で捉えるようになった（弾道 ${trajectoryArrow(
-                  change.before,
-                )} → ${trajectoryArrow(change.after)}／ミート上昇）`
+              ? `${player.name}は線で捉えるようになった（弾道 ${
+                  TRAJECTORY_LABELS[change.before]
+                } → ${TRAJECTORY_LABELS[change.after]}／ミート上昇）`
               : `${player.name}のミートが伸びた`,
             tone: 'good',
             changes: change ? [...meet.changes, change] : meet.changes,

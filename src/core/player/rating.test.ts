@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
-import { overallRating, toRank, trajectoryArrow } from './rating'
+import { overallRating, toRank, trajectoryAngle } from './rating'
 
 describe('toRank', () => {
   it('境界値が正しくランク分けされる', () => {
@@ -24,17 +24,26 @@ describe('toRank', () => {
   })
 })
 
-describe('trajectoryArrow', () => {
-  it('弾道を矢印の向きで表す', () => {
-    // 星は「多いほど良い」に見えるが、弾道は高ければ良い値ではない
-    expect(trajectoryArrow(1)).toBe('↘')
-    expect(trajectoryArrow(2)).toBe('→')
-    expect(trajectoryArrow(3)).toBe('↗')
-    expect(trajectoryArrow(4)).toBe('↑')
+describe('trajectoryAngle', () => {
+  it('弾道を打球の角度で表す', () => {
+    // **打球が下に飛ぶことは無い。** 1は水平から始める
+    expect(trajectoryAngle(1)).toBe(0)
+    expect(trajectoryAngle(3)).toBe(45)
+    expect(trajectoryAngle(4)).toBe(65)
+  })
+
+  it('弾道が上がるほど角度も上がる', () => {
+    for (let value = 1; value < 4; value++) {
+      expect(trajectoryAngle(value + 1)).toBeGreaterThan(trajectoryAngle(value))
+    }
+  })
+
+  it('真上には向けない（真上はポップフライで良い打球ではない）', () => {
+    expect(trajectoryAngle(4)).toBeLessThan(90)
   })
 
   it('範囲外でも落ちない', () => {
-    expect(trajectoryArrow(0)).toBe('→')
+    expect(trajectoryAngle(0)).toBe(0)
   })
 })
 

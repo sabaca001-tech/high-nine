@@ -30,20 +30,26 @@ export function toRank(value: number): Rank {
 }
 
 /**
- * 弾道(1〜4)は矢印で表す。打球の上がり方そのものを向きで示す。
+ * 弾道(1〜4)を**打球の角度**で表す（水平からの度数）。
  *
  * 星（★★☆☆）にしていた頃は、他の能力と同じ「多いほど良い」に見えたが、
  * 弾道は**高ければ良いという値ではない**（ミートで当てる打者は低いほうが合う）。
- * 向きなら、その打者がどんな打球を打つのかがそのまま読める。
+ * 角度なら、その打者がどんな打球を打つのかがそのまま読める。
+ *
+ * **既製の矢印文字（→↗↑）では足りない。** 4段階に対して
+ * 使える向きが45度刻みしか無く、弾道2と3が同じ字面になるか、
+ * 弾道1が「下向き」という誤った意味になっていた。
+ * 打球が下に飛ぶことは無いので、**1は水平**。
+ * 上限も真上ではなく65度に留める（真上はポップフライで、良い打球ではない）。
  */
-export const TRAJECTORY_ARROWS: Record<number, string> = {
-  1: '↘',
-  2: '→',
-  3: '↗',
-  4: '↑',
+export const TRAJECTORY_ANGLES: Record<number, number> = {
+  1: 0,
+  2: 22,
+  3: 45,
+  4: 65,
 }
 
-/** 弾道の説明。矢印だけでは伝わらないので添える */
+/** 弾道の説明。角度だけでは伝わらないので添える */
 export const TRAJECTORY_LABELS: Record<number, string> = {
   1: 'ゴロ',
   2: 'ライナー',
@@ -51,9 +57,9 @@ export const TRAJECTORY_LABELS: Record<number, string> = {
   4: 'アーチ',
 }
 
-/** 弾道(1〜4) → 矢印 */
-export function trajectoryArrow(trajectory: number): string {
-  return TRAJECTORY_ARROWS[trajectory] ?? '→'
+/** 弾道(1〜4) → 打球の角度（度）。範囲外は水平として扱う */
+export function trajectoryAngle(trajectory: number): number {
+  return TRAJECTORY_ANGLES[trajectory] ?? 0
 }
 
 /**

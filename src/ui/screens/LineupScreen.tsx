@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
 import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
-import { overallRating, toRank, trajectoryArrow } from '@/core/player/rating'
+import { overallRating, toRank } from '@/core/player/rating'
+import { TrajectoryArrow } from '@/ui/components/TrajectoryArrow'
 import { PitchChart } from '@/ui/components/PitchChart'
 import { PitcherStats } from '@/ui/components/PitcherStats'
 import { ABILITY_LABELS, MOTIVATION_LABELS } from '@/core/types/player'
@@ -403,7 +405,12 @@ export function LineupEditor() {
               </div>
             )}
             {previewed ? (
-              <AbilityPanel player={previewed} />
+              /*
+                **選手が変わったら表示も既定に戻す。**
+                key を付けないと、投手を見たあとに野手を選んでも
+                「投手能力」を選んだままの状態が残る
+              */
+              <AbilityPanel key={previewed.id} player={previewed} />
             ) : (
               !armed && <p className={styles.empty}>選手をタップ</p>
             )}
@@ -461,9 +468,20 @@ function PositionLegend() {
   )
 }
 
-/** 選んだ選手の能力。右側に固定で出す */
+/** 能力の表示。投手／野手のどちらを出すか */
+type AbilityView = 'pitching' | 'batting'
+
+/**
+ * 選んだ選手の能力。右側に固定で出す。
+ *
+ * **投手にも野手能力はある。** 打順を組むときは投手の打力を、
+ * 継投を考えるときは球速と持ち球を見たい。
+ * どちらも同時に出すと枠に入らないので、切り替えられるようにした。
+ * 既定はその選手の本職（投手なら投手能力）。
+ */
 function AbilityPanel({ player }: { player: Player }) {
   const rank = toRank(overallRating(player))
+  const [view, setView] = useState<AbilityView>(player.pitching ? 'pitching' : 'batting')
 
   return (
     <div className={styles.panel}>
@@ -480,12 +498,35 @@ function AbilityPanel({ player }: { player: Player }) {
       <Row label="状態" value={MOTIVATION_LABELS[player.motivation]} />
       <Row label="体力" value={`${player.condition}`} />
 
+      {/* 野手は投手能力を持たないので、切り替えは投手にだけ出す */}
+      {player.pitching && (
+        <div className={styles.viewSwitch}>
+          {(
+            [
+              ['pitching', '投手'],
+              ['batting', '野手'],
+            ] as [AbilityView, string][]
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={
+                view === value ? `${styles.viewTab} ${styles.viewTabActive}` : styles.viewTab
+              }
+              onClick={() => setView(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/*
         **投手には投手の並びを出す。** 打撃6項目まで並べていたので、
         肝心の球速・変化球より下に押し出されていた。
         持ち球も、ここで分からないと継投の判断ができない。
       */}
-      {player.pitching ? (
+      {player.pitching && view === 'pitching' ? (
         <>
           <div className={styles.panelPitching}>
             <PitcherStats pitching={player.pitching} columns={1} />
@@ -498,7 +539,7 @@ function AbilityPanel({ player }: { player: Player }) {
         <>
           <Row
             label={ABILITY_LABELS.trajectory}
-            value={trajectoryArrow(player.batting.trajectory)}
+            value={<TrajectoryArrow trajectory={player.batting.trajectory} size={16} />}
           />
           <Row label={ABILITY_LABELS.meet} value={toRank(player.batting.meet)} />
           <Row label={ABILITY_LABELS.power} value={toRank(player.batting.power)} />
@@ -589,8 +630,9 @@ function PlayablePositions({ player }: { player: Player }) {
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  const isRank = value.length === 1 && /[SABCDEFG]/.test(value)
+function Row({ label, value }: { label: string; value: ReactNode }) {
+  // ランク1文字のときだけ色を付ける。弾道の矢印のような要素はそのまま出す
+  const isRank = typeof value === 'string' && value.length === 1 && /[SABCDEFG]/.test(value)
 
   return (
     <div className={styles.panelRow}>

@@ -13,7 +13,8 @@ import type { TrainingFocus } from '@/core/player/trainingFocus'
 import { effectOf } from '@/core/player/personality'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
-import { overallRating, toRank, trajectoryArrow, TRAJECTORY_LABELS } from '@/core/player/rating'
+import { overallRating, toRank, TRAJECTORY_LABELS } from '@/core/player/rating'
+import { TrajectoryArrow } from '@/ui/components/TrajectoryArrow'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { Skill, SkillRank } from '@/core/types/skill'
 import { ABILITY_LABELS, MOTIVATION_LABELS, POSITION_LABELS, snapshotOf } from '@/core/types/player'
@@ -186,7 +187,7 @@ function AbilityTab({ player }: { player: Player }) {
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>{ABILITY_LABELS.trajectory}</span>
           <span className={styles.trajectory}>
-            {trajectoryArrow(b.trajectory)}
+            <TrajectoryArrow trajectory={b.trajectory} size={22} />
             <span className={styles.trajectoryName}>{TRAJECTORY_LABELS[b.trajectory]}</span>
           </span>
         </div>

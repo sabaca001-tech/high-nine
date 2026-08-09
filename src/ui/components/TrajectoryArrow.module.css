@@ -1,0 +1,26 @@
+/**
+ * 弾道の矢印。打球の角度をそのまま描く。
+ * 色は文字と同じ扱いにして、置いた場所の色を継ぐ。
+ */
+.arrow {
+  display: inline-block;
+  vertical-align: middle;
+  overflow: visible;
+}
+
+.ground {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  opacity: 0.3;
+}
+
+.shaft {
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.head {
+  fill: currentColor;
+}
