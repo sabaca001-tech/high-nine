@@ -106,9 +106,13 @@ export const RIVALS_PER_REGION = 10
  *
  * 全国大会の相手も使い捨てにしていたので、
  * 「去年あそこに負けた」「今年こそ」という記憶が積み上がらなかった。
- * 20校あれば甲子園で何度も顔を合わせる。
+ *
+ * **自県以外の48地区すべてに1校ずつ置く。**
+ * 20校だった頃は、U18の代表を全国から30人選ぼうにも
+ * 候補になる学校が20校しか存在しなかった。
+ * 名簿は種から作り直すので、増えるのは名前と数値だけ。
  */
-export const NATIONAL_RIVALS = 20
+export const NATIONAL_RIVALS = REGIONS.length - 1
 
 /**
  * 県内の学校の地力の分布。
@@ -197,7 +201,7 @@ export function createRivals(rng: Rng, homeRegionId: RegionId): RivalSchool[] {
     add(`rs${index + 1}`, homeRegionId, tradition, index < RIVALS_PER_REGION)
   })
 
-  // 県外の全国クラス。1県に1校までにして、全国に散らす
+  // 県外の全国クラス。1県に1校ずつ置いて、全国に散らす
   const elsewhere = REGIONS.filter((region) => region.id !== homeRegionId)
   const picked = shuffle(rng, elsewhere).slice(0, NATIONAL_RIVALS)
 

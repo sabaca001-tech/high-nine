@@ -3,7 +3,11 @@ import type { CSSProperties } from 'react'
 import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
 import {
   canConvert,
+  CONVERT_MAIN_MAX,
+  CONVERT_MAIN_STEPS,
+  CONVERT_MAX,
   CONVERT_PRACTICE_PENALTY,
+  convertSteps,
   CONVERT_STEPS,
   DEFAULT_FOCUS,
   FOCUS_BONUS,
@@ -441,6 +445,10 @@ function TrainingTab({ player }: { player: Player }) {
   const setTrainingFocus = useGameStore((s) => s.setTrainingFocus)
   const focus = player.focus ?? DEFAULT_FOCUS
   const progress = player.convertProgress ?? 0
+  // いま指示中のコンバートがあれば、その種類を初期表示にする
+  const [mainConvert, setMainConvert] = useState(
+    focus.type === 'convert' ? (focus.main ?? false) : false,
+  )
 
   const choose = (next: TrainingFocus) => setTrainingFocus(player.id, next)
 
@@ -460,7 +468,9 @@ function TrainingTab({ player }: { player: Player }) {
           onClick={() => choose({ type: 'team' })}
         >
           <span className={styles.focusName}>チーム練習に合わせる</span>
-          <span className={styles.focusDesc}>すべての能力が等倍で伸びる</span>
+          <span className={styles.focusDesc}>
+            本職（{POSITION_LABELS[player.position]}）で大事な能力ほど伸びる
+          </span>
         </button>
 
         <p className={styles.chartNote}>能力を重点的に伸ばす</p>
@@ -489,16 +499,49 @@ function TrainingTab({ player }: { player: Player }) {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>ポジション適性とコンバート</h2>
+
+        {/*
+          **サブで守れるようにするのか、本職そのものを移すのかを選ぶ。**
+          「守れる位置を増やす」しか無かった頃は、
+          遊撃手を一塁へ移したくても本職は遊撃のままだった。
+        */}
+        <div className={styles.convertMode}>
+          {(
+            [
+              [false, 'サブで守る', `${CONVERT_MAX}まで・${CONVERT_STEPS}回で1段階`],
+              [true, '本職を移す', `${CONVERT_MAIN_MAX}まで・${CONVERT_MAIN_STEPS}回で1段階`],
+            ] as [boolean, string, string][]
+          ).map(([value, label, note]) => (
+            <button
+              key={label}
+              type="button"
+              className={
+                mainConvert === value
+                  ? `${styles.convertMode} ${styles.convertModeButton} ${styles.convertModeActive}`
+                  : `${styles.convertMode} ${styles.convertModeButton}`
+              }
+              onClick={() => setMainConvert(value)}
+            >
+              <span className={styles.convertModeName}>{label}</span>
+              <span className={styles.convertModeNote}>{note}</span>
+            </button>
+          ))}
+        </div>
+
         <p className={styles.chartNote}>
-          守れるようにしたい位置をタップすると、その練習を始めます。
-          {CONVERT_STEPS}回の練習で適性が1段階上がり、Aまで伸ばせます（本職Sには届きません）。
+          {mainConvert
+            ? `守らせたい位置をタップすると、本職を移す練習を始めます。適性が${CONVERT_MAIN_MAX}に届いた時点でポジションが入れ替わります（投手⇄野手も可）。`
+            : `守れるようにしたい位置をタップすると、その練習を始めます。${CONVERT_MAX}まで伸ばせます（本職${CONVERT_MAIN_MAX}には届きません）。`}
         </p>
 
         <div className={styles.aptitudeGrid}>
           {ALL_POSITIONS.map((position) => {
             const aptitude = player.aptitudes[position]
-            const convertible = canConvert(player, position)
-            const active = focus.type === 'convert' && focus.position === position
+            const convertible = canConvert(player, position, mainConvert)
+            const active =
+              focus.type === 'convert' &&
+              focus.position === position &&
+              (focus.main ?? false) === mainConvert
 
             return (
               <button
@@ -511,7 +554,11 @@ function TrainingTab({ player }: { player: Player }) {
                 }
                 disabled={!convertible}
                 onClick={() =>
-                  choose(active ? { type: 'team' } : { type: 'convert', position })
+                  choose(
+                    active
+                      ? { type: 'team' }
+                      : { type: 'convert', position, ...(mainConvert ? { main: true } : {}) },
+                  )
                 }
               >
                 <span className={styles.aptitudePos}>{position}</span>
@@ -532,21 +579,28 @@ function TrainingTab({ player }: { player: Player }) {
         {focus.type === 'convert' ? (
           <div className={styles.convertPanel}>
             <p className={styles.convertText}>
-              {focus.position}へ転向中（あと{CONVERT_STEPS - progress}回）
+              {focus.position}
+              {focus.main ? 'へ本職転向中' : 'を練習中'}（あと
+              {convertSteps(focus) - progress}回）
               <span className={styles.convertTrack}>
                 <span
                   className={styles.convertFill}
-                  style={{ width: `${(progress / CONVERT_STEPS) * 100}%` }}
+                  style={{ width: `${(progress / convertSteps(focus)) * 100}%` }}
                 />
               </span>
               <span className={styles.convertCost}>
                 この間、通常の練習の伸びは{CONVERT_PRACTICE_PENALTY}倍になります
+                {focus.main && focus.position === 'P' && !player.isPitcher && (
+                  <>／転向したときに投球能力が決まります（肩の強さで球速が変わります）</>
+                )}
               </span>
             </p>
           </div>
         ) : (
           <p className={styles.convertHint}>
-            本職とA到達済みの位置は選べません
+            {mainConvert
+              ? '本職と同じ位置は選べません'
+              : `本職と${CONVERT_MAX}到達済みの位置は選べません`}
           </p>
         )}
       </section>

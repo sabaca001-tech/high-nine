@@ -24,11 +24,32 @@ import type { RivalPlayer, RivalSchool } from './rivals'
 /** 1学年あたりの人数。3学年で15人 */
 const PER_GRADE = 5
 
+/**
+ * 学校の戦力を、選手ひとりの素質にどれだけ乗せるか。
+ *
+ * **そのまま乗せると上限に張り付いていた。**
+ * 戦力46の学校の3年生は素質96になり、
+ * `TALENT_SPREAD`（±18）が乗ると全能力が100付近で飽和する。
+ * U18の名簿を作ったら「30人全員が総合98〜99」という並びになり、
+ * 自校の選手は何をどう育てても届かなくなっていた。
+ *
+ * 学校の戦力は**層の厚さ**であって、突出した個人の多さではない。
+ * 0.55にすると、戦力46の名門でも3年生の上位が総合90前後で止まる。
+ */
+const ROSTER_TALENT_RATE = 0.55
+
 /** 各学年の何人目までを投手にするか */
 const PITCHERS_PER_GRADE = 2
 
 /**
  * 学校の部員を作る。**同じ学校・同じ年なら必ず同じ結果になる。**
+ *
+ * **id には `r` を挟む。** 挟んでいなかった頃は
+ * `${'${school.id}'}-${'${入学年}'}-${'${背番号}'}` という形が
+ * 注目選手（`advanceRival` の `makeStar`）の id とまったく同じで、
+ * **同じ名簿の中に同じ id の選手が2人**現れることがあった。
+ * U18の名簿は id で選手を引き当てるので、
+ * 「総合99で選んだはずが、引き当てたら総合71の別人」という取り違えが起きていた。
  *
  * 入学年ごとに種を分けているので、学年が上がっても同じ選手が同じ名前で残る。
  * 能力はその学校の今の戦力（`strength`）を基準にするので、
@@ -60,10 +81,10 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
       // 同じ代なのに翌年は3人目以降が別人になっていた
       const rng = createRng(playerSeed(school.rosterSeed, enrolledYear, i))
       const player = createPlayer(rng, {
-        id: `${school.id}-${enrolledYear}-${i}`,
+        id: `${school.id}-r${enrolledYear}-${i}`,
         grade,
         isPitcher: i < PITCHERS_PER_GRADE,
-        talentBonus: school.strength,
+        talentBonus: Math.round(school.strength * ROSTER_TALENT_RATE),
         takenNames,
       })
       takenNames.push(player.name)

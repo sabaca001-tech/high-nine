@@ -302,3 +302,106 @@
   font-size: var(--fs-sm);
   font-weight: 700;
 }
+
+/* ── U18日本代表の名簿 ─────────────────────── */
+.u18Row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.u18Ours {
+  background: rgba(255, 200, 87, 0.1);
+  border-radius: 6px;
+}
+
+.u18Order {
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.u18Who {
+  min-width: 0;
+}
+
+.u18Name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.u18Badge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.u18School {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.u18Stats {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.u18Pos {
+  min-width: 26px;
+  text-align: center;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-base);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.u18Grade {
+  font-size: 10px;
+  color: var(--text-sub);
+}
+
+.u18Rank {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.u18Rating {
+  min-width: 22px;
+  text-align: right;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 年度が替わって卒業した選手。名前は名簿に残す */
+.u18Gone {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bg-base);
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+}

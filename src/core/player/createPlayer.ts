@@ -16,6 +16,7 @@ import type {
   Position,
   Trajectory,
 } from '@/core/types/player'
+import { VELOCITY_MAX, VELOCITY_MIN } from '@/core/types/player'
 
 /**
  * 姓（実在選手を想起させない一般的な姓のみ使用）。
@@ -149,7 +150,15 @@ const TALENT_SPREAD = 18
  *  素質に恵まれた3年（base66）で149km/h。
  */
 function velocityFor(rng: Rng, base: number, grade: Grade): number {
-  return Math.round(VELOCITY_INTERCEPT + clampAbility(base) * 0.5 + grade * 1.2 + rng.int(-3, 3))
+  // **上限で止める。** 止めていなかった頃は、素質の高い他校の投手が
+  // 169km/h で生成され、球速スコアが飽和して総合100の投手が量産されていた
+  return Math.min(
+    VELOCITY_MAX,
+    Math.max(
+      VELOCITY_MIN,
+      Math.round(VELOCITY_INTERCEPT + clampAbility(base) * 0.5 + grade * 1.2 + rng.int(-3, 3)),
+    ),
+  )
 }
 
 /** 素質0のときの球速。`velocityScore` の対応表から逆算した値 */

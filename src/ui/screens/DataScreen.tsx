@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { autoLineup } from '@/core/lineup/autoLineup'
+import { activeU18Players, resolveU18Squad, u18Players, U18_SQUAD_SIZE } from '@/core/player/u18Squad'
+import type { U18Entry } from '@/core/player/u18Squad'
 import { formatInnings } from '@/core/player/careerStats'
 import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
 import type { GrowthRange } from '@/core/player/growthReport'
@@ -26,18 +29,20 @@ import {
   REPUTATION_GRADE_LABELS,
 } from '@/core/types/season'
 import { findRegion, regionStrength, roundsFor } from '@/core/types/region'
+import { rankColorOf } from '@/ui/theme/playerColors'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { HELP_TOPICS } from './helpTopics'
 import styles from './DataScreen.module.css'
 
-type Tab = 'team' | 'growth' | 'facility' | 'rivals' | 'draft' | 'scout' | 'help'
+type Tab = 'team' | 'growth' | 'facility' | 'rivals' | 'u18' | 'draft' | 'scout' | 'help'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'team', label: 'チーム' },
   { id: 'growth', label: '成長' },
   { id: 'facility', label: '設備' },
   { id: 'rivals', label: '他校' },
+  { id: 'u18', label: 'U18' },
   { id: 'draft', label: '進路' },
   { id: 'scout', label: 'スカウト' },
   { id: 'help', label: '遊び方' },
@@ -75,6 +80,7 @@ export function DataScreen() {
       {tab === 'growth' && <GrowthTab />}
       {tab === 'facility' && <FacilityTab />}
       {tab === 'rivals' && <RivalsTab />}
+      {tab === 'u18' && <U18Tab />}
       {tab === 'draft' && <DraftTab />}
       {tab === 'scout' && <ScoutTab />}
       {tab === 'help' && <HelpTab />}
@@ -351,6 +357,134 @@ function RivalsTab() {
         ))}
       </Section>
     </>
+  )
+}
+
+/**
+ * U18日本代表。
+ *
+ * **次の選考まで、前回選ばれた顔ぶれをそのまま見せる。**
+ * 名簿は id だけを保存しているので、能力は開くたびに引き直す。
+ * 選考のあとに伸びたぶんがそのまま出るし、
+ * 年度が替わって卒業した選手は「卒業」と分かる。
+ */
+function U18Tab() {
+  const game = useGameStore((s) => s.game)!
+  const squad = game.u18Squad
+
+  // 30人ぶんの名簿を毎回作り直すので、描画のたびに走らせない
+  const entries = useMemo(
+    () =>
+      squad
+        ? resolveU18Squad(squad, {
+            schools: game.rivals,
+            ourPlayers: game.players,
+            ourSchoolName: game.schoolName,
+            year: game.year,
+          })
+        : [],
+    [squad, game.rivals, game.players, game.schoolName, game.year],
+  )
+
+  // スタメンはその場で組む。能力が伸びれば顔ぶれも入れ替わる。
+  // **卒業した選手も当時の姿で並べる**（3年生を外すと9人に足りない）
+  const lineup = useMemo(() => {
+    const players = u18Players(entries)
+    return players.length >= 9 ? autoLineup(players) : null
+  }, [entries])
+
+  if (!squad) {
+    return (
+      <Section title="U18日本代表">
+        <p className={styles.empty}>
+          まだ選考が行われていません。毎年{U18_SELECTION_MONTH}月に、全国から
+          {U18_SQUAD_SIZE}人が選ばれます
+        </p>
+      </Section>
+    )
+  }
+
+  const starters = new Map(
+    (lineup?.slots ?? []).map((slot, index) => [slot.playerId, { order: index + 1, position: slot.position }]),
+  )
+  const ours = entries.filter((entry) => entry.ours)
+
+  const sorted = [...entries].sort((a, b) => {
+    const rank = (entry: U18Entry) =>
+      entry.player ? (starters.get(entry.player.id)?.order ?? 100) : 200
+    return rank(a) - rank(b)
+  })
+
+  return (
+    <>
+      <Section title={`${squad.year}年目の代表（${squad.members.length}人）`}>
+        <Row label="自校からの選出" value={`${ours.length}人`} />
+        <Row label="在籍中" value={`${activeU18Players(entries).length}人`} />
+        {lineup && <Row label="スタメン" value="下の一覧で「打順／守備位置」が付いた9人" />}
+        <p className={styles.note}>
+          次の選考（{U18_SELECTION_MONTH}月）まで、この顔ぶれのまま。
+          能力は今の値で表示されます
+        </p>
+      </Section>
+
+      <Section title="名簿">
+        {sorted.map((entry) => (
+          <U18Row
+            key={`${entry.member.schoolId ?? 'ours'}-${entry.member.playerId}`}
+            entry={entry}
+            slot={entry.player ? starters.get(entry.player.id) : undefined}
+          />
+        ))}
+      </Section>
+    </>
+  )
+}
+
+/** 代表選考が行われる月。gameEngine の U18_SELECTION_MONTH と揃える */
+const U18_SELECTION_MONTH = 11
+
+function U18Row({
+  entry,
+  slot,
+}: {
+  entry: U18Entry
+  slot?: { order: number; position: string }
+}) {
+  const player = entry.player
+
+  return (
+    <div className={entry.ours ? `${styles.u18Row} ${styles.u18Ours}` : styles.u18Row}>
+      <span className={styles.u18Order}>{slot ? slot.order : '—'}</span>
+      <span className={styles.u18Who}>
+        <span className={styles.u18Name}>
+          {entry.member.name}
+          {entry.ours && <span className={styles.u18Badge}>自校</span>}
+          {entry.graduated && <span className={styles.u18Gone}>卒業</span>}
+        </span>
+        <span className={styles.u18School}>{entry.schoolName}</span>
+      </span>
+      {player ? (
+        <span className={styles.u18Stats}>
+          <span className={styles.u18Pos}>
+            {slot ? slot.position : player.position}
+          </span>
+          <span className={styles.u18Grade}>
+            {entry.graduated ? `${entry.member.grade}年（当時）` : `${player.grade}年`}
+          </span>
+          <span
+            className={styles.u18Rank}
+            style={{ color: rankColorOf(toRank(overallRating(player))) }}
+          >
+            {toRank(overallRating(player))}
+          </span>
+          <span className={styles.u18Rating}>{overallRating(player)}</span>
+        </span>
+      ) : (
+        <span className={styles.u18Stats}>
+          <span className={styles.u18Grade}>{entry.member.grade}年（当時）</span>
+        </span>
+      )}
+    </div>
   )
 }
 

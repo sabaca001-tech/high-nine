@@ -16,8 +16,8 @@ import { playStep, playUntilYearEnd, playYear, startedGame } from './autoPlay'
 import { overallRating } from './player/rating'
 import type { GameState } from './types/game'
 import { createRng } from './rng/random'
-import { upperStarRatingAtRank } from './rival/rivals'
-import { u18Bar, U18_SQUAD_SIZE } from './player/u18'
+import { overallRating as ratingOf } from './player/rating'
+import { resolveU18Squad } from './player/u18Squad'
 import { createProspects, MAX_APPROACHES, successChance } from './scout/scouting'
 import { scoutTripCost } from './shop/travel'
 import { findRegion } from './types/region'
@@ -184,7 +184,20 @@ describe('スカウトとU18の到達度', () => {
         // 卒業する前に数える。3年生で選ばれた選手を取りこぼさないため
         state = playUntilYearEnd(state)
         selected[y] += state.players.filter((p) => p.u18.length > 0).length
-        bar[y] += u18Bar(upperStarRatingAtRank(state.rivals, U18_SQUAD_SIZE - 1))
+        // 代表の当落線＝名簿のいちばん下の総合
+        const squad = state.u18Squad
+        if (squad) {
+          const entries = resolveU18Squad(squad, {
+            schools: state.rivals,
+            ourPlayers: state.players,
+            ourSchoolName: state.schoolName,
+            year: state.year,
+          })
+          const ratings = entries
+            .map((entry) => (entry.player ? ratingOf(entry.player) : null))
+            .filter((value): value is number => value !== null)
+          if (ratings.length > 0) bar[y] += Math.min(...ratings)
+        }
         best[y] += Math.max(...state.players.map(overallRating))
 
         state = applyCommand(state, { type: 'advanceYear' }).state

@@ -13,7 +13,9 @@
  */
 
 import { APTITUDE_ORDER, ALL_POSITIONS } from '@/core/lineup/aptitude'
+import type { Rng } from '@/core/rng/random'
 import type { Aptitude, GrowableKey, Player, Position } from '@/core/types/player'
+import { rollPitchingFor } from './convertPitching'
 
 /** 練習方針 */
 export type TrainingFocus =
@@ -21,8 +23,15 @@ export type TrainingFocus =
   | { type: 'team' }
   /** 特定の能力を重点的に伸ばす */
   | { type: 'ability'; key: GrowableKey }
-  /** 別のポジションを守れるように練習する */
-  | { type: 'convert'; position: Position }
+  /**
+   * 別のポジションを練習する。
+   *
+   * `main` を立てると**本職そのものを移す**。
+   * サブ（既定）は「守れる位置を増やす」だけで、適性はAで止まる。
+   * 本職にするなら S まで上げるので時間がかかるが、
+   * 到達した時点でポジションが入れ替わる。
+   */
+  | { type: 'convert'; position: Position; main?: boolean }
 
 export const DEFAULT_FOCUS: TrainingFocus = { type: 'team' }
 
@@ -35,26 +44,54 @@ export const FOCUS_PENALTY = 0.6
 /** コンバート練習中は通常の練習効果が下がる */
 export const CONVERT_PRACTICE_PENALTY = 0.7
 
-/** コンバートで到達できる上限。本職(S)には届かない */
+/** サブポジとして鍛えたときの上限。本職(S)には届かない */
 export const CONVERT_MAX: Aptitude = 'A'
+
+/** 本職として転向したときの上限。ここまで来ると本職が入れ替わる */
+export const CONVERT_MAIN_MAX: Aptitude = 'S'
 
 /** 適性が1段階上がるのに必要な練習回数 */
 export const CONVERT_STEPS = 8
+
+/**
+ * 本職を移すときの1段階ぶん。
+ *
+ * **サブで守れるようにするのとは重みが違う。**
+ * 「今日から一塁手」で済むなら、守備適性という仕組み自体の意味が薄い。
+ */
+export const CONVERT_MAIN_STEPS = 14
+
+/** その方針での上限 */
+export function convertCeiling(focus: { main?: boolean }): Aptitude {
+  return focus.main ? CONVERT_MAIN_MAX : CONVERT_MAX
+}
+
+/** その方針での1段階ぶんの練習回数 */
+export function convertSteps(focus: { main?: boolean }): number {
+  return focus.main ? CONVERT_MAIN_STEPS : CONVERT_STEPS
+}
 
 /** APTITUDE_ORDER は S が0番。数字が小さいほど良い */
 function rankIndex(aptitude: Aptitude): number {
   return APTITUDE_ORDER.indexOf(aptitude)
 }
 
-/** その位置をこれ以上鍛えられるか */
-export function canConvert(player: Player, position: Position): boolean {
+/**
+ * その位置をこれ以上鍛えられるか。
+ *
+ * サブなら A まで、本職として移すなら S まで。
+ * **本職を移す指定は、すでに S でも受け付ける**
+ * （適性が足りていれば、その場で本職が入れ替わる）。
+ */
+export function canConvert(player: Player, position: Position, main = false): boolean {
   if (player.position === position) return false
+  if (main) return true
   return rankIndex(player.aptitudes[position]) > rankIndex(CONVERT_MAX)
 }
 
 /** いま指定できるコンバート先の一覧 */
-export function convertiblePositions(player: Player): Position[] {
-  return ALL_POSITIONS.filter((position) => canConvert(player, position))
+export function convertiblePositions(player: Player, main = false): Position[] {
+  return ALL_POSITIONS.filter((position) => canConvert(player, position, main))
 }
 
 /**
@@ -126,7 +163,9 @@ export function withFocus(player: Player, focus: TrainingFocus): Player {
 export function isSameFocus(a: TrainingFocus, b: TrainingFocus): boolean {
   if (a.type !== b.type) return false
   if (a.type === 'ability' && b.type === 'ability') return a.key === b.key
-  if (a.type === 'convert' && b.type === 'convert') return a.position === b.position
+  if (a.type === 'convert' && b.type === 'convert') {
+    return a.position === b.position && (a.main ?? false) === (b.main ?? false)
+  }
   return true
 }
 
@@ -134,25 +173,33 @@ export type ConvertStep = {
   player: Player
   /** 適性が上がったときだけ入る */
   promoted?: { position: Position; from: Aptitude; to: Aptitude }
+  /** 本職が入れ替わったときだけ入る */
+  converted?: { from: Position; to: Position }
 }
 
 /**
  * コンバート練習を1回ぶん進める。
  *
  * 一定回数積み上がると適性が1段階上がる。
- * 上限（A）に達したら方針をチーム練習へ戻す（進めても意味が無いため）。
+ * 上限に達したら方針をチーム練習へ戻す（進めても意味が無いため）。
+ * **本職として転向していた場合は、そこでポジションが入れ替わる。**
  */
-export function advanceConvert(player: Player): ConvertStep {
+export function advanceConvert(rng: Rng, player: Player): ConvertStep {
   const focus = player.focus
   if (focus?.type !== 'convert') return { player }
 
   const position = focus.position
-  if (!canConvert(player, position)) {
-    return { player: { ...player, focus: DEFAULT_FOCUS, convertProgress: 0 } }
+  const main = focus.main ?? false
+  const ceiling = convertCeiling(focus)
+  const steps = convertSteps(focus)
+
+  // すでに上限まで来ていれば、本職の入れ替えだけ済ませて終わる
+  if (rankIndex(player.aptitudes[position]) <= rankIndex(ceiling)) {
+    return main ? switchMainPosition(rng, player, position) : { player: backToTeam(player) }
   }
 
   const progress = (player.convertProgress ?? 0) + 1
-  if (progress < CONVERT_STEPS) {
+  if (progress < steps) {
     return { player: { ...player, convertProgress: progress } }
   }
 
@@ -160,25 +207,59 @@ export function advanceConvert(player: Player): ConvertStep {
   const to = APTITUDE_ORDER[rankIndex(from) - 1]
   const aptitudes = { ...player.aptitudes, [position]: to }
   const promoted = { position, from, to }
+  const reachedMax = rankIndex(to) <= rankIndex(ceiling)
 
-  // 上限に届いたらチーム練習へ戻す
-  const reachedMax = rankIndex(to) <= rankIndex(CONVERT_MAX)
+  const raised: Player = { ...player, aptitudes, convertProgress: 0 }
+  if (!reachedMax) return { player: raised, promoted }
 
-  return {
-    player: {
-      ...player,
-      aptitudes,
-      convertProgress: 0,
-      ...(reachedMax ? { focus: DEFAULT_FOCUS } : {}),
-    },
-    promoted,
+  if (!main) return { player: backToTeam(raised), promoted }
+
+  const switched = switchMainPosition(rng, raised, position)
+  return { ...switched, promoted }
+}
+
+function backToTeam(player: Player): Player {
+  return { ...player, focus: DEFAULT_FOCUS, convertProgress: 0 }
+}
+
+/**
+ * 本職を入れ替える。
+ *
+ * **投手と野手の行き来もここで扱う。**
+ * 野手が投手になるときは投球能力を持っていないので、その場で作る
+ * （持たないまま本職にすると、登板しても何も投げられない）。
+ * 逆に投手が野手になったら投球能力は捨てる。
+ * `isPitcher` と `pitching` は必ず揃っている、という前提が
+ * あちこちにあるため（`Player` の型注釈）。
+ */
+function switchMainPosition(rng: Rng, player: Player, position: Position): ConvertStep {
+  const from = player.position
+  const toPitcher = position === 'P'
+
+  const base: Player = {
+    ...backToTeam(player),
+    position,
+    // 転向した位置は本職なので S にする
+    aptitudes: { ...player.aptitudes, [position]: 'S' as Aptitude },
+    isPitcher: toPitcher,
   }
+
+  const converted = { from, to: position }
+  if (toPitcher) {
+    return {
+      player: { ...base, pitching: player.pitching ?? rollPitchingFor(rng, player) },
+      converted,
+    }
+  }
+  return { player: { ...base, pitching: null }, converted }
 }
 
 /** 方針の表示名 */
 export function focusLabel(focus: TrainingFocus | undefined, labels: Record<string, string>): string {
   const value = focus ?? DEFAULT_FOCUS
   if (value.type === 'ability') return labels[value.key] ?? value.key
-  if (value.type === 'convert') return `${value.position}へ転向`
+  if (value.type === 'convert') {
+    return value.main ? `${value.position}へ本職転向` : `${value.position}を練習`
+  }
   return 'チーム練習'
 }

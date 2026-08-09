@@ -142,3 +142,25 @@ describe('rivalRoster', () => {
     expect(rivalRoster(graduated, 5).map((p) => p.name)).not.toContain('卒業 済')
   })
 })
+
+describe('idの重複', () => {
+  it('名簿の中に同じidの選手が2人いない', () => {
+    // **注目選手の id と形式が同じだった。**
+    // U18の名簿は id で選手を引き当てるので、重複すると別人を掴む
+    for (const target of schools.slice(0, 12)) {
+      for (const year of [3, 5, 8]) {
+        const ids = rivalRoster(target, year).map((player) => player.id)
+        expect(new Set(ids).size).toBe(ids.length)
+      }
+    }
+  })
+
+  it('注目選手のidとぶつからない', () => {
+    const withStars = schools.find((s) => s.stars.length > 0)!
+    const roster = rivalRoster(withStars, 5)
+    const starIds = new Set(withStars.stars.map((star) => star.id))
+    // 注目選手として差し込まれた1人ぶんを除けば、名簿側と重ならない
+    const plain = roster.filter((player) => !starIds.has(player.id))
+    for (const player of plain) expect(starIds.has(player.id)).toBe(false)
+  })
+})

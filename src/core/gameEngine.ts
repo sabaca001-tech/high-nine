@@ -50,7 +50,6 @@ import {
   localRivals,
   nationalRivals,
   schoolForProspect,
-  upperStarRatingAtRank,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import { rivalRoster } from '@/core/rival/rivalRoster'
@@ -68,7 +67,8 @@ import {
 } from '@/core/scout/scouting'
 import type { ScoutRegion, ScoutResult } from '@/core/scout/scouting'
 import { createTraits, shiftTraits } from '@/core/scout/scoutTraits'
-import { playU18, selectU18, U18_SQUAD_SIZE } from '@/core/player/u18'
+import { playU18 } from '@/core/player/u18'
+import { ourU18Players, selectU18Squad } from '@/core/player/u18Squad'
 import {
   applyCamp,
   campSeasonOf,
@@ -128,7 +128,13 @@ import { applyTournamentGrowth } from '@/core/tournament/tournamentGrowth'
 import { findSkill } from '@/core/skill/skillDefs'
 import { PRACTICE_LABELS } from '@/core/types/card'
 import type { PracticeCard, PracticeKind } from '@/core/types/card'
-import { ABILITY_LABELS, HISTORY_LIMIT, isAvailable, snapshotOf } from '@/core/types/player'
+import {
+  ABILITY_LABELS,
+  HISTORY_LIMIT,
+  isAvailable,
+  POSITION_LABELS,
+  snapshotOf,
+} from '@/core/types/player'
 import type { AbilityChange, Player } from '@/core/types/player'
 import type { GameEvent, LogEntry } from '@/core/types/event'
 import type { EngineResult, GameCommand, GameState, Month, PracticeBoost } from '@/core/types/game'
@@ -213,6 +219,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     pendingSetup: null,
     regionId,
     rivals: createRivals(rng, regionId),
+    u18Squad: null,
     scouting: { ...emptyScouting(), nationalTeam: createNationalTeam(rng, 1) },
     scoutTraits: createTraits(rng),
     tournament: null,
@@ -465,8 +472,8 @@ function setTrainingFocus(
   const player = state.players.find((p) => p.id === playerId)
   if (!player) return { state, events: [] }
 
-  // 上限に届いている位置は指定できない
-  if (focus.type === 'convert' && !canConvert(player, focus.position)) {
+  // 上限に届いている位置は指定できない（本職として移す指定は常に受け付ける）
+  if (focus.type === 'convert' && !canConvert(player, focus.position, focus.main)) {
     return { state, events: [] }
   }
 
@@ -497,7 +504,10 @@ function setTrainingFocus(
  * コンバート練習を1回ぶん進める。
  * 一定回数積み上がると適性が1段階上がる。
  */
-function applyConvertTraining(players: GameState['players']): {
+function applyConvertTraining(
+  rng: Rng,
+  players: GameState['players'],
+): {
   players: GameState['players']
   events: GameEvent[]
 } {
@@ -507,11 +517,20 @@ function applyConvertTraining(players: GameState['players']): {
     // 離脱中は練習していない
     if (player.focus?.type !== 'convert' || !isAvailable(player)) return player
 
-    const step = advanceConvert(player)
+    const step = advanceConvert(rng, player)
     if (step.promoted) {
       events.push({
         type: 'message',
         text: `${player.name}の${step.promoted.position}適性が上がった（${step.promoted.from} → ${step.promoted.to}）`,
+        tone: 'good',
+      })
+    }
+    if (step.converted) {
+      events.push({
+        type: 'message',
+        text: `${player.name}が${POSITION_LABELS[step.converted.to]}に転向した（${
+          POSITION_LABELS[step.converted.from]
+        }から）`,
         tone: 'good',
       })
     }
@@ -1632,7 +1651,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   players = recoverPitcherFatigue(players, to - from)
 
   // 自主練としてのコンバートは、どのマスに止まっても進む
-  const converted = applyConvertTraining(players)
+  const converted = applyConvertTraining(rng, players)
   players = converted.players
   events.push(...converted.events)
 
@@ -1770,6 +1789,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
       groundLevel: monthly.groundLevel,
       equipment: monthly.equipment,
       scouting: monthly.scouting,
+      u18Squad: monthly.u18Squad,
       reputation: applyReputation(monthly.reputation, outcome.reputationDelta ?? 0),
       phase,
       log,
@@ -1854,6 +1874,7 @@ type MonthChangeResult = {
   groundLevel: number
   equipment: string[]
   scouting: GameState['scouting']
+  u18Squad: GameState['u18Squad']
   /** 壊れて使えなくなった練習。手札から取り除くために返す */
   lostKinds: PracticeKind[]
   events: GameEvent[]
@@ -1881,12 +1902,13 @@ function applyMonthChanges(
   let groundLevel = state.groundLevel
   let equipment = state.equipment
   let scouting = state.scouting
+  let u18Squad = state.u18Squad
   const reputation = state.reputation
 
   for (const month of crossed) {
     const result = applyOneMonth(
       rng,
-      { ...state, players, funds, groundLevel, equipment, scouting },
+      { ...state, players, funds, groundLevel, equipment, scouting, u18Squad },
       month,
     )
     players = result.players
@@ -1894,6 +1916,7 @@ function applyMonthChanges(
     groundLevel = result.groundLevel
     equipment = result.equipment
     scouting = result.scouting
+    u18Squad = result.u18Squad
     events.push(...result.events)
   }
 
@@ -1902,7 +1925,17 @@ function applyMonthChanges(
     (kind) => !unlockedKinds(equipment).includes(kind),
   )
 
-  return { players, funds, reputation, groundLevel, equipment, scouting, lostKinds, events }
+  return {
+    players,
+    funds,
+    reputation,
+    groundLevel,
+    equipment,
+    scouting,
+    u18Squad,
+    lostKinds,
+    events,
+  }
 }
 
 /**
@@ -1922,6 +1955,7 @@ export function applyOneMonth(
   groundLevel: number
   equipment: string[]
   scouting: GameState['scouting']
+  u18Squad: GameState['u18Squad']
   events: GameEvent[]
 } {
   const events: GameEvent[] = []
@@ -1930,6 +1964,7 @@ export function applyOneMonth(
   let groundLevel = state.groundLevel
   let equipment = state.equipment
   let scouting = state.scouting
+  let u18Squad = state.u18Squad
 
   events.push({ type: 'monthAdvanced', year: state.year, month })
   events.push({ type: 'message', text: `${state.year}年目 ${month}月`, tone: 'normal' })
@@ -2043,14 +2078,17 @@ export function applyOneMonth(
     })
   }
 
-  // 冬前：U18日本代表の召集。県内の注目選手を上回っていることが条件
+  // 冬前：U18日本代表の召集。
+  // **全国の学校から実際に30人を選ぶ。** 注目選手の総合と比べるだけだった頃は、
+  // 「うちから何人選ばれたか」しか分からず、他の29人が誰なのかが見えなかった
   if (month === U18_SELECTION_MONTH) {
-    // 全国の注目選手（上級生）を並べて、代表枠のいちばん下を基準にする。
-    // 県内の1人と比べていた頃は、地区選択の難易度差が選考に乗っていた
-    const selected = selectU18(
-      players,
-      upperStarRatingAtRank(state.rivals, U18_SQUAD_SIZE - 1),
-    )
+    u18Squad = selectU18Squad({
+      schools: state.rivals,
+      ourPlayers: players,
+      year: state.year,
+    })
+
+    const selected = ourU18Players(u18Squad, players)
     for (const player of selected) {
       const outcome = playU18(rng, player, state.year)
       players = players.map((p) => (p.id === player.id ? outcome.player : p))
@@ -2080,7 +2118,7 @@ export function applyOneMonth(
     history: [...player.history, snapshotOf(player, state.year, month)].slice(-HISTORY_LIMIT),
   }))
 
-  return { players, funds, groundLevel, equipment, scouting, events }
+  return { players, funds, groundLevel, equipment, scouting, u18Squad, events }
 }
 
 /** U18日本代表が召集される月。冬の合宿の前 */

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
+
+/** コンバートは投手転向で投球能力を作るので乱数が要る */
+const rng = createRng(1)
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { Player } from '@/core/types/player'
 import { applyPractice } from './growth'
@@ -7,6 +10,7 @@ import { emptyCareerStats } from './careerStats'
 import {
   advanceConvert,
   canConvert,
+  CONVERT_MAIN_STEPS,
   CONVERT_MAX,
   CONVERT_PRACTICE_PENALTY,
   CONVERT_STEPS,
@@ -138,12 +142,12 @@ describe('コンバート', () => {
     expect(player.aptitudes['1B']).toBe('C')
 
     for (let i = 0; i < CONVERT_STEPS - 1; i++) {
-      player = advanceConvert(player).player
+      player = advanceConvert(rng, player).player
       // 途中では上がらない
       expect(player.aptitudes['1B']).toBe('C')
     }
 
-    const step = advanceConvert(player)
+    const step = advanceConvert(rng, player)
     expect(step.promoted).toEqual({ position: '1B', from: 'C', to: 'B' })
     expect(step.player.aptitudes['1B']).toBe('B')
     expect(step.player.convertProgress).toBe(0)
@@ -156,7 +160,7 @@ describe('コンバート', () => {
       aptitudes: { ...makePlayer().aptitudes, '2B': 'B' },
     })
 
-    player = advanceConvert(player).player
+    player = advanceConvert(rng, player).player
     expect(player.aptitudes['2B']).toBe(CONVERT_MAX)
     expect(player.focus).toEqual(DEFAULT_FOCUS)
   })
@@ -167,7 +171,7 @@ describe('コンバート', () => {
       aptitudes: { ...makePlayer().aptitudes, '2B': 'A' },
     })
     // すでにAなので、方針ごと戻される
-    player = advanceConvert(player).player
+    player = advanceConvert(rng, player).player
 
     expect(player.aptitudes['2B']).toBe('A')
     expect(player.focus).toEqual(DEFAULT_FOCUS)
@@ -175,7 +179,7 @@ describe('コンバート', () => {
 
   it('方針でないときは何も起きない', () => {
     const player = makePlayer()
-    expect(advanceConvert(player).player).toBe(player)
+    expect(advanceConvert(rng, player).player).toBe(player)
   })
 })
 
@@ -215,7 +219,10 @@ describe('focusLabel', () => {
   it('方針ごとに読める名前になる', () => {
     expect(focusLabel(undefined, labels)).toBe('チーム練習')
     expect(focusLabel({ type: 'ability', key: 'meet' }, labels)).toBe('ミート')
-    expect(focusLabel({ type: 'convert', position: 'SS' }, labels)).toBe('SSへ転向')
+    expect(focusLabel({ type: 'convert', position: 'SS' }, labels)).toBe('SSを練習')
+    expect(focusLabel({ type: 'convert', position: 'SS', main: true }, labels)).toBe(
+      'SSへ本職転向',
+    )
   })
 })
 
@@ -278,5 +285,96 @@ describe('positionGrowthMultiplier', () => {
     expect(
       focusMultiplier({ ...shortstop, focus: { type: 'convert', position: '2B' } }, 'fielding'),
     ).toBe(CONVERT_PRACTICE_PENALTY)
+  })
+})
+
+describe('本職の転向', () => {
+  /**
+   * **サブで守れるようにするのとは別物。**
+   * 「今日から一塁手」で済むなら、守備適性という仕組み自体の意味が薄い。
+   */
+  const upTo = (player: Player, times: number): Player => {
+    let current = player
+    for (let i = 0; i < times; i++) current = advanceConvert(rng, current).player
+    return current
+  }
+
+  it('本職として指定すると S まで上がり、ポジションが入れ替わる', () => {
+    const player = makePlayer({
+      focus: { type: 'convert', position: '1B', main: true },
+      aptitudes: { ...makePlayer().aptitudes, '1B': 'A' },
+    })
+    // A → S で1段階ぶん
+    const done = upTo(player, CONVERT_MAIN_STEPS)
+
+    expect(done.position).toBe('1B')
+    expect(done.aptitudes['1B']).toBe('S')
+    expect(done.focus).toEqual(DEFAULT_FOCUS)
+  })
+
+  it('サブなら A で止まり、本職は変わらない', () => {
+    const player = makePlayer({
+      focus: { type: 'convert', position: '1B' },
+      aptitudes: { ...makePlayer().aptitudes, '1B': 'B' },
+    })
+    const done = upTo(player, CONVERT_STEPS)
+
+    expect(done.aptitudes['1B']).toBe('A')
+    expect(done.position).toBe(makePlayer().position)
+  })
+
+  it('野手が投手になると、投球能力がその場で作られる', () => {
+    // 持たないまま投手にすると、登板しても何も投げられない
+    const player = makePlayer({
+      focus: { type: 'convert', position: 'P', main: true },
+      aptitudes: { ...makePlayer().aptitudes, P: 'A' },
+    })
+    const done = upTo(player, CONVERT_MAIN_STEPS)
+
+    expect(done.isPitcher).toBe(true)
+    expect(done.pitching).not.toBeNull()
+    expect(done.pitching!.velocity).toBeGreaterThan(100)
+    expect(done.pitching!.pitches.length).toBeGreaterThan(0)
+  })
+
+  it('肩の強い野手ほど速い球を投げる', () => {
+    const convert = (arm: number) => {
+      const base = makePlayer({
+        focus: { type: 'convert', position: 'P', main: true },
+        aptitudes: { ...makePlayer().aptitudes, P: 'A' },
+      })
+      const player = { ...base, batting: { ...base.batting, arm } }
+      return upTo(player, CONVERT_MAIN_STEPS).pitching!.velocity
+    }
+    expect(convert(90)).toBeGreaterThan(convert(45))
+  })
+
+  it('投手が野手になると、投球能力は捨てる', () => {
+    // isPitcher と pitching が食い違うと、野手のはずの選手が登板候補になる
+    const base = makePlayer()
+    const pitcher: Player = {
+      ...base,
+      isPitcher: true,
+      position: 'P',
+      pitching: { velocity: 140, control: 60, stamina: 60, breaking: 60, pitches: [] },
+      focus: { type: 'convert', position: 'LF', main: true },
+      aptitudes: { ...base.aptitudes, LF: 'A' },
+    }
+    const done = upTo(pitcher, CONVERT_MAIN_STEPS)
+
+    expect(done.isPitcher).toBe(false)
+    expect(done.pitching).toBeNull()
+    expect(done.position).toBe('LF')
+  })
+
+  it('すでに適性 S の位置なら、その場で本職が入れ替わる', () => {
+    const base = makePlayer()
+    const player = makePlayer({
+      focus: { type: 'convert', position: '2B', main: true },
+      aptitudes: { ...base.aptitudes, '2B': 'S' },
+    })
+    const done = advanceConvert(rng, player).player
+    expect(done.position).toBe('2B')
+    expect(done.focus).toEqual(DEFAULT_FOCUS)
   })
 })

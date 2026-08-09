@@ -153,6 +153,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 36) {
     data = migrateV35ToV36(data)
   }
+  if (version < 37) {
+    data = migrateV36ToV37(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -911,6 +914,19 @@ function migrateV35ToV36(raw: Record<string, unknown>): Record<string, unknown> 
   if (!isRecord(raw.tournament)) return { ...raw, version: 36, rivals, tournament: null }
   if (isRecord(raw.tournament.bracket)) return { ...raw, version: 36, rivals }
   return { ...raw, version: 36, rivals, tournament: null, phase: 'cardSelect' }
+}
+
+/**
+ * v36 → v37
+ *  - U18日本代表の名簿（`u18Squad`）を追加
+ *
+ * 過去の選考をさかのぼって作り直すことはできない（そのときの他校の顔ぶれが
+ * 分からない）ので、**次の選考（11月）まで空**にする。
+ * 自校の選手が持っている代表歴（`Player.u18`）はそのまま残るので、
+ * ドラフトの評価には影響しない。
+ */
+function migrateV36ToV37(raw: Record<string, unknown>): Record<string, unknown> {
+  return { ...raw, version: 37, u18Squad: raw.u18Squad ?? null }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */
