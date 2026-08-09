@@ -53,8 +53,12 @@ export type RivalSchool = {
   strength: number
   /** 前年からの増減。「力をつけてきた」の表示に使う */
   trend: number
-  /** 注目選手。U18の選考とスカウトの進学先に使う */
-  stars: RivalPlayer[]
+  /**
+   * 注目選手。U18の選考とスカウトの進学先に使う。
+   * **抱えていない学校は持たない**（各県の筆頭校だけが持つ）。
+   * 2800校ぶんの空配列は、それだけで30KBの無駄になる。読むときは `starsOf` を通す。
+   */
+  stars?: RivalPlayer[]
   /**
    * 注目選手を抱える学校か。
    *
@@ -94,6 +98,14 @@ export function emptyRivalRecord(): RivalRecord {
   return { wins: 0, losses: 0, draws: 0, last: null }
 }
 
+/** その学校の注目選手。抱えていなければ空 */
+export function starsOf(school: RivalSchool): RivalPlayer[] {
+  return school.stars ?? EMPTY_STARS
+}
+
+/** 注目選手を持たない学校用。毎回作らないよう1つだけ持つ */
+const EMPTY_STARS: RivalPlayer[] = []
+
 /** その学校との対戦成績。まだ当たっていなければ空の記録を返す */
 export function recordOf(school: RivalSchool): RivalRecord {
   return school.record ?? EMPTY_RECORD
@@ -122,7 +134,7 @@ export const RIVALS_PER_REGION = 10
  *
  * 名簿は種から作り直すので、増えるのは名前と数値だけ。
  */
-export const NATIONAL_SCHOOLS_PER_REGION = 16
+export const NATIONAL_SCHOOLS_PER_REGION = 55
 
 /**
  * 県外に置く学校の総数。
@@ -218,8 +230,7 @@ export function createRivals(
       tradition,
       strength: tradition + rng.int(-DRIFT, DRIFT),
       trend: 0,
-      ...(notable ? { notable: true } : {}),
-      stars: notable ? createStars(rng, id, tradition, playerNames, year) : [],
+      ...(notable ? { notable: true, stars: createStars(rng, id, tradition, playerNames, year) } : {}),
       rosterSeed: rng.int(1, 2_000_000_000),
     })
   }
@@ -382,8 +393,8 @@ export function advanceRival(rng: Rng, school: RivalSchool, year: number): Rival
   const trend = next - school.strength
 
   // 注目選手：3年生は卒業し、残りは進級して伸びる
-  const takenNames = school.stars.map((star) => star.name)
-  const stars = school.stars
+  const takenNames = starsOf(school).map((star) => star.name)
+  const stars = starsOf(school)
     .filter((star) => star.grade < 3)
     .map((star) => ({
       ...star,
@@ -452,7 +463,7 @@ export function schoolForProspect(
 export function addStar(school: RivalSchool, star: RivalPlayer): RivalSchool {
   return {
     ...school,
-    stars: [...school.stars, star],
+    stars: [...starsOf(school), star],
     // 良い選手が入れば戦力も上がる
     strength: school.strength + Math.max(0, Math.round((star.rating - 40) / 8)),
   }
@@ -518,7 +529,7 @@ export function formatRecord(record: RivalRecord): string {
 export function bestStarRating(schools: RivalSchool[]): number {
   let best = 0
   for (const school of schools) {
-    for (const star of school.stars) best = Math.max(best, star.rating)
+    for (const star of starsOf(school)) best = Math.max(best, star.rating)
   }
   return best
 }
@@ -533,7 +544,7 @@ export function bestStarRating(schools: RivalSchool[]): number {
  */
 export function starRatingAtRank(schools: RivalSchool[], rank: number): number {
   const ratings = schools
-    .flatMap((school) => school.stars.map((star) => star.rating))
+    .flatMap((school) => starsOf(school).map((star) => star.rating))
     .sort((a, b) => b - a)
 
   if (ratings.length === 0) return 0
@@ -543,7 +554,7 @@ export function starRatingAtRank(schools: RivalSchool[], rank: number): number {
 /** 上級生の注目選手だけを強い順に並べたときの `rank` 番目 */
 export function upperStarRatingAtRank(schools: RivalSchool[], rank: number): number {
   const ratings = schools
-    .flatMap((school) => school.stars.filter((star) => star.grade >= 2))
+    .flatMap((school) => starsOf(school).filter((star) => star.grade >= 2))
     .map((star) => star.rating)
     .sort((a, b) => b - a)
 

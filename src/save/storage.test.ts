@@ -96,3 +96,31 @@ describe('セーブの枠', () => {
     expect(restored!.year).toBe(1)
   })
 })
+
+describe('他校の詰め替え', () => {
+  it('保存して読み直しても他校がそのまま戻る', () => {
+    save(game, DEFAULT_SLOT)
+    const loaded = load(DEFAULT_SLOT)!
+
+    expect(loaded.rivals).toEqual(game.rivals)
+    expect(loaded.rivals.length).toBe(game.rivals.length)
+  })
+
+  it('保存された JSON はキー名を持たない配列になっている', () => {
+    // **キー名が中身より重い。** 2800校ぶんのキー名だけで200KB近くを占める
+    save(game, DEFAULT_SLOT)
+    const raw = store.raw.get('hs-baseball-sim:save:v1')!
+
+    expect(raw).toContain('"rivalsPacked"')
+    expect(raw).not.toContain('"rosterSeed"')
+    expect(raw.length).toBeLessThan(JSON.stringify(game).length)
+  })
+
+  it('詰められていない古いセーブもそのまま読める', () => {
+    // v37までのセーブは rivals をそのまま持っている
+    store.raw.set('hs-baseball-sim:save:v1', JSON.stringify(game))
+    const loaded = load(DEFAULT_SLOT)!
+
+    expect(loaded.rivals).toEqual(game.rivals)
+  })
+})

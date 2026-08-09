@@ -11,6 +11,7 @@
 
 import type { GameState } from '@/core/types/game'
 import { migrate } from './migrate'
+import { packRivals, PACKED_RIVALS_KEY, unpackRivals } from './packRivals'
 
 /** 枠の数 */
 export const SLOT_COUNT = 3
@@ -76,7 +77,7 @@ export function save(state: GameState, slot: SlotId = DEFAULT_SLOT): boolean {
     if (previous !== null) {
       localStorage.setItem(backupKeyOf(slot), previous)
     }
-    localStorage.setItem(keyOf(slot), JSON.stringify(state))
+    localStorage.setItem(keyOf(slot), JSON.stringify(toStored(state)))
     return true
   } catch (error) {
     console.error('セーブに失敗しました', error)
@@ -110,11 +111,38 @@ export function clearSave(slot: SlotId = DEFAULT_SLOT): void {
   }
 }
 
+/**
+ * 保存する形にする。
+ *
+ * **他校だけ配列に詰め替える。** 2800校ぶんのキー名が
+ * それだけで200KB近くを占めるため（`packRivals`）。
+ * `GameState` の型は変えず、保存の直前だけ形を変える。
+ */
+function toStored(state: GameState): Record<string, unknown> {
+  const { rivals, ...rest } = state
+  return { ...rest, [PACKED_RIVALS_KEY]: packRivals(rivals) }
+}
+
+/**
+ * 読み込んだ生データを `GameState` の形に戻す。
+ * 詰められていない古いセーブは、そのまま `rivals` を持っている。
+ */
+function fromStored(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw
+
+  const record = raw as Record<string, unknown>
+  const packed = record[PACKED_RIVALS_KEY]
+  if (packed === undefined) return record
+
+  const { [PACKED_RIVALS_KEY]: _packed, ...rest } = record
+  return { ...rest, rivals: unpackRivals(packed as unknown[]) }
+}
+
 function readAndMigrate(key: string): GameState | null {
   try {
     const raw = localStorage.getItem(key)
     if (raw === null) return null
-    return migrate(JSON.parse(raw))
+    return migrate(fromStored(JSON.parse(raw)))
   } catch (error) {
     console.error(`セーブデータの読み込みに失敗しました: ${key}`, error)
     return null

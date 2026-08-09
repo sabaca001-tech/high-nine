@@ -20,6 +20,7 @@ import { createPlayer } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
 import type { Grade, Player } from '@/core/types/player'
 import type { RivalPlayer, RivalSchool } from './rivals'
+import { starsOf } from './rivals'
 
 /** 1学年あたりの人数。3学年で15人 */
 const PER_GRADE = 5
@@ -105,7 +106,7 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
 function mergeStars(players: Player[], school: RivalSchool, year: number): Player[] {
   const result = [...players]
 
-  for (const star of school.stars) {
+  for (const star of starsOf(school)) {
     const grade = starGrade(star, year)
     if (grade === null) continue
 

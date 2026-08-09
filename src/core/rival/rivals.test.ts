@@ -8,6 +8,7 @@ import {
   addResult,
   hasMet,
   recordOf,
+  starsOf,
   NATIONAL_RIVALS,
   NATIONAL_SCHOOLS_PER_REGION,
   nationalRepresentatives,
@@ -25,7 +26,7 @@ const rivals = createRivals(createRng(11), 'kanagawa')
 describe('starRatingAtRank', () => {
   it('上から数えた順位の総合を返す（U18の当落線）', () => {
     const ratings = rivals
-      .flatMap((school) => school.stars.filter((star) => star.grade >= 2))
+      .flatMap((school) => starsOf(school).filter((star) => star.grade >= 2))
       .map((star) => star.rating)
       .sort((a, b) => b - a)
 
@@ -47,7 +48,7 @@ describe('starRatingAtRank', () => {
 
 describe('bestStarRating', () => {
   it('県内でいちばん強い注目選手を返す（U18の選考基準）', () => {
-    const highest = Math.max(...rivals.flatMap((s) => s.stars.map((star) => star.rating)))
+    const highest = Math.max(...rivals.flatMap((s) => starsOf(s).map((star) => star.rating)))
     expect(bestStarRating(rivals)).toBe(highest)
   })
 
@@ -69,7 +70,7 @@ describe('createRivals', () => {
   it('注目選手を持つのは名の通った学校だけ', () => {
     // 全校に置くと、U18の選考基準が注目選手の数に引きずられる
     const local = localRivals(rivals, 'kanagawa')
-    expect(local.filter((school) => school.stars.length > 0)).toHaveLength(RIVALS_PER_REGION)
+    expect(local.filter((school) => starsOf(school).length > 0)).toHaveLength(RIVALS_PER_REGION)
   })
 
   it('県内に格上が十分いる', () => {
@@ -145,10 +146,10 @@ describe('advanceRival', () => {
     const before = rivals[0]
     const after = advanceRival(rng, before, 2).school
 
-    expect(after.stars.length).toBe(before.stars.length)
+    expect(starsOf(after).length).toBe(starsOf(before).length)
     // 3年生だった選手は居なくなっている
-    for (const star of before.stars.filter((s) => s.grade === 3)) {
-      expect(after.stars.map((s) => s.id)).not.toContain(star.id)
+    for (const star of starsOf(before).filter((s) => s.grade === 3)) {
+      expect(starsOf(after).map((s) => s.id)).not.toContain(star.id)
     }
   })
 
@@ -166,13 +167,13 @@ describe('advanceRival', () => {
   it('注目選手は在学中ずっと伸びる（自分の学校と同じように育つ）', () => {
     const rng = createRng(3)
     // 1年生の注目選手を1人つかまえて、卒業まで追いかける
-    let school = rivals.find((s) => s.stars.some((star) => star.grade === 1))!
-    const target = school.stars.find((star) => star.grade === 1)!
+    let school = rivals.find((s) => starsOf(s).some((star) => star.grade === 1))!
+    const target = starsOf(school).find((star) => star.grade === 1)!
     let previous = target.rating
 
     for (let year = 2; year <= 3; year++) {
       school = advanceRival(rng, school, year).school
-      const now = school.stars.find((star) => star.id === target.id)!
+      const now = starsOf(school).find((star) => star.id === target.id)!
       expect(now.rating).toBeGreaterThan(previous)
       previous = now.rating
     }
@@ -219,7 +220,7 @@ describe('addStar', () => {
       rating: 72,
     })
 
-    expect(after.stars.length).toBe(before.stars.length + 1)
+    expect(starsOf(after).length).toBe(starsOf(before).length + 1)
     expect(after.strength).toBeGreaterThan(before.strength)
   })
 })
@@ -249,8 +250,8 @@ describe('他校のデータは年を重ねても増えない', () => {
 
     for (let year = 2; year <= 40; year++) {
       school = advanceRival(rng, school, year).school
-      expect(school.stars.length).toBeLessThanOrEqual(2)
-      for (const star of school.stars) expect(star.grade).toBeLessThanOrEqual(3)
+      expect(starsOf(school).length).toBeLessThanOrEqual(2)
+      for (const star of starsOf(school)) expect(star.grade).toBeLessThanOrEqual(3)
     }
   })
 

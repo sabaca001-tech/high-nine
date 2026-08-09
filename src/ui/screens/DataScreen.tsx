@@ -16,6 +16,7 @@ import {
   localRivals,
   nationalRivals,
   recordOf,
+  starsOf,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import type { ScoutResult } from '@/core/scout/scouting'
@@ -513,10 +514,8 @@ function U18Row({
 }
 
 function RivalRow({ school, showRegion }: { school: RivalSchool; showRegion?: boolean }) {
-  const best = school.stars.reduce(
-    (top, star) => (star.rating > top.rating ? star : top),
-    school.stars[0],
-  )
+  const stars = starsOf(school)
+  const best = stars.reduce((top, star) => (star.rating > top.rating ? star : top), stars[0])
 
   return (
     <div className={styles.rival}>
