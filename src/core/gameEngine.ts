@@ -2407,6 +2407,8 @@ function resolveScouting(
         talentBonus: prospect.rating - GRADE_BASE[1],
         // 素質を示してから獲った選手なので、そこからさらに振らない
         talentSpread: 0,
+        // 名前は触れ込みのものを使うので、留学生としては作らない
+        exchange: false,
         takenNames: state.players.map((p) => p.name),
       })
       // 触れ込みの特殊能力を持って入学してくる。ここがスカウトの意味

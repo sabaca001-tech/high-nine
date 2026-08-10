@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { overallRating, toRank } from '@/core/player/rating'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { Player } from '@/core/types/player'
+import { PLAYER_ORIGIN_LABELS } from '@/core/types/player'
 import { CAREER_PATH_LABELS } from '@/core/types/career'
 import type { GraduateRecord } from '@/core/types/season'
 import {
@@ -238,15 +239,17 @@ function NewcomerRow({
   const rating = overallRating(player)
   const rank = toRank(rating)
 
+  // 入部の経路（推薦・留学生）が分かるようにする。
+  // 留学生は名前だけでも分かるが、他の一覧と表記を揃えておく
+  const badge = player.origin ? PLAYER_ORIGIN_LABELS[player.origin] : recommended ? '推薦' : null
+
   return (
-    <div
-      className={recommended ? `${styles.newcomer} ${styles.recommended}` : styles.newcomer}
-    >
+    <div className={badge ? `${styles.newcomer} ${styles.recommended}` : styles.newcomer}>
       <PlayerPortrait playerId={player.id} size={34} cap capColor={capColor} />
       <span>
         <span className={styles.name}>
           {player.name}
-          {recommended && <span className={styles.recommendBadge}>推薦</span>}
+          {badge && <span className={styles.recommendBadge}>{badge}</span>}
         </span>
         <span className={styles.sub}>
           {player.position} / 総合{rating}

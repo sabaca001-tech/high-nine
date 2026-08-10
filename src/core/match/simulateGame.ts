@@ -10,6 +10,7 @@
  */
 
 import type { Rng } from '@/core/rng/random'
+import { POSITION_LABELS } from '@/core/types/player'
 import type {
   BattingLine,
   Half,
@@ -21,7 +22,7 @@ import type {
   PlayLog,
 } from '@/core/types/match'
 import { createOpponent } from './opponent'
-import { playHalf } from './halfInning'
+import { fieldingPitchers, playHalf, promoteToMound } from './halfInning'
 import type { MatchTeam } from './teamState'
 import { benchPlayers, createTeam, swapIn } from './teamState'
 
@@ -310,6 +311,9 @@ function assignDecision(
 /**
  * 自校の選手を1人入れ替える。回の切れ目にだけ行える操作。
  * 成立しない交代なら null を返す（呼び手は状態を変えない）。
+ *
+ * **投手の枠には、野手として出場中の投手も入れられる。**
+ * その場合は誰も退かず、守備位置が組み直される（`promoteToMound`）。
  */
 export function applySubstitution(
   state: MatchState,
@@ -325,6 +329,23 @@ export function applySubstitution(
 
   const incoming = team.players.find((player) => player.id === incomingId)
   if (!incoming) return null
+
+  // 守備に就いている投手をマウンドへ。控えを1人も使わずに継投できる
+  if (slot.position === 'P' && fieldingPitchers(team).some((p) => p.id === incomingId)) {
+    const outgoing = team.players.find((player) => player.id === slot.playerId)
+    const moved = promoteToMound(team, incoming)
+    if (moved === null) return null
+
+    next.events.push({
+      id: `event-${next.serial}`,
+      order: next.serial++,
+      inning: next.inning,
+      half: next.half,
+      text: `投手交代 ${outgoing?.name ?? ''} → ${incoming.name}（${outgoing?.name ?? ''}は${POSITION_LABELS[moved]}へ）`,
+    })
+    return next
+  }
+
   if (!benchPlayers(team).some((player) => player.id === incomingId)) return null
   // 投手の枠には投手能力を持つ選手しか入れられない
   if (slot.position === 'P' && !incoming.pitching) return null

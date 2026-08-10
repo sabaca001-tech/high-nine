@@ -7,11 +7,13 @@
  */
 
 import type { Rng } from '@/core/rng/random'
-import type { Player } from '@/core/types/player'
-import { isAvailable } from '@/core/types/player'
+import type { Player, Position } from '@/core/types/player'
+import { isAvailable, POSITION_LABELS } from '@/core/types/player'
+import type { Lineup } from '@/core/types/lineup'
 import type { Half, MatchEventLog, PlayLog, PlayResult } from '@/core/types/match'
 import { isHit, outsOf, PLAY_RESULT_LABELS } from '@/core/types/match'
 import { misplacementPenalty } from '@/core/lineup/aptitude'
+import { reassignFieldPositions } from '@/core/lineup/autoLineup'
 import {
   effectiveStamina,
   FATIGUE_AVOID,
@@ -31,6 +33,7 @@ import {
   recordExtraOut,
   recordPitching,
   recordSteal,
+  refreshDefense,
   swapIn,
 } from './teamState'
 import { skillBonus } from '@/core/skill/skillEffects'
@@ -371,24 +374,24 @@ function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
     // **下級生がいなければ、それでも降ろす。** 先発が最年少のときに
     // 「若い投手がいない」で完投させていたが、
     // 勝敗が決した試合で主戦を消耗させない、という目的は学年と関係ない
-    const relievers = availableRelievers(team, 'youth')
+    const relievers = reliefCandidates(team, 'youth')
     const reliever = relievers.find((player) => player.grade < current.grade) ?? relievers[0]
     if (reliever && !rng.chance(0.4)) {
-      changePitcher(team, reliever, ctx, '経験を積ませる')
+      sendToMound(team, reliever, ctx, '経験を積ませる')
       return
     }
   }
 
   if (staminaFactor(current, team.faced) > PITCHER_PULL_FACTOR) return
 
-  const reliever = availableRelievers(team)[0]
+  const reliever = reliefCandidates(team)[0]
   if (!reliever) return
   // 現状よりはっきり良くならないなら代えない（消耗ぶんを見込んで比べる）
   if (pitcherValue(reliever) < pitcherValue(current) * 0.7) return
   // 交代のタイミングには幅を持たせる
   if (rng.chance(0.2)) return
 
-  changePitcher(team, reliever, ctx)
+  sendToMound(team, reliever, ctx)
 }
 
 /**
@@ -400,24 +403,70 @@ function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
  */
 export function availableRelievers(team: MatchTeam, order: 'best' | 'youth' = 'best'): Player[] {
   const onField = new Set(team.lineup.slots.map((slot) => slot.playerId))
-  const list = team.players.filter(
-    (p) =>
-      p.isPitcher &&
-      p.pitching &&
-      !team.usedPitchers.includes(p.id) &&
-      !team.retiredIds.includes(p.id) &&
-      !onField.has(p.id) &&
-      isAvailable(p),
+  return sortRelievers(
+    team.players.filter(
+      (p) =>
+        p.isPitcher &&
+        p.pitching &&
+        !team.usedPitchers.includes(p.id) &&
+        !team.retiredIds.includes(p.id) &&
+        !onField.has(p.id) &&
+        isAvailable(p),
+    ),
+    order,
+  )
+}
+
+/**
+ * **野手として出場している投手**。継投の候補に入れる。
+ *
+ * 打てる投手を右翼で使う、という編成は普通にあるのに、
+ * 継投の候補が「ベンチにいる投手」だけだったので、
+ * **その投手には一度も出番が回らなかった**。
+ * ベンチに投手が残っていなければ、エースが何点取られても投げ続けていた。
+ *
+ * マウンドへ上げるときは `promoteToMound` で守備位置を組み直す。
+ */
+export function fieldingPitchers(team: MatchTeam, order: 'best' | 'youth' = 'best'): Player[] {
+  const fielding = new Set(
+    team.lineup.slots.filter((slot) => slot.position !== 'P').map((slot) => slot.playerId),
   )
 
+  return sortRelievers(
+    team.players.filter(
+      (p) =>
+        fielding.has(p.id) &&
+        p.pitching &&
+        !team.usedPitchers.includes(p.id) &&
+        isAvailable(p),
+    ),
+    order,
+  )
+}
+
+/** 継投の候補すべて。ベンチと守備位置の両方から集める */
+export function reliefCandidates(team: MatchTeam, order: 'best' | 'youth' = 'best'): Player[] {
+  return sortRelievers([...availableRelievers(team, order), ...fieldingPitchers(team, order)], order)
+}
+
+function sortRelievers(list: Player[], order: 'best' | 'youth'): Player[] {
   const tired = (player: Player) => (fatigueOf(player) >= FATIGUE_AVOID ? 1 : 0)
 
   if (order === 'youth') {
-    return list.sort(
+    return [...list].sort(
       (a, b) => tired(a) - tired(b) || a.grade - b.grade || pitcherValue(b) - pitcherValue(a),
     )
   }
-  return list.sort((a, b) => tired(a) - tired(b) || pitcherValue(b) - pitcherValue(a))
+  return [...list].sort((a, b) => tired(a) - tired(b) || pitcherValue(b) - pitcherValue(a))
+}
+
+/** 出どころ（ベンチ／守備位置）に応じてマウンドに上げる */
+function sendToMound(team: MatchTeam, reliever: Player, ctx: HalfContext, reason?: string): void {
+  const onField = team.lineup.slots.some(
+    (slot) => slot.position !== 'P' && slot.playerId === reliever.id,
+  )
+  if (onField) moveToMound(team, reliever, ctx, reason)
+  else changePitcher(team, reliever, ctx, reason)
 }
 
 /** 投手を代える。降板した投手は退く */
@@ -445,6 +494,67 @@ export function changePitcher(
     text: `${team.isPlayer ? '' : `${team.name} `}投手交代 ${current?.name ?? ''} → ${reliever.name}${
       reason ? `（${reason}）` : ''
     }`,
+  })
+}
+
+/**
+ * 野手として出ている投手をマウンドへ上げる。
+ *
+ * **降りた投手は退かない。** 空いた守備位置に回り、
+ * そのうえで**8人の守備位置を組み直す**（`reassignFieldPositions`）。
+ * 単に位置を入れ替えるだけだと、球威で選ばれた投手が
+ * そのまま遊撃を守るような並びになる。
+ * 打順は動かせないので、動かすのは守備位置だけ。
+ *
+ * 交代が成立したら、退いた投手が回った守備位置を返す。
+ */
+export function promoteToMound(team: MatchTeam, reliever: Player): Position | null {
+  const moundIndex = team.lineup.slots.findIndex((slot) => slot.position === 'P')
+  const fieldIndex = team.lineup.slots.findIndex((slot) => slot.playerId === reliever.id)
+  if (moundIndex < 0 || fieldIndex < 0 || moundIndex === fieldIndex) return null
+  if (!reliever.pitching) return null
+
+  const vacated = team.lineup.slots[fieldIndex].position
+  const swapped: Lineup = {
+    slots: team.lineup.slots.map((slot, index) => {
+      if (index === fieldIndex) return { ...slot, position: 'P' }
+      if (index === moundIndex) return { ...slot, position: vacated }
+      return slot
+    }),
+  }
+
+  const outgoingId = team.lineup.slots[moundIndex].playerId
+  team.lineup = reassignFieldPositions(swapped, team.players)
+  team.pitcherId = reliever.id
+  team.faced = 0
+  if (!team.usedPitchers.includes(reliever.id)) {
+    team.usedPitchers = [...team.usedPitchers, reliever.id]
+  }
+  refreshDefense(team)
+
+  return team.lineup.slots.find((slot) => slot.playerId === outgoingId)?.position ?? null
+}
+
+/** マウンドへ上げて実況にも出す。自動継投から呼ぶ */
+export function moveToMound(
+  team: MatchTeam,
+  reliever: Player,
+  ctx: HalfContext,
+  reason?: string,
+): void {
+  const current = findPlayer(team, team.pitcherId)
+  const moved = promoteToMound(team, reliever)
+  if (moved === null) return
+
+  const notes = [`${current?.name ?? ''}は${POSITION_LABELS[moved]}へ`, reason].filter(Boolean)
+
+  const order = ctx.nextOrder()
+  ctx.events.push({
+    id: `event-${order}`,
+    order,
+    inning: ctx.inning,
+    half: ctx.half,
+    text: `${team.isPlayer ? '' : `${team.name} `}投手交代 ${current?.name ?? ''} → ${reliever.name}（${notes.join('／')}）`,
   })
 }
 

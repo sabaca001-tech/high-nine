@@ -237,6 +237,58 @@ function improveBySwaps(plan: AutoLineupPlan, assigned: Map<Position, Player>): 
 }
 
 /**
+ * 打順はそのままに、**守備位置だけ組み直す**。
+ *
+ * 試合中に打順は動かせないので、動かせるのは誰がどこを守るかだけ。
+ * 野手として出ていた投手がマウンドに上がったとき、
+ * 押し出された投手を含めた8人を置き直すために使う
+ * （エースを一塁に回して継投する、という形が自然に出る）。
+ *
+ * **投手の枠には触らない。** 誰が投げるかは呼び出し側で決まっている。
+ */
+export function reassignFieldPositions(
+  lineup: Lineup,
+  players: Player[],
+  plan: AutoLineupPlan = 'balanced',
+): Lineup {
+  const byId = new Map(players.map((player) => [player.id, player]))
+  const fielders = lineup.slots
+    .filter((slot) => slot.position !== 'P')
+    .map((slot) => byId.get(slot.playerId))
+    .filter((player): player is Player => player !== undefined)
+
+  // 誰か1人でも見つからないなら、組み直すと守備位置が欠ける
+  if (fielders.length !== lineup.slots.length - 1) return lineup
+
+  const assigned = new Map<Position, Player>()
+  const used = new Set<string>()
+
+  for (const position of FILL_ORDER) {
+    if (position === 'P') continue
+    const candidates = fielders.filter((player) => !used.has(player.id))
+    if (candidates.length === 0) break
+
+    const best = candidates.reduce((a, b) =>
+      fitFor(plan, b, position) > fitFor(plan, a, position) ? b : a,
+    )
+    assigned.set(position, best)
+    used.add(best.id)
+  }
+
+  improveBySwaps(plan, assigned)
+
+  const positionOf = new Map<string, Position>(
+    [...assigned.entries()].map(([position, player]) => [player.id, position]),
+  )
+
+  return {
+    slots: lineup.slots.map((slot) =>
+      slot.position === 'P' ? slot : { ...slot, position: positionOf.get(slot.playerId) ?? slot.position },
+    ),
+  }
+}
+
+/**
  * 打順を決める。
  *
  * **打順ごとに見たいものが違う。** ミートとパワーの平均で並べていた頃は、

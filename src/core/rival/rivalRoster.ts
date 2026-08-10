@@ -141,6 +141,8 @@ function materializeStar(star: RivalPlayer, slot: Player, grade: Grade): Player 
     talentBonus: star.rating - BASE_RATING,
     // 素質を示してから入学させるので、そこからさらに振らない
     talentSpread: 0,
+    // 名前は注目選手のものを使うので、留学生としては作らない
+    exchange: false,
   })
 
   return {

@@ -294,11 +294,12 @@ export type Player = {
 }
 
 /** 入部の経路 */
-export type PlayerOrigin = 'scout' | 'recommended'
+export type PlayerOrigin = 'scout' | 'recommended' | 'exchange'
 
 export const PLAYER_ORIGIN_LABELS: Record<PlayerOrigin, string> = {
   scout: 'スカウト',
   recommended: '推薦',
+  exchange: '留学生',
 }
 
 /**

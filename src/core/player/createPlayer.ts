@@ -3,6 +3,7 @@
 import type { Rng } from '@/core/rng/random'
 import { createAptitudes } from '@/core/lineup/aptitude'
 import { rollInitialPitches } from './pitchDefs'
+import { pickExchangeName } from './exchangeNames'
 import { snapshotOf } from '@/core/types/player'
 import { armFromVelocity, ARM_SPREAD } from './growth'
 import { pitchingRating } from './rating'
@@ -91,6 +92,36 @@ const PERSONALITY_WEIGHTS: { value: Personality; weight: number }[] = [
 
 /** 天才肌の入学時の上乗せ。素質そのものが違う */
 export const GENIUS_TALENT_BONUS = 8
+
+/**
+ * 留学生の出現率。**天才肌と同じくらいの珍しさ**にしてある。
+ *
+ * 部員10人の代でおよそ5年に1人。他校も同じ率で作られるので、
+ * 全国を見れば毎年どこかの学校に入ってくる。
+ */
+export const EXCHANGE_RATE = 0.02
+
+/**
+ * 留学生の体つき。**合計0で振り分ける。**
+ *
+ * 身体能力（パワー・走力・肩力）に振って、
+ * そのぶん技術（ミート・守備・捕球）を引く。
+ * 総合そのものは動かさないので、スカウトの「素質◯◯」とも食い違わない。
+ * 上がるのは「何が得意な選手か」の分かりやすさだけ。
+ */
+const EXCHANGE_FIELDER_TILT = 7
+
+/** 留学生の投手。球速とスタミナに寄せ、制球と変化球を引く */
+const EXCHANGE_VELOCITY = 4
+const EXCHANGE_STAMINA = 7
+const EXCHANGE_PITCH_PENALTY = 5
+
+/** 留学生の伸び代の上乗せ。得意な項目がさらに伸びる */
+const EXCHANGE_GROWTH_BOOST = 1.45
+
+/** 留学生が伸ばす能力。身体能力に限る */
+const EXCHANGE_PITCHER_KEYS: GrowableKey[] = ['velocity', 'stamina']
+const EXCHANGE_FIELDER_KEYS: GrowableKey[] = ['power', 'speed', 'arm']
 
 /** 野手のポジション（投手を除く） */
 const FIELDER_POSITIONS: Position[] = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -226,12 +257,22 @@ export type CreatePlayerOptions = {
   talentSpread?: number
   /** すでに部内で使われている名前。同姓同名を避けるために渡す */
   takenNames?: readonly string[]
+  /**
+   * 留学生として作るか。省略時は乱数で決まる（`EXCHANGE_RATE`）。
+   * **名前を後から差し替える経路では `false` を渡す。**
+   * スカウトや注目選手のように名前が先に決まっている選手が
+   * 留学生の体つきだけ持つ、という食い違いを防ぐため。
+   */
+  exchange?: boolean
 }
 
 /** 選手を1人生成する */
 export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const { id, grade, talentBonus = 0 } = options
   const isPitcher = options.isPitcher ?? rng.chance(PITCHER_RATE)
+
+  // **留学生。** 身体能力に寄った体つきで入ってくる
+  const exchange = options.exchange ?? rng.chance(EXCHANGE_RATE)
 
   // 性格は能力より先に決める。天才肌は素質そのものが違うので、
   // 決まった性格が入学時の能力にも効く
@@ -257,16 +298,22 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const battingSpread = centeredSpread(rng, BATTING_KEYS.length, ABILITY_SPREAD)
   const pitchingSpread = isPitcher ? centeredSpread(rng, 3, ABILITY_SPREAD) : []
 
-  const name = pickName(rng, options.takenNames ?? [])
+  const taken = options.takenNames ?? []
+  const name = exchange ? pickExchangeName(rng, taken) : pickName(rng, taken)
   const position: Position = isPitcher ? 'P' : rng.pick(FIELDER_POSITIONS)
-  const breaking = clampAbility(base + (pitchingSpread[2] ?? 0))
+  // 留学生の投手は球速とスタミナに寄る。そのぶん制球と変化球を引く
+  const pitchPenalty = exchange ? EXCHANGE_PITCH_PENALTY : 0
+  const breaking = clampAbility(base + (pitchingSpread[2] ?? 0) - pitchPenalty)
 
   // **投手能力を先に決める。** 野手能力の上限に使うため
   const pitching = isPitcher
     ? {
-        velocity: velocityFor(rng, base, grade),
-        control: clampAbility(base + pitchingSpread[0]),
-        stamina: clampAbility(base + pitchingSpread[1]),
+        velocity: Math.min(
+          VELOCITY_MAX,
+          velocityFor(rng, base, grade) + (exchange ? EXCHANGE_VELOCITY : 0),
+        ),
+        control: clampAbility(base + pitchingSpread[0] - pitchPenalty),
+        stamina: clampAbility(base + pitchingSpread[1] + (exchange ? EXCHANGE_STAMINA : 0)),
         breaking,
         pitches: rollInitialPitches(rng, breaking),
       }
@@ -280,9 +327,15 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
    * 自動編成が「打てるから」と別のポジションへ回したり、
    * 打線の中軸に据えたりして、**投手を投手として扱えなくなっていた**。
    */
+  // 留学生の体つき。パワー・走力・肩力に振り、技術から引く（合計0）
+  const tilt = exchange && !pitching ? [-1, 1, 1, 1, -1, -1] : [0, 0, 0, 0, 0, 0]
+
   let battingIndex = 0
   const fielderAbility = (): number => {
-    if (!pitching) return clampAbility(base + battingSpread[battingIndex++])
+    if (!pitching) {
+      const index = battingIndex++
+      return clampAbility(base + battingSpread[index] + tilt[index] * EXCHANGE_FIELDER_TILT)
+    }
     const cap = pitchingRating(pitching)
     return clampAbility(rng.int(Math.max(1, Math.round(cap * PITCHER_FIELDING_FLOOR)), cap))
   }
@@ -309,12 +362,13 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     condition: 70 + rng.int(0, 30),
     injuryMonths: 0,
     personality,
-    growthAptitude: createGrowthAptitude(rng, isPitcher),
+    growthAptitude: createGrowthAptitude(rng, isPitcher, exchange),
     aptitudes: createAptitudes(rng, position),
     skills: [],
     history: [],
     stats: emptyCareerStats(),
     u18: [],
+    ...(exchange ? { origin: 'exchange' as const } : {}),
   }
 
   // 投手の肩力は球速に連動させる。速い球を投げる腕が送球だけ弱いのは不自然。
@@ -343,6 +397,8 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
 export function createGrowthAptitude(
   rng: Rng,
   isPitcher: boolean,
+  /** 留学生。身体能力の伸び代が上乗せされる */
+  exchange = false,
 ): Partial<Record<GrowableKey, number>> {
   // 持っていない能力に伸び代を付けても意味が無い。
   // **球速も対象に入れる。** 入れていなかった頃は、
@@ -382,6 +438,17 @@ export function createGrowthAptitude(
    */
   if (isPitcher && rng.chance(LATE_BLOOMER_CHANCE)) {
     aptitude.velocity = round2(1.9 + rng.float() * 0.5)
+  }
+
+  /*
+   * **留学生は身体能力が伸びる。**
+   * 投手なら球速とスタミナ、野手ならパワー・走力・肩力。
+   * 元の乱数に掛けるので、当たり外れは残る（全員が同じ伸び方にはならない）。
+   */
+  if (exchange) {
+    for (const key of isPitcher ? EXCHANGE_PITCHER_KEYS : EXCHANGE_FIELDER_KEYS) {
+      aptitude[key] = round2(clampAptitude((aptitude[key] ?? 1) * EXCHANGE_GROWTH_BOOST))
+    }
   }
 
   return aptitude

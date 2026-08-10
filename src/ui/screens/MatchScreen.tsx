@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { benchPlayers } from '@/core/match/teamState'
+import { fieldingPitchers } from '@/core/match/halfInning'
 import type { MatchEventLog, MatchResult, MatchSpeed, PlayLog } from '@/core/types/match'
 import { MATCH_SPEED_LABELS } from '@/core/types/match'
 import { POSITION_LABELS } from '@/core/types/player'
@@ -282,6 +283,11 @@ function nextStep(timeline: Entry[], current: number, speed: MatchSpeed): number
  *
  * 高校野球と同じく**退いた選手は戻れない**ので、それを画面にも書く。
  * 守備位置は動かさず、その枠に入る選手だけを選ぶ形にしている。
+ *
+ * ただし**投手の枠だけは、守備に就いている投手も選べる**。
+ * 野手で出している投手を継投に使えないと、控え投手が尽きた時点で
+ * どれだけ打たれても代えられなくなる。
+ * この場合は誰も退かず、守備位置が組み直される。
  */
 function SubstitutionSheet({
   state,
@@ -300,8 +306,15 @@ function SubstitutionSheet({
   const bench = benchPlayers(team)
   const slot = slotIndex === null ? null : team.lineup.slots[slotIndex]
 
-  // 投手の枠には投手能力を持つ選手しか入れられない
-  const candidates = slot?.position === 'P' ? bench.filter((p) => p.pitching) : bench
+  // 投手の枠には投手能力を持つ選手しか入れられない。
+  // **守備に就いている投手も候補に入れる**（マウンドへ回す交代）
+  const fromField = slot?.position === 'P' ? fieldingPitchers(team) : []
+  const candidates =
+    slot?.position === 'P' ? [...bench.filter((p) => p.pitching), ...fromField] : bench
+
+  /** その選手がいま守っている位置。ベンチなら null */
+  const positionOf = (id: string) =>
+    team.lineup.slots.find((s) => s.playerId === id)?.position ?? null
 
   return (
     <div className={styles.sheet}>
@@ -337,20 +350,26 @@ function SubstitutionSheet({
               <p className={styles.sheetNote}>出せる控えがいません。</p>
             ) : (
               <div className={styles.slotList}>
-                {candidates.map((player) => (
-                  <button
-                    key={player.id}
-                    type="button"
-                    className={styles.slot}
-                    onClick={() => {
-                      substitutePlayer(slotIndex, player.id)
-                      onClose()
-                    }}
-                  >
-                    <span className={styles.slotPos}>{player.grade}年</span>
-                    <span className={styles.slotName}>{player.name}</span>
-                  </button>
-                ))}
+                {candidates.map((player) => {
+                  const from = positionOf(player.id)
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      className={styles.slot}
+                      onClick={() => {
+                        substitutePlayer(slotIndex, player.id)
+                        onClose()
+                      }}
+                    >
+                      <span className={styles.slotPos}>{player.grade}年</span>
+                      <span className={styles.slotName}>{player.name}</span>
+                      {from && (
+                        <span className={styles.slotFrom}>{POSITION_LABELS[from]}から</span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </>

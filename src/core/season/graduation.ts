@@ -140,7 +140,10 @@ export function recruitFreshmen(
       takenNames: [...players, ...newcomers].map((player) => player.name),
     })
 
-    newcomers.push(isRecommended ? { ...player, origin: 'recommended' } : player)
+    // **留学生の表記は上書きしない。** 推薦枠で来た留学生は「留学生」と出す
+    newcomers.push(
+      isRecommended && !player.origin ? { ...player, origin: 'recommended' } : player,
+    )
     if (isRecommended) recommendedIds.push(id)
   }
 

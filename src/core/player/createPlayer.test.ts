@@ -195,13 +195,20 @@ describe('学年による差', () => {
     expect(gradeGap).toBeLessThan(spread / 2)
   })
 
+  /*
+   * **上位1割で測ってはいけない。**
+   * 素質は一様分布（±`TALENT_SPREAD`）なので、1年の上位1割は
+   * ちょうど3年の平均と重なる（36 + 0.8×18 ＝ 50.4 ≒ 50）。
+   * 境目そのものを見ているので、乱数が少しずれるだけで裏返る。
+   * 「強い1年」と言える上位5%で測る。
+   */
   it('1年生の上位は3年生の平均を超える（強い1年は強い）', () => {
-    const topFirst = [...first].sort((a, b) => b - a)[Math.floor(first.length * 0.1)]
+    const topFirst = [...first].sort((a, b) => b - a)[Math.floor(first.length * 0.05)]
     expect(topFirst).toBeGreaterThan(average(third))
   })
 
   it('3年生の下位は1年生の平均を下回る（弱い3年は弱い）', () => {
-    const lowThird = [...third].sort((a, b) => a - b)[Math.floor(third.length * 0.1)]
+    const lowThird = [...third].sort((a, b) => a - b)[Math.floor(third.length * 0.05)]
     expect(lowThird).toBeLessThan(average(first))
   })
 })

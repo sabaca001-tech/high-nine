@@ -375,6 +375,15 @@
   font-weight: 700;
 }
 
+/* 「右翼から」。ベンチではなく守備位置から回す交代であることを示す */
+.slotFrom {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
 .sheetClose {
   width: 100%;
   min-height: 48px;

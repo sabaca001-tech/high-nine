@@ -2781,7 +2781,7 @@ describe('ライバル校', () => {
     let found = false
 
     // 鳥取（24校＝5回戦）でも全国に届くのは稀なので、何度も試す
-    for (let seed = 8000; seed < 8200 && !found; seed++) {
+    for (let seed = 8000; seed < 8400 && !found; seed++) {
       let state = startedGame({ seed, regionId: 'tottori' })
 
       for (let guard = 0; guard < 600 && !found; guard++) {
