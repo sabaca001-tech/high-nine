@@ -102,40 +102,90 @@ export function convertiblePositions(player: Player, main = false): Position[] {
  * 3年経つと**誰を見ても同じ形のレーダー**になっていた。
  * 守る位置なりの選手に育つほうが、編成を考える意味が出る。
  *
- * **強制ではない。** 幅は 0.7〜1.35 に収めてあり、
+ * **強制ではない。** 幅は 0.65〜1.35 に収めてあり、
  * 選手ごとの得意・苦手（`growthAptitude`）や練習カードの内容のほうが
  * 効き方は大きい。「遊撃手だが打てる」も普通に生まれる。
  *
  * 平均が1.0になるように配ってあるので、チーム全体の成長量は変わらない
  * （変えたいのは「誰のどこが伸びるか」だけ）。
+ *
+ * **順位で持つ。** 倍率を直に持たせると、監督が並べ替えたときに
+ * 平均が1.0から外れてチーム全体の成長速度まで動いてしまう。
+ * 順位から倍率を引けば、どう並べ替えても総量は変わらない。
  */
-const POSITION_GROWTH: Record<Position, Partial<Record<GrowableKey, number>>> = {
+const DEFAULT_GROWTH_PLAN: Record<Position, GrowableKey[]> = {
   // 投手は投げる能力に寄せる。打撃はほとんど伸びない
-  P: {
-    velocity: 1.35,
-    control: 1.3,
-    breaking: 1.3,
-    stamina: 1.25,
-    catching: 0.9,
-    fielding: 0.85,
-    arm: 0.85,
-    speed: 0.8,
-    meet: 0.7,
-    power: 0.7,
-  },
-  C: { catching: 1.3, arm: 1.2, fielding: 1.05, meet: 0.95, power: 0.8, speed: 0.7 },
-  SS: { fielding: 1.25, arm: 1.1, speed: 1.1, meet: 0.95, catching: 0.9, power: 0.7 },
-  '2B': { fielding: 1.25, speed: 1.1, catching: 1.1, meet: 1.0, arm: 0.85, power: 0.7 },
-  '3B': { arm: 1.25, fielding: 1.1, power: 1.1, meet: 0.95, catching: 0.9, speed: 0.7 },
-  '1B': { power: 1.3, meet: 1.25, catching: 1.1, fielding: 0.9, speed: 0.75, arm: 0.7 },
-  CF: { speed: 1.3, fielding: 1.15, meet: 1.05, arm: 0.95, power: 0.85, catching: 0.7 },
-  LF: { power: 1.3, meet: 1.15, speed: 1.0, fielding: 0.9, arm: 0.85, catching: 0.8 },
-  RF: { arm: 1.2, power: 1.2, meet: 1.1, speed: 0.95, fielding: 0.85, catching: 0.7 },
+  P: [
+    'velocity',
+    'control',
+    'breaking',
+    'stamina',
+    'catching',
+    'fielding',
+    'arm',
+    'speed',
+    'meet',
+    'power',
+  ],
+  C: ['catching', 'arm', 'fielding', 'meet', 'power', 'speed'],
+  SS: ['fielding', 'arm', 'speed', 'meet', 'catching', 'power'],
+  '2B': ['fielding', 'speed', 'catching', 'meet', 'arm', 'power'],
+  '3B': ['arm', 'fielding', 'power', 'meet', 'catching', 'speed'],
+  '1B': ['power', 'meet', 'catching', 'fielding', 'speed', 'arm'],
+  CF: ['speed', 'fielding', 'meet', 'arm', 'power', 'catching'],
+  LF: ['power', 'meet', 'speed', 'fielding', 'arm', 'catching'],
+  RF: ['arm', 'power', 'meet', 'speed', 'fielding', 'catching'],
 }
 
-/** 本職での重要度による倍率。表に無い能力は等倍 */
-export function positionGrowthMultiplier(position: Position, key: GrowableKey): number {
-  return POSITION_GROWTH[position]?.[key] ?? 1
+/**
+ * 順位ごとの倍率。**合計が項目数と一致する**ように置いてある。
+ *
+ * 平均が1.0なので、並べ替えても**チーム全体の成長量は変わらない**。
+ * 変わるのは「誰のどこが伸びるか」だけ。
+ */
+const FIELDER_WEIGHTS = [1.3, 1.15, 1.05, 0.95, 0.85, 0.7]
+const PITCHER_WEIGHTS = [1.35, 1.3, 1.25, 1.15, 1.0, 0.9, 0.85, 0.8, 0.75, 0.65]
+
+/** 優先順の並びから倍率を引く */
+function weightAt(position: Position, rank: number): number {
+  const table = position === 'P' ? PITCHER_WEIGHTS : FIELDER_WEIGHTS
+  return table[rank] ?? 1
+}
+
+/** そのポジションの既定の優先順 */
+export function defaultGrowthOrder(position: Position): GrowableKey[] {
+  return DEFAULT_GROWTH_PLAN[position]
+}
+
+/** 監督が並べ替えた優先順。ポジションごとに持つ */
+export type GrowthPlan = Partial<Record<Position, GrowableKey[]>>
+
+/**
+ * そのポジションでいま使われている優先順。
+ * 指定が無ければ既定を返す。
+ *
+ * **並びが壊れていても直して返す。** 保存されたデータに
+ * 知らない能力が混ざっていたり、足りなかったりしても、
+ * 既定の並びで埋めれば成長計算は続けられる。
+ */
+export function growthOrderOf(position: Position, plan?: GrowthPlan): GrowableKey[] {
+  const base = DEFAULT_GROWTH_PLAN[position]
+  const saved = plan?.[position]
+  if (!saved) return base
+
+  const valid = saved.filter((key, index) => base.includes(key) && saved.indexOf(key) === index)
+  return [...valid, ...base.filter((key) => !valid.includes(key))]
+}
+
+/** 本職での重要度による倍率。並びに無い能力は等倍 */
+export function positionGrowthMultiplier(
+  position: Position,
+  key: GrowableKey,
+  plan?: GrowthPlan,
+): number {
+  const order = growthOrderOf(position, plan)
+  const rank = order.indexOf(key)
+  return rank < 0 ? 1 : weightAt(position, rank)
 }
 
 /**
@@ -145,12 +195,12 @@ export function positionGrowthMultiplier(position: Position, key: GrowableKey): 
  * - 能力を指定 … その能力は1.6倍、他は0.6倍
  * - コンバート … 全体に0.7倍（守備位置の練習に時間を使うため）
  */
-export function focusMultiplier(player: Player, key: GrowableKey): number {
+export function focusMultiplier(player: Player, key: GrowableKey, plan?: GrowthPlan): number {
   const focus = player.focus ?? DEFAULT_FOCUS
 
   if (focus.type === 'convert') return CONVERT_PRACTICE_PENALTY
   if (focus.type === 'ability') return focus.key === key ? FOCUS_BONUS : FOCUS_PENALTY
-  return positionGrowthMultiplier(player.position, key)
+  return positionGrowthMultiplier(player.position, key, plan)
 }
 
 /** 方針を変えたときの新しい選手。コンバートの進捗はやり直しになる */

@@ -87,11 +87,13 @@ import {
 } from '@/core/player/squad'
 import {
   advanceConvert,
+  defaultGrowthOrder,
+  growthOrderOf,
   canConvert,
   focusLabel,
   withFocus,
 } from '@/core/player/trainingFocus'
-import type { TrainingFocus } from '@/core/player/trainingFocus'
+import type { GrowthPlan, TrainingFocus } from '@/core/player/trainingFocus'
 import { fixedEventFor } from '@/core/calendar/fixedEvents'
 import { formatFunds, FUNDS_MAX, monthlyFunds, tournamentPrize } from '@/core/shop/funds'
 import { scoutTripCost, tournamentTravel } from '@/core/shop/travel'
@@ -135,7 +137,7 @@ import {
   POSITION_LABELS,
   snapshotOf,
 } from '@/core/types/player'
-import type { AbilityChange, Player } from '@/core/types/player'
+import type { AbilityChange, GrowableKey, Player, Position } from '@/core/types/player'
 import type { GameEvent, LogEntry } from '@/core/types/event'
 import type { EngineResult, GameCommand, GameState, Month, PracticeBoost } from '@/core/types/game'
 import { GRADUATES_LIMIT, LOG_LIMIT, SAVE_VERSION } from '@/core/types/game'
@@ -320,6 +322,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return buyItem(state, command.itemId)
     case 'setTrainingFocus':
       return setTrainingFocus(state, command.playerId, command.focus)
+    case 'setGrowthOrder':
+      return setGrowthOrder(state, command.position, command.order)
     case 'upgradeGround':
       return upgradeGround(state, command.steps ?? 1)
     case 'buyEquipment':
@@ -498,6 +502,29 @@ function setTrainingFocus(
     },
     events,
   }
+}
+
+/**
+ * ポジションごとの成長の優先順を差し替える。
+ *
+ * **順位で持つ。** 倍率を直に持たせると、並べ替えたときに平均が1.0から外れ、
+ * チーム全体の成長速度まで動いてしまう。
+ * 既定と同じ並びに戻したときは指定そのものを消す（セーブに残さない）。
+ */
+function setGrowthOrder(
+  state: GameState,
+  position: Position,
+  order: GrowableKey[],
+): EngineResult {
+  const fixed = growthOrderOf(position, { [position]: order })
+  const isDefault = fixed.join() === defaultGrowthOrder(position).join()
+
+  const plan: GrowthPlan = { ...state.growthPlan }
+  if (isDefault) delete plan[position]
+  else plan[position] = fixed
+
+  const growthPlan = Object.keys(plan).length > 0 ? plan : undefined
+  return { state: { ...state, growthPlan }, events: [] }
 }
 
 /**
@@ -1457,6 +1484,8 @@ function applyCardTraining(
       managerGrowthBonus(state.managers),
     // ベンチ外は指導が行き届かないぶん伸びが鈍い
     perPlayerMultiplier: (player) => squadMultiplierOf(player.id, firstSquad),
+    // ポジションごとの成長の優先順（監督が並べ替えられる）
+    growthPlan: state.growthPlan,
   })
 
   const events: GameEvent[] = [

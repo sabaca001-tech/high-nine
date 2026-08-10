@@ -9,6 +9,7 @@ import type { GameEvent } from '@/core/types/event'
 import type { GameState } from '@/core/types/game'
 import type { Lineup } from '@/core/types/lineup'
 import type { TrainingFocus } from '@/core/player/trainingFocus'
+import type { GrowableKey, Position } from '@/core/types/player'
 import type { MatchSpeed } from '@/core/types/match'
 import * as storage from '@/save/storage'
 
@@ -24,6 +25,7 @@ export type Screen =
   | 'scout'
   | 'alumni'
   | 'records'
+  | 'growthPlan'
   | 'data'
 
 type GameStore = {
@@ -73,6 +75,8 @@ type GameStore = {
   chooseFriendlyMatch: (offerId: string | null) => void
   buyItem: (itemId: string) => void
   setTrainingFocus: (playerId: string, focus: TrainingFocus) => void
+  /** ポジションごとの成長の優先順を並べ替える */
+  setGrowthOrder: (position: Position, order: GrowableKey[]) => void
   upgradeGround: (steps?: number) => void
   buyEquipment: (equipmentId: string) => void
   visitScoutRegion: (regionId: string) => void
@@ -229,6 +233,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { game } = get()
     if (!game) return
     dispatch(set, game, { type: 'setTrainingFocus', playerId, focus })
+  },
+
+  setGrowthOrder: (position, order) => {
+    const { game } = get()
+    if (!game) return
+    dispatch(set, game, { type: 'setGrowthOrder', position, order })
   },
 
   upgradeGround: (steps) => {

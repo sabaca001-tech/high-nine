@@ -1,0 +1,129 @@
+.back {
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-2);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+}
+
+.note,
+.footNote {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ポジションのタブ。9つあるので横スクロールで収める */
+.tabs {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-2);
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.tabActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.headTitle {
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.headNote {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.reset {
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+/* 優先順の一覧。上ほど伸びやすい */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.rank {
+  text-align: center;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.weight {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.moves {
+  display: flex;
+  gap: 2px;
+}
+
+.move {
+  width: 34px;
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-base);
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+}
+
+.move:disabled {
+  opacity: 0.25;
+}

@@ -13,6 +13,7 @@ import { NewGameScreen } from '@/ui/screens/NewGameScreen'
 import { SeasonScreen } from '@/ui/screens/SeasonScreen'
 import { DataScreen } from '@/ui/screens/DataScreen'
 import { RecordsScreen } from '@/ui/screens/RecordsScreen'
+import { GrowthPlanScreen } from '@/ui/screens/GrowthPlanScreen'
 import { ScoutScreen } from '@/ui/screens/ScoutScreen'
 import { ShopScreen } from '@/ui/screens/ShopScreen'
 import { TournamentScreen } from '@/ui/screens/TournamentScreen'
@@ -91,6 +92,8 @@ function Screen() {
       return <AlumniScreen />
     case 'records':
       return <RecordsScreen />
+    case 'growthPlan':
+      return <GrowthPlanScreen />
     case 'data':
       return <DataScreen />
     case 'players':

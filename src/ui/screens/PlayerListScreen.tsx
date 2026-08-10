@@ -42,6 +42,19 @@ export function PlayerListScreen() {
           歴代記録
           <span className={styles.linkArrow}>▶</span>
         </button>
+        {/*
+          **ポジションごとの成長の優先順を並べ替える。**
+          おまかせ練習の傾き方が決め打ちで、
+          「うちの一塁手は走らせたい」という意図が通らなかった
+        */}
+        <button
+          type="button"
+          className={styles.alumniLink}
+          onClick={() => setScreen('growthPlan')}
+        >
+          成長方針
+          <span className={styles.linkArrow}>▶</span>
+        </button>
       </div>
 
       <Section

@@ -203,6 +203,11 @@ export type GameState = {
    */
   managers: TeamManager[]
   /**
+   * ポジションごとの成長の優先順。監督が並べ替えられる。
+   * 指定が無いポジションは既定（`defaultGrowthOrder`）。
+   */
+  growthPlan?: import('@/core/player/trainingFocus').GrowthPlan
+  /**
    * 持っている練習器具のid。
    * 買うと対応する練習カードが手札に出るようになり、壊れると出なくなる。
    */
@@ -303,6 +308,12 @@ export type GameCommand =
   | { type: 'buyItem'; itemId: string }
   /** 選手ごとの練習方針を決める（コンバートもここで指示する） */
   | { type: 'setTrainingFocus'; playerId: string; focus: TrainingFocus }
+  /** ポジションごとの成長の優先順を並べ替える */
+  | {
+      type: 'setGrowthOrder'
+      position: import('@/core/types/player').Position
+      order: import('@/core/types/player').GrowableKey[]
+    }
   /** グラウンドを整備する。steps 段階ぶんまとめて上げられる（既定1） */
   | { type: 'upgradeGround'; steps?: number }
   /** 練習器具を買う。対応する練習カードが手札に出るようになる */

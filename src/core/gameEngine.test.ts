@@ -45,6 +45,8 @@ import { championOf, opponentAt } from './tournament/bracket'
 import { overallRating } from './player/rating'
 import { opponentRating, teamRating } from './season/matchReputation'
 import { findPlayerEvent } from './event/playerEvents'
+import { defaultGrowthOrder, positionGrowthMultiplier } from './player/trainingFocus'
+import type { GrowableKey } from './types/player'
 import {
   findScoutRegion,
   MAX_APPROACHES,
@@ -2892,5 +2894,60 @@ describe('新年度の学校の変更', () => {
     expect(applyCommand(state, { type: 'finishSeason', schoolName: '別の高校' }).state).toBe(
       state,
     )
+  })
+})
+
+describe('成長方針（ポジションごとの優先順）', () => {
+  it('並べ替えると保存され、伸び方が変わる', () => {
+    const base = startedGame({ seed: 810 })
+    const order: GrowableKey[] = ['speed', 'meet', 'power', 'fielding', 'catching', 'arm']
+
+    const next = applyCommand(base, { type: 'setGrowthOrder', position: '1B', order }).state
+
+    expect(next.growthPlan?.['1B']).toEqual(order)
+    // 走力を最優先にしたので、既定（パワー最優先）より走力が伸びやすい
+    expect(positionGrowthMultiplier('1B', 'speed', next.growthPlan)).toBeGreaterThan(
+      positionGrowthMultiplier('1B', 'speed'),
+    )
+  })
+
+  it('既定と同じ並びに戻すと、指定そのものが消える', () => {
+    // セーブに要らないものを残さない
+    const base = startedGame({ seed: 811 })
+    const changed = applyCommand(base, {
+      type: 'setGrowthOrder',
+      position: 'CF',
+      order: ['meet', 'speed', 'fielding', 'arm', 'power', 'catching'],
+    }).state
+    expect(changed.growthPlan?.CF).toBeTruthy()
+
+    const restored = applyCommand(changed, {
+      type: 'setGrowthOrder',
+      position: 'CF',
+      order: defaultGrowthOrder('CF'),
+    }).state
+    expect(restored.growthPlan).toBeUndefined()
+  })
+
+  it('練習の伸び方に実際に効く', () => {
+    // 一塁手を「走力最優先」にすると、走力が伸びやすくなる
+    const base = startedGame({ seed: 812 })
+    const firstBaseman = base.players.find((p) => p.position === '1B')
+    if (!firstBaseman) return
+
+    const speedFirst: GrowableKey[] = ['speed', 'meet', 'power', 'fielding', 'catching', 'arm']
+    const planned = applyCommand(base, {
+      type: 'setGrowthOrder',
+      position: '1B',
+      order: speedFirst,
+    }).state
+
+    const grow = (state: GameState) => {
+      let current = state
+      for (let i = 0; i < 30; i++) current = stepCard(current)
+      return current.players.find((p) => p.id === firstBaseman.id)!.batting.speed
+    }
+
+    expect(grow(planned)).toBeGreaterThanOrEqual(grow(base))
   })
 })

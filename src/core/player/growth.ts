@@ -27,6 +27,7 @@ import {
 import { effectOf } from './personality'
 import { improvePitches } from './pitchDefs'
 import { focusMultiplier } from './trainingFocus'
+import type { GrowthPlan } from './trainingFocus'
 
 /** 投手能力に属するキー（球速は尺度が違うので別扱い） */
 const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
@@ -226,6 +227,8 @@ export type PracticeOptions = {
   multiplier?: number
   /** 選手ごとの倍率（ベンチ入り/ベンチ外など）。省略時は全員1倍 */
   perPlayerMultiplier?: (player: Player) => number
+  /** ポジションごとの成長の優先順。省略時は既定 */
+  growthPlan?: GrowthPlan
 }
 
 /**
@@ -241,7 +244,13 @@ export function applyPractice(
   def: PracticeDef,
   options: PracticeOptions,
 ): PracticeOutcome {
-  const { steps, isRare = false, multiplier: cellMultiplier = 1, perPlayerMultiplier } = options
+  const {
+    steps,
+    isRare = false,
+    multiplier: cellMultiplier = 1,
+    perPlayerMultiplier,
+    growthPlan,
+  } = options
   const changes: AbilityChange[] = []
   const pitchNews: string[] = []
   const multiplier = (isRare ? RARE_MULTIPLIER : 1) * cellMultiplier * steps
@@ -263,7 +272,7 @@ export function applyPractice(
         rng,
         current,
         gain,
-        playerMultiplier * focusMultiplier(player, gain.key),
+        playerMultiplier * focusMultiplier(player, gain.key, growthPlan),
       )
       if (amount <= 0) continue
 

@@ -181,16 +181,32 @@
 }
 
 /* 適性図と能力レーダーを左右に並べる */
-.charts {
+/*
+ * 左に絵（守備適性・弾道／持ち球）、右に能力の数値。
+ * 弾道だけを持ち球と同じ枠に置いていた頃は、
+ * 並べる重みが違ううえ、能力値が上に離れて読みづらかった。
+ */
+.body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-2);
-  margin-top: var(--sp-2);
+  grid-template-columns: 58px 1fr;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+}
+
+.figures {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stats {
+  min-width: 0;
 }
 
 .chartBox {
   display: block;
-  padding: var(--sp-1);
+  padding: 3px;
   border-radius: 6px;
   background: var(--bg-base);
 }
@@ -201,11 +217,6 @@
   text-align: center;
   font-size: 9px;
   color: var(--text-dim);
-}
-
-/* 投手の4能力。守備適性図の上に、カード幅いっぱいで置く */
-.pitchStats {
-  margin-top: var(--sp-1);
 }
 
 /* 自主練の内容。指定しているときだけ出す */
@@ -234,11 +245,11 @@
   font-weight: 800;
 }
 
-/* 弾道。守備適性図と高さを揃える */
+/* 弾道。持ち球の図と高さを揃える */
 .trajectoryBox {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 38px;
   color: var(--accent);
 }

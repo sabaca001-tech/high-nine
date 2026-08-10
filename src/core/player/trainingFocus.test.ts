@@ -20,6 +20,8 @@ import {
   focusLabel,
   focusMultiplier,
   isSameFocus,
+  defaultGrowthOrder,
+  growthOrderOf,
   positionGrowthMultiplier,
   withFocus,
 } from './trainingFocus'
@@ -244,12 +246,12 @@ describe('positionGrowthMultiplier', () => {
     }
   })
 
-  it('強制ではない（幅は0.7〜1.35に収める）', () => {
+  it('強制ではない（幅は0.65〜1.35に収める）', () => {
     // ここを広げると「遊撃手だが打てる」が生まれなくなる
     for (const position of ALL_POSITIONS) {
       for (const key of BATTING) {
         const value = positionGrowthMultiplier(position, key)
-        expect(value).toBeGreaterThanOrEqual(0.7)
+        expect(value).toBeGreaterThanOrEqual(0.65)
         expect(value).toBeLessThanOrEqual(1.35)
       }
     }
@@ -376,5 +378,60 @@ describe('本職の転向', () => {
     const done = advanceConvert(rng, player).player
     expect(done.position).toBe('2B')
     expect(done.focus).toEqual(DEFAULT_FOCUS)
+  })
+})
+
+describe('成長の優先順を並べ替える', () => {
+  /**
+   * **倍率ではなく順位で持つ。**
+   * 倍率を直に持たせると、監督が並べ替えたときに平均が1.0から外れ、
+   * チーム全体の成長速度まで動いてしまう。
+   */
+  it('どう並べ替えても、そのポジションの平均は1.0のまま', () => {
+    const shuffled: GrowableKey[] = ['power', 'catching', 'meet', 'arm', 'speed', 'fielding']
+    const plan = { SS: shuffled }
+    const values = shuffled.map((key) => positionGrowthMultiplier('SS', key, plan))
+    const mean = values.reduce((sum, v) => sum + v, 0) / values.length
+
+    expect(mean).toBeCloseTo(1, 5)
+  })
+
+  it('上に置いた能力がいちばん伸びる', () => {
+    const plan = { '1B': ['speed', 'meet', 'power', 'fielding', 'catching', 'arm'] as GrowableKey[] }
+    expect(positionGrowthMultiplier('1B', 'speed', plan)).toBeGreaterThan(
+      positionGrowthMultiplier('1B', 'power', plan),
+    )
+    // 既定ではパワーが上、走力が下だった
+    expect(positionGrowthMultiplier('1B', 'power')).toBeGreaterThan(
+      positionGrowthMultiplier('1B', 'speed'),
+    )
+  })
+
+  it('指定が無いポジションは既定のまま', () => {
+    const plan = { '1B': ['speed'] as GrowableKey[] }
+    expect(positionGrowthMultiplier('SS', 'fielding', plan)).toBe(
+      positionGrowthMultiplier('SS', 'fielding'),
+    )
+  })
+
+  it('並びが壊れていても直して使う', () => {
+    // 足りない能力は既定の並びで埋め、重複や知らない能力は落とす
+    const broken = ['power', 'power', 'velocity'] as GrowableKey[]
+    const order = growthOrderOf('1B', { '1B': broken })
+
+    expect(order).toHaveLength(defaultGrowthOrder('1B').length)
+    expect(new Set(order).size).toBe(order.length)
+    expect(order[0]).toBe('power')
+    expect(order).not.toContain('velocity')
+  })
+
+  it('投手は投球能力も並べ替えられる', () => {
+    const order = defaultGrowthOrder('P')
+    expect(order).toContain('velocity')
+    expect(order).toHaveLength(10)
+
+    const plan = { P: [...order].reverse() }
+    const values = order.map((key) => positionGrowthMultiplier('P', key, plan))
+    expect(values.reduce((sum, v) => sum + v, 0) / values.length).toBeCloseTo(1, 5)
   })
 })

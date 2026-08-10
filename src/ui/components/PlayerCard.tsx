@@ -140,46 +140,46 @@ export function PlayerCard({
         形が読めても球速が141km/hなのか135km/hなのか分からなかった。
         投手は数値4つと持ち球で判断する。
       */}
-      {player.pitching ? (
-        <>
-          <div className={styles.pitchStats}>
-            <PitcherStats pitching={player.pitching} compact />
-          </div>
-          <div className={styles.charts}>
-            <span className={styles.chartBox}>
-              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
-              <span className={styles.chartCaption}>守備適性</span>
-            </span>
-            <span className={styles.chartBox}>
+      {/*
+        **左に絵、右に数字。**
+        弾道だけを投手の持ち球と同じ枠に置いていたが、
+        持ち球は「何を投げるか」という中身で、弾道は能力ひとつ。
+        並べる重みが違ううえ、能力値が上に離れて読みづらかった。
+        左は守備適性と弾道（投手は持ち球）、右に能力を縦に並べる。
+      */}
+      <div className={styles.body}>
+        <div className={styles.figures}>
+          <span className={styles.chartBox}>
+            <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+            <span className={styles.chartCaption}>守備適性</span>
+          </span>
+          <span className={styles.chartBox}>
+            {player.pitching ? (
               <PitchChart pitches={player.pitching.pitches} labels={false} compact />
-              <span className={styles.chartCaption}>持ち球</span>
-            </span>
-          </div>
-        </>
-      ) : (
-        <>
-          {/*
-            **六角形のレーダーをやめた。** 形は打撃型か守備型かを伝えるが、
-            ミートがA(83)なのかB(75)なのかは読めない。
-            一覧で比べるときに知りたいのはその数字のほうで、投手とも揃う
-          */}
-          <div className={styles.pitchStats}>
-            <BatterStats batting={player.batting} compact />
-          </div>
-          <div className={styles.charts}>
-            <span className={styles.chartBox}>
-              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
-              <span className={styles.chartCaption}>守備適性</span>
-            </span>
-            <span className={styles.chartBox}>
+            ) : (
               <span className={styles.trajectoryBox}>
-                <TrajectoryArrow trajectory={player.batting.trajectory} size={26} />
+                <TrajectoryArrow trajectory={player.batting.trajectory} size={24} />
               </span>
-              <span className={styles.chartCaption}>弾道</span>
+            )}
+            <span className={styles.chartCaption}>
+              {player.pitching ? '持ち球' : '弾道'}
             </span>
-          </div>
-        </>
-      )}
+          </span>
+        </div>
+
+        <div className={styles.stats}>
+          {player.pitching ? (
+            <PitcherStats
+              pitching={player.pitching}
+              batting={player.batting}
+              compact
+              columns={1}
+            />
+          ) : (
+            <BatterStats batting={player.batting} compact columns={1} />
+          )}
+        </div>
+      </div>
 
       {footer}
     </>

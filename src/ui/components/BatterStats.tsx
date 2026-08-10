@@ -21,13 +21,20 @@ export function BatterStats({
   compact = false,
   /** 弾道も並べる（詳細画面など。カードでは省く） */
   showTrajectory = false,
+  /** 何列で並べるか。カードでは絵の右に縦一列で置く */
+  columns = 2,
 }: {
   batting: BattingAbilities
   compact?: boolean
   showTrajectory?: boolean
+  columns?: 1 | 2
 }) {
+  const className = [styles.grid, compact ? styles.compact : '', columns === 1 ? styles.single : '']
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={compact ? `${styles.grid} ${styles.compact}` : styles.grid}>
+    <div className={className}>
       <Cell label="ミート" value={batting.meet} />
       <Cell label="パワー" value={batting.power} />
       <Cell label="走力" value={batting.speed} />

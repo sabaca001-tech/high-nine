@@ -44,10 +44,14 @@
   font-size: var(--fs-xs);
 }
 
-/* 一覧のカードの中。2列で約140pxに収める */
+/* 一覧のカードの中。絵の右に縦一列で置く */
 .compact .cell {
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 4px;
+}
+
+.compact.single {
+  gap: 2px;
 }
 
 .compact .label {
