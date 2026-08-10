@@ -19,6 +19,7 @@
  * **名簿の大半が名前だけの行**になってしまう。
  */
 
+import type { Month } from '@/core/types/game'
 import type { Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
 import type { RivalSchool } from '@/core/rival/rivals'
@@ -103,9 +104,11 @@ export function selectU18Squad(params: {
   /** 自校の部員 */
   ourPlayers: Player[]
   year: number
+  /** 選考する月。他校の部員は年度が進むほど伸びている */
+  month?: Month
   size?: number
 }): U18Squad {
-  const { schools, ourPlayers, year, size = U18_SQUAD_SIZE } = params
+  const { schools, ourPlayers, year, month, size = U18_SQUAD_SIZE } = params
 
   const pool: { member: U18Member; rating: number }[] = []
 
@@ -136,7 +139,7 @@ export function selectU18Squad(params: {
     .slice(0, CANDIDATE_SCHOOLS)
 
   for (const school of candidates) {
-    addFrom(school.id, rivalRoster(school, year))
+    addFrom(school.id, rivalRoster(school, year, month))
   }
 
   const members = pool
@@ -182,9 +185,11 @@ export function resolveU18Squad(
     ourSchoolName: string
     /** いまの年。ここで名簿を作り直すので、進級と成長が反映される */
     year: number
+    /** いまの月。年度の途中で伸びたぶんも反映される */
+    month?: Month
   },
 ): U18Entry[] {
-  const { schools, ourPlayers, ourSchoolName, year } = context
+  const { schools, ourPlayers, ourSchoolName, year, month } = context
   const rosters = new Map<string, Player[]>()
 
   /** その年の名簿を1回だけ作る */
@@ -192,7 +197,8 @@ export function resolveU18Squad(
     const key = `${school.id}@${at}`
     const cached = rosters.get(key)
     if (cached) return cached
-    const roster = rivalRoster(school, at)
+    // 当時の名簿を引き直すときは、年度末の姿（選考後の伸びを含む）で見る
+    const roster = rivalRoster(school, at, at === year ? month : undefined)
     rosters.set(key, roster)
     return roster
   }

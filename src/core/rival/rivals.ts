@@ -155,7 +155,8 @@ export const NATIONAL_RIVALS = (REGIONS.length - 1) * NATIONAL_SCHOOLS_PER_REGIO
  * 178校の県なら、常連5校・強豪12校・中堅上位27校が出てくる。
  */
 const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
-  { weight: 3, min: 28, max: 40 }, // 甲子園常連
+  { weight: 1, min: 42, max: 68 }, // 全国区の名門
+  { weight: 3, min: 28, max: 42 }, // 甲子園常連
   { weight: 7, min: 18, max: 28 }, // 強豪
   { weight: 15, min: 8, max: 18 }, // 中堅上位
   { weight: 30, min: -2, max: 8 }, // 中堅
@@ -173,13 +174,23 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
  * 数が足りないぶんは最後の段を繰り返す。
  */
 const NATIONAL_TRADITION_TIERS: { min: number; max: number }[] = [
-  { min: 14, max: 34 }, // 県の代表クラス
-  { min: 8, max: 26 }, // それに続く強豪
+  { min: 20, max: 68 }, // 県の代表クラス。名門はここに混ざる
+  { min: 10, max: 34 }, // それに続く強豪
   { min: 2, max: 18 }, // 中堅上位
   { min: -4, max: 12 }, // 中堅
   { min: -10, max: 6 }, // 中堅下位
   { min: -16, max: 2 }, // 下位
 ]
+
+/**
+ * 県の筆頭校の地力。
+ *
+ * **どの県にも「甲子園に手が届く学校」を1つは置く。**
+ * 県外（`NATIONAL_TRADITION_TIERS` の先頭）では各県の代表クラスを
+ * 必ず作っているのに、自県だけ抽選任せだと、
+ * 県によっては格上が1校も存在しないまま3年目には県内最強になっていた。
+ */
+const FLAGSHIP_TRADITION = { min: 32, max: 68 }
 
 /** 1校が抱える注目選手の数 */
 const STARS_PER_SCHOOL = 2
@@ -249,6 +260,17 @@ export function createRivals(
   const traditions = Array.from({ length: localCount }, () => rollTradition(rng)).sort(
     (a, b) => b - a,
   )
+
+  /*
+   * **県の筆頭校は必ず名門にする。**
+   *
+   * 抽選任せだと、名門の段（101分の1）を1校も引かない県が普通に出る。
+   * 24校の鳥取なら期待値0.24校で、実際その県には
+   * 「甲子園に手が届く学校」が1つも存在しないことになっていた。
+   * 県外は `NATIONAL_TRADITION_TIERS` の先頭で同じことをしているので、
+   * 自県だけ弱いのも筋が通らない。
+   */
+  traditions[0] = Math.max(traditions[0], rng.int(FLAGSHIP_TRADITION.min, FLAGSHIP_TRADITION.max))
 
   traditions.forEach((tradition, index) => {
     add(`rs${index + 1}`, homeRegionId, tradition, index < RIVALS_PER_REGION)

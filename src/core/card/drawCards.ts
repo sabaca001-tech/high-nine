@@ -14,12 +14,24 @@ const BASE_KIND_WEIGHTS = Object.values(PRACTICE_DEFS)
   .filter((def) => !requiresEquipment(def.kind))
   .map((def) => ({ value: def.kind, weight: def.weight }))
 
+/**
+ * いま何も起きない練習。**手札に出さない。**
+ *
+ * 治療は離脱中の選手がいなければ「幸い、怪我をしている部員はいなかった」で
+ * 終わるだけのカードで、選ぶ意味が無いのに枠を1つ塞いでいた
+ * （壊れた器具の練習を手札から取り除くのと同じ話）。
+ */
+function isUseless(kind: PracticeKind, hasInjured: boolean): boolean {
+  return PRACTICE_DEFS[kind].special === 'heal' && !hasInjured
+}
+
 /** その時点で引ける練習の一覧を作る */
-function kindWeightsFor(unlocked: readonly PracticeKind[]) {
-  if (unlocked.length === 0) return BASE_KIND_WEIGHTS
+function kindWeightsFor(unlocked: readonly PracticeKind[], hasInjured: boolean) {
+  const base = BASE_KIND_WEIGHTS.filter((entry) => !isUseless(entry.value, hasInjured))
+  if (unlocked.length === 0) return base
 
   return [
-    ...BASE_KIND_WEIGHTS,
+    ...base,
     ...unlocked.map((kind) => ({ value: kind, weight: PRACTICE_DEFS[kind].weight })),
   ]
 }
@@ -29,16 +41,18 @@ function kindWeightsFor(unlocked: readonly PracticeKind[]) {
  * id は手札の中で重複しなければよいので、呼び出し側から通し番号を渡す。
  *
  * @param unlocked 練習器具で使えるようになっている練習の一覧
+ * @param hasInjured 離脱中の選手がいるか。いなければ治療は出さない
  */
 export function drawCard(
   rng: Rng,
   serial: number,
   unlocked: readonly PracticeKind[] = [],
+  hasInjured = false,
 ): PracticeCard {
   return {
     id: `card-${serial}`,
     number: rng.weighted(CARD_NUMBER_WEIGHTS),
-    kind: rng.weighted<PracticeKind>(kindWeightsFor(unlocked)),
+    kind: rng.weighted<PracticeKind>(kindWeightsFor(unlocked, hasInjured)),
     isRare: rng.chance(RARE_CARD_RATE),
   }
 }
@@ -53,8 +67,11 @@ export function drawHand(
   startSerial: number,
   size = HAND_SIZE,
   unlocked: readonly PracticeKind[] = [],
+  hasInjured = false,
 ): PracticeCard[] {
-  return Array.from({ length: size }, (_, i) => drawCard(rng, startSerial + i, unlocked))
+  return Array.from({ length: size }, (_, i) =>
+    drawCard(rng, startSerial + i, unlocked, hasInjured),
+  )
 }
 
 /**
@@ -69,11 +86,14 @@ export function replaceCard(
   /** 補充後の枚数。評判が上がると増える */
   size = hand.length,
   unlocked: readonly PracticeKind[] = [],
+  hasInjured = false,
 ): PracticeCard[] {
   const remaining = hand.filter((card) => card.id !== usedCardId)
   // 枠が増えたぶんはまとめて補充する
   const need = Math.max(1, size - remaining.length)
-  const drawn = Array.from({ length: need }, (_, i) => drawCard(rng, serial + i, unlocked))
+  const drawn = Array.from({ length: need }, (_, i) =>
+    drawCard(rng, serial + i, unlocked, hasInjured),
+  )
   return [...remaining, ...drawn].slice(0, Math.max(size, remaining.length))
 }
 
@@ -88,11 +108,34 @@ export function replaceBrokenCards(
   lost: readonly PracticeKind[],
   serial: number,
   unlocked: readonly PracticeKind[],
+  hasInjured = false,
 ): PracticeCard[] {
   if (lost.length === 0) return hand
 
   let next = serial
   return hand.map((card) =>
-    lost.includes(card.kind) ? drawCard(rng, next++, unlocked) : card,
+    lost.includes(card.kind) ? drawCard(rng, next++, unlocked, hasInjured) : card,
+  )
+}
+
+/**
+ * いま何も起きないカードを引き直す。
+ *
+ * 怪我人が復帰した後の治療カードは、壊れた器具の練習と同じで
+ * **選んでも何も起きないカード**として手札に残り続ける。
+ * 手を進めるためだけに切らせるのは、判断を1つ奪っているのと同じ。
+ */
+export function replaceUselessCards(
+  rng: Rng,
+  hand: PracticeCard[],
+  serial: number,
+  unlocked: readonly PracticeKind[],
+  hasInjured: boolean,
+): PracticeCard[] {
+  if (!hand.some((card) => isUseless(card.kind, hasInjured))) return hand
+
+  let next = serial
+  return hand.map((card) =>
+    isUseless(card.kind, hasInjured) ? drawCard(rng, next++, unlocked, hasInjured) : card,
   )
 }

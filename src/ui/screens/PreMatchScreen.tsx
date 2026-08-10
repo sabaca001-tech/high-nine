@@ -61,7 +61,9 @@ export function PreMatchScreen() {
         {/* 言葉だけでなく数字も出す。自分のスタメンと同じ物差しで比べられる */}
         <span className={styles.opponentRating}>
           {ratingLabel(
-            school ? lineupRatingOf(school, game.year) : opponentRating(setup.opponentStrength),
+            school
+              ? lineupRatingOf(school, game.year, game.month)
+              : opponentRating(setup.opponentStrength),
           )}
         </span>
       </div>

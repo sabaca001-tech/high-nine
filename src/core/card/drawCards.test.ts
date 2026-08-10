@@ -3,7 +3,7 @@ import { createRng } from '@/core/rng/random'
 import { HAND_SIZE } from '@/core/types/card'
 import { PRACTICE_DEFS } from './cardDefs'
 import type { PracticeKind } from '@/core/types/card'
-import { drawCard, drawHand, replaceCard } from './drawCards'
+import { drawCard, drawHand, replaceCard, replaceUselessCards } from './drawCards'
 
 describe('drawCard', () => {
   it('数字は1〜5（進むマス数）、種別は定義済みのものになる', () => {
@@ -117,5 +117,38 @@ describe('練習系とそれ以外の割合', () => {
     }
 
     expect(rate(['teeBatting', 'weight', 'machineBatting'])).toBeGreaterThan(rate([]))
+  })
+})
+
+describe('治療カードは怪我人がいるときだけ出る', () => {
+  const KINDS = (hand: { kind: string }[]) => hand.map((card) => card.kind)
+
+  it('離脱中の選手がいなければ引かれない', () => {
+    const hand = drawHand(createRng(5), 0, 200, [], false)
+    expect(KINDS(hand)).not.toContain('medical')
+  })
+
+  it('離脱中の選手がいれば引かれる', () => {
+    const hand = drawHand(createRng(5), 0, 200, [], true)
+    expect(KINDS(hand)).toContain('medical')
+  })
+
+  it('復帰したら手札の治療カードを引き直す', () => {
+    const hand = drawHand(createRng(5), 0, 8, [], true)
+    const before = hand.filter((card) => card.kind === 'medical').length
+    expect(before).toBeGreaterThan(0)
+
+    const next = replaceUselessCards(createRng(9), hand, 100, [], false)
+    expect(KINDS(next)).not.toContain('medical')
+    expect(next).toHaveLength(hand.length)
+    // 治療以外のカードはそのまま残る（同じ位置に同じカード）
+    hand.forEach((card, index) => {
+      if (card.kind !== 'medical') expect(next[index]).toEqual(card)
+    })
+  })
+
+  it('怪我人がいるうちは引き直さない', () => {
+    const hand = drawHand(createRng(5), 0, 8, [], true)
+    expect(replaceUselessCards(createRng(9), hand, 100, [], true)).toBe(hand)
   })
 })

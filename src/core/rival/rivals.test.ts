@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { findRegion, REGIONS } from '@/core/types/region'
+import { lineupRatingOf } from './rivalRoster'
+import { toRank } from '@/core/player/rating'
 import {
   addStar,
   bestStarRating,
@@ -264,5 +266,28 @@ describe('他校のデータは年を重ねても増えない', () => {
     const met = addResult(fresh[0], { year: 3, label: '練習試合', outcome: 'win' })
     expect(hasMet(recordOf(met))).toBe(true)
     expect(recordOf(met).wins).toBe(1)
+  })
+})
+
+describe('名門校', () => {
+  it('どの県にも「甲子園に手が届く筆頭校」がいる', () => {
+    // 抽選任せだと、校数の少ない県には格上が1校も生まれなかった
+    for (const regionId of ['tottori', 'kanagawa', 'osaka'] as const) {
+      const schools = createRivals(createRng(regionId.length * 97), regionId)
+      const top = localRivals(schools, regionId).reduce((a, b) =>
+        b.tradition > a.tradition ? b : a,
+      )
+      expect(top.tradition).toBeGreaterThanOrEqual(32)
+    }
+  })
+
+  it('全国には総合Aのスタメンを組む学校がある', () => {
+    // 「他校でAに届くところが1つも無い」のは、2818校もあれば不自然
+    const schools = createRivals(createRng(20), 'kanagawa')
+    const best = nationalRepresentatives(schools, 'kanagawa')
+      .map((school) => lineupRatingOf(school, 3, 4))
+      .sort((a, b) => b - a)[0]
+
+    expect(toRank(best)).toBe('A')
   })
 })

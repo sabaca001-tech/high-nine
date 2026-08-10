@@ -834,9 +834,13 @@ describe('大会', () => {
   })
 
   it('地区大会に優勝すると全国大会のマスが盤面に現れる', () => {
-    // 優勝するまでシードを変えて探す
+    // **1年目の弱小校では、まず優勝できない。**
+    // どの県にも甲子園に手が届く筆頭校が必ずいるので、
+    // 数年育ててから探す（校数の少ない鳥取でも同じ）
     for (let seed = 200; seed < 260; seed++) {
-      const inTournament = untilTournament(startedGame({ seed, regionId: 'tottori' }))
+      let grown = startedGame({ seed, regionId: 'tottori' })
+      for (let i = 0; i < 8; i++) grown = playYear(grown)
+      const inTournament = untilTournament(grown)
       const played = playOutTournament(inTournament)
       if (!played.tournament!.champion) continue
 
@@ -2950,4 +2954,19 @@ describe('成長方針（ポジションごとの優先順）', () => {
 
     expect(grow(planned)).toBeGreaterThanOrEqual(grow(base))
   })
+})
+
+describe('治療カード', () => {
+  it('怪我人がいない間は手札に出ない', () => {
+    let state = startedGame({ seed: 44 })
+
+    for (let i = 0; i < 120; i++) {
+      const injured = state.players.some((player) => player.injuryMonths > 0)
+      if (!injured) {
+        expect(state.hand.map((card) => card.kind)).not.toContain('medical')
+      }
+      state = playStep(state)
+      if (state.phase === 'yearEnd') break
+    }
+  }, 60000)
 })

@@ -16,6 +16,8 @@
  */
 
 import { createRng } from '@/core/rng/random'
+import { SEASON_START_MONTH } from '@/core/calendar/days'
+import type { Month } from '@/core/types/game'
 import { createPlayer } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
 import { autoLineup } from '@/core/lineup/autoLineup'
@@ -44,6 +46,53 @@ export const ROSTER_TALENT_RATE = 0.55
 const PITCHERS_PER_GRADE = 2
 
 /**
+ * 他校の部員ごとの素質の振れ幅（±）。**自校より小さく取る。**
+ *
+ * 既定（`TALENT_SPREAD` ＝ 18）のまま作ると、1学年5人しかいない名簿では
+ * 平均が±8ほど揺れる。**地力64の名門が地力37の学校より弱く見える**ことが
+ * 普通に起きていて（実測でスタメン平均67.3対69.8）、
+ * 「名門は強い」という一覧の読み方そのものが成り立たなかった。
+ *
+ * 個人差は注目選手（`stars`）が担うので、名簿のほうは学校の格に寄せる。
+ */
+const ROSTER_TALENT_SPREAD = 10
+
+/**
+ * 他校の部員が**1年で伸びる量**。
+ *
+ * これが無かった頃は、他校の名簿は1年を通してまったく同じ能力だった。
+ * 3年生が抜けても翌年の3年生が同じ基準で作られるので、
+ * **卒業しても学校の力が1ミリも下がらない**。
+ * こちらだけが3年生を送り出して弱くなる、という不自然な世界になっていた。
+ *
+ * 学年のベース（`GRADE_BASE`）の刻みに合わせてある（1年36→2年44→3年50）。
+ * 年度末の1年生（36+4）が、翌年度初めの2年生（44-4）とちょうど並ぶので、
+ * **選手ひとりの能力は年度をまたいでも途切れない**。
+ * 下がるのは学校の平均のほうで、
+ * 「よく育った3年生が抜けて、代わりに1年生が入る」ぶんだけ落ちる。
+ *
+ * **年度の真ん中を0にする**（4月は -4、3月は +4）。
+ * 4月を0にして積み上げると、1年を通した平均が丸ごと上がってしまい、
+ * 夏の大会がそれまでより一段厳しくなる。
+ * 実測でも、甲子園出場が30年で7.6回から4.0回まで落ちた。
+ * 上げたいのは「年度の中での上下」であって、他校全体の水準ではない。
+ */
+export const RIVAL_YEAR_GROWTH = 8
+
+/**
+ * 年度のどこまで来ているか（0＝4月1日、1＝3月末）。
+ * 1マス1日で進むので、月から見て十分。
+ */
+export function seasonProgress(month: Month): number {
+  return ((month - SEASON_START_MONTH + 12) % 12) / 12
+}
+
+/** その月の伸びぶん。年度の真ん中で0になるよう中心をずらす */
+export function seasonGrowth(month: Month): number {
+  return Math.round((seasonProgress(month) - 0.5) * RIVAL_YEAR_GROWTH)
+}
+
+/**
  * 学校の部員を作る。**同じ学校・同じ年なら必ず同じ結果になる。**
  *
  * **id には `r` を挟む。** 挟んでいなかった頃は
@@ -61,8 +110,16 @@ const PITCHERS_PER_GRADE = 2
  * 注目選手（`stars`）は**この名簿を置き換える形で混ぜる**。
  * スカウトで逃した選手が、その学校にちゃんと在籍していることになる。
  */
-export function rivalRoster(school: RivalSchool, year: number): Player[] {
+export function rivalRoster(
+  school: RivalSchool,
+  year: number,
+  /** いまの月。年度が進むほど部員が伸びている */
+  month: Month = SEASON_START_MONTH,
+): Player[] {
   const players: Player[] = []
+  // 年度の中でも伸びる。**乱数の引き方は変えない**ので、
+  // 同じ学校・同じ年なら顔ぶれはそのままで能力だけが上がる
+  const grown = seasonGrowth(month)
 
   for (const grade of [3, 2, 1] as Grade[]) {
     // 入学年で種を決める。学年が上がっても同じ人物になる
@@ -86,7 +143,8 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
         id: `${school.id}-r${enrolledYear}-${i}`,
         grade,
         isPitcher: i < PITCHERS_PER_GRADE,
-        talentBonus: Math.round(school.strength * ROSTER_TALENT_RATE),
+        talentBonus: Math.round(school.strength * ROSTER_TALENT_RATE) + grown,
+        talentSpread: ROSTER_TALENT_SPREAD,
         takenNames,
       })
       takenNames.push(player.name)
@@ -94,7 +152,7 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
     }
   }
 
-  return mergeStars(players, school, year)
+  return mergeStars(players, school, year, grown)
 }
 
 /**
@@ -104,7 +162,12 @@ export function rivalRoster(school: RivalSchool, year: number): Player[] {
  * 単に足すと部員数が増えて他校より有利になるし、
  * いちばん強い選手を押しのけると学校の格が下がってしまう。
  */
-function mergeStars(players: Player[], school: RivalSchool, year: number): Player[] {
+function mergeStars(
+  players: Player[],
+  school: RivalSchool,
+  year: number,
+  grown: number,
+): Player[] {
   const result = [...players]
 
   for (const star of starsOf(school)) {
@@ -120,7 +183,7 @@ function mergeStars(players: Player[], school: RivalSchool, year: number): Playe
 
     const weakest = candidates.reduce((a, b) => (overallRating(b) < overallRating(a) ? b : a))
     const index = result.indexOf(weakest)
-    result[index] = materializeStar(star, weakest, grade)
+    result[index] = materializeStar(star, weakest, grade, grown)
   }
 
   return result
@@ -132,13 +195,13 @@ function mergeStars(players: Player[], school: RivalSchool, year: number): Playe
  * 素質（`rating`）どおりの能力になるよう、置き換える相手との差を補正で埋める。
  * 名前・学年・投手かどうか・触れ込みの特殊能力は注目選手のものを使う。
  */
-function materializeStar(star: RivalPlayer, slot: Player, grade: Grade): Player {
+function materializeStar(star: RivalPlayer, slot: Player, grade: Grade, grown: number): Player {
   const rng = createRng(hashId(star.id))
   const base = createPlayer(rng, {
     id: star.id,
     grade,
     isPitcher: star.isPitcher,
-    talentBonus: star.rating - BASE_RATING,
+    talentBonus: star.rating - BASE_RATING + grown,
     // 素質を示してから入学させるので、そこからさらに振らない
     talentSpread: 0,
     // 名前は注目選手のものを使うので、留学生としては作らない
@@ -207,8 +270,12 @@ function hashId(id: string): number {
  * **実際に試合で当たるスタメンの平均**と完全に一致する。
  * 1校あたり0.2msほどかかるので、画面では `useMemo` で抑えること。
  */
-export function lineupRatingOf(school: RivalSchool, year: number): number {
-  const roster = rivalRoster(school, year)
+export function lineupRatingOf(
+  school: RivalSchool,
+  year: number,
+  month: Month = SEASON_START_MONTH,
+): number {
+  const roster = rivalRoster(school, year, month)
   const lineup = autoLineup(roster)
   const byId = new Map(roster.map((player) => [player.id, player]))
 

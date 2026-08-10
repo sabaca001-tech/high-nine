@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import { createRivals } from './rivals'
+import { createRivals, localRivals } from './rivals'
 import type { RivalSchool } from './rivals'
-import { rivalRoster } from './rivalRoster'
+import { lineupRatingOf, rivalRoster } from './rivalRoster'
+import type { Month } from '@/core/types/game'
 import { starsOf } from './rivals'
 import { overallRating } from '@/core/player/rating'
 
@@ -171,5 +172,46 @@ describe('idの重複', () => {
     // 注目選手として差し込まれた1人ぶんを除けば、名簿側と重ならない
     const plain = roster.filter((player) => !starIds.has(player.id))
     for (const player of plain) expect(starIds.has(player.id)).toBe(false)
+  })
+})
+
+describe('年度の中で伸び、卒業で一度下がる', () => {
+  const schools = createRivals(createRng(31), 'kanagawa', 1)
+  const local = localRivals(schools, 'kanagawa').slice(0, 60)
+  const average = (year: number, month: Month) =>
+    local.reduce((sum, school) => sum + lineupRatingOf(school, year, month), 0) / local.length
+
+  it('4月より3月のほうが強い（年度の中で伸びる）', () => {
+    expect(average(3, 3)).toBeGreaterThan(average(3, 4) + 3)
+  })
+
+  it('年度が替わると下がる（3年生が抜ける）', () => {
+    // こちらの卒業と同じタイミングで、他校も3年生を送り出す
+    expect(average(4, 4)).toBeLessThan(average(3, 3) - 3)
+  })
+
+  it('同じ月どうしで比べると弱くならない', () => {
+    // 下がりっぱなしだと、年を追うごとに世界が弱体化していく。
+    // **注目選手を抱えない学校で見る。** 注目選手は `advanceRival` が
+    // 毎年立て直すもので、学校を据え置いたまま年だけ進めると
+    // 卒業して減っていくだけになる
+    const plain = local.filter((school) => !school.notable)
+    const plainAverage = (year: number) =>
+      plain.reduce((sum, school) => sum + lineupRatingOf(school, year, 4), 0) / plain.length
+
+    expect(plainAverage(4)).toBeGreaterThan(plainAverage(3) - 1)
+    expect(plainAverage(5)).toBeGreaterThan(plainAverage(3) - 1)
+  })
+
+  it('選手ひとりの能力は年度をまたいでも途切れない', () => {
+    const school = local[0]
+    const march = rivalRoster(school, 3, 3).filter((player) => player.grade === 1)
+    const april = rivalRoster(school, 4, 4).filter((player) => player.grade === 2)
+
+    // 3月の1年生（学年ベース36＋1年ぶんの伸び）と、
+    // 4月の2年生（学年ベース44）がほぼ並ぶ
+    const before = march.reduce((sum, p) => sum + overallRating(p), 0) / march.length
+    const after = april.reduce((sum, p) => sum + overallRating(p), 0) / april.length
+    expect(Math.abs(after - before)).toBeLessThan(4)
   })
 })

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { Month } from '@/core/types/game'
 import type { ReactNode } from 'react'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import { activeU18Players, resolveU18Squad, u18Players, U18_SQUAD_SIZE } from '@/core/player/u18Squad'
@@ -335,11 +336,12 @@ function pickRivals(
   preview: number,
   all: boolean,
   year: number,
+  month: Month,
 ): { school: RivalSchool; rating: number }[] {
   return [...schools]
     .sort((a, b) => b.strength - a.strength)
     .filter((school, index) => all || index < preview || hasMet(recordOf(school)))
-    .map((school) => ({ school, rating: lineupRatingOf(school, year) }))
+    .map((school) => ({ school, rating: lineupRatingOf(school, year, month) }))
     .sort((a, b) => b.rating - a.rating)
 }
 
@@ -362,15 +364,16 @@ function RivalsTab() {
    */
   const localAll = localRivals(game.rivals, game.regionId)
   const nationalAll = nationalRivals(game.rivals, game.regionId)
-  const { year } = game
+  // 他校の部員も年度の中で伸びるので、月まで見る
+  const { year, month } = game
 
   const localShown = useMemo(
-    () => pickRivals(localAll, LOCAL_PREVIEW, showAll, year),
-    [localAll, showAll, year],
+    () => pickRivals(localAll, LOCAL_PREVIEW, showAll, year, month),
+    [localAll, showAll, year, month],
   )
   const nationalShown = useMemo(
-    () => pickRivals(nationalAll, NATIONAL_PREVIEW, showAllNational, year),
-    [nationalAll, showAllNational, year],
+    () => pickRivals(nationalAll, NATIONAL_PREVIEW, showAllNational, year, month),
+    [nationalAll, showAllNational, year, month],
   )
 
   return (
@@ -434,9 +437,10 @@ function U18Tab() {
             ourPlayers: game.players,
             ourSchoolName: game.schoolName,
             year: game.year,
+            month: game.month,
           })
         : [],
-    [squad, game.rivals, game.players, game.schoolName, game.year],
+    [squad, game.rivals, game.players, game.schoolName, game.year, game.month],
   )
 
   // スタメンはその場で組む。能力が伸びれば顔ぶれも入れ替わる。
@@ -602,7 +606,13 @@ function RivalRow({
       </div>
 
       {open && (
-        <OpponentRoster school={school} year={game.year} label="スタメン" defaultOpen />
+        <OpponentRoster
+          school={school}
+          year={game.year}
+          month={game.month}
+          label="スタメン"
+          defaultOpen
+        />
       )}
     </div>
   )

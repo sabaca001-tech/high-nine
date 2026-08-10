@@ -24,7 +24,12 @@ import { SEASON_START_MONTH } from '@/core/calendar/days'
 import { resolveCell } from '@/core/board/resolveCell'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { PracticeSpecial } from '@/core/card/cardDefs'
-import { drawHand, replaceBrokenCards, replaceCard } from '@/core/card/drawCards'
+import {
+  drawHand,
+  replaceBrokenCards,
+  replaceCard,
+  replaceUselessCards,
+} from '@/core/card/drawCards'
 import { autoLineup, repairLineup, validateLineup } from '@/core/lineup/autoLineup'
 import { createInitialRoster, createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
 import { recruitFreshmen } from '@/core/season/graduation'
@@ -1597,7 +1602,7 @@ function opponentRangeFor(
 function rosterOfSchool(state: GameState, schoolId?: string): Player[] | undefined {
   if (!schoolId) return undefined
   const school = state.rivals.find((rival) => rival.id === schoolId)
-  return school ? rivalRoster(school, state.year) : undefined
+  return school ? rivalRoster(school, state.year, state.month) : undefined
 }
 
 /**
@@ -1740,13 +1745,20 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   // 使ったカードを補充する。評判が上がっていれば枠ごと増える
   const handSize = handSizeFor(monthly.reputation)
   const unlocked = unlockedKinds(monthly.equipment)
+  // 治療は**離脱中の選手がいるときだけ**出す。
+  // このマスで怪我をした選手も含めるので、判定は解決後の名簿で行う
+  const hasInjured = outcome.players.some((player) => player.injuryMonths > 0)
   let serial = state.serial
-  const refilled = replaceCard(rng, state.hand, cardId, serial, handSize, unlocked)
+  const refilled = replaceCard(rng, state.hand, cardId, serial, handSize, unlocked, hasInjured)
   serial += Math.max(1, handSize - (state.hand.length - 1))
 
   // 器具が壊れたら、その練習のカードは手札からも引き直す
-  const hand = replaceBrokenCards(rng, refilled, monthly.lostKinds, serial, unlocked)
+  const broken = replaceBrokenCards(rng, refilled, monthly.lostKinds, serial, unlocked, hasInjured)
   serial += monthly.lostKinds.length > 0 ? refilled.length : 0
+
+  // 怪我人が復帰したら、残っている治療カードも引き直す
+  const hand = replaceUselessCards(rng, broken, serial, unlocked, hasInjured)
+  serial += hand === broken ? 0 : broken.length
 
   // 止まったマスの種類でフェーズが決まる
   const reachedGoal = to >= GOAL_INDEX
@@ -2117,6 +2129,7 @@ export function applyOneMonth(
       schools: state.rivals,
       ourPlayers: players,
       year: state.year,
+      month,
     })
 
     const selected = ourU18Players(u18Squad, players)
@@ -2197,7 +2210,14 @@ function advanceYear(state: GameState): EngineResult {
   // 全国大会の出場権は年度をまたぐと失効する
   const board = withSeasonTournaments(createBoard(rng), state.regionId)
   const handSize = handSizeFor(state.reputation)
-  const hand = drawHand(rng, state.serial, handSize, unlockedKinds(state.equipment))
+  // 3年生は抜けるので、残る部員に離脱者がいるかで見る
+  const hand = drawHand(
+    rng,
+    state.serial,
+    handSize,
+    unlockedKinds(state.equipment),
+    state.players.some((player) => player.grade !== 3 && player.injuryMonths > 0),
+  )
   let serial = state.serial + handSize
 
   const events: GameEvent[] = [

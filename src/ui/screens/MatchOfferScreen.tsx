@@ -48,7 +48,7 @@ export function MatchOfferScreen() {
             ? game.rivals.find((item) => item.id === offer.opponentSchoolId)
             : undefined
           const rating = school
-            ? lineupRatingOf(school, game.year)
+            ? lineupRatingOf(school, game.year, game.month)
             : opponentRating(offer.opponentStrength)
 
           return (
