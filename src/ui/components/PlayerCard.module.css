@@ -182,8 +182,8 @@
 
 /* 適性図と能力レーダーを左右に並べる */
 /*
- * 野手は左に守備適性、右に能力の数値。
- * 弾道は能力の1行に混ぜてある（専用の枠を切ると縦を大きく食う）。
+ * 野手は左に弾道と守備適性、右に能力の数値。
+ * 弾道はラベルの右に矢印を置くだけの1行にして、縦を食わないようにする。
  */
 .body {
   display: grid;
@@ -191,6 +191,30 @@
   gap: var(--sp-1);
   margin-top: var(--sp-1);
   align-items: start;
+}
+
+.figures {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* 弾道。守備適性の上に1行だけ置く */
+.trajectoryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-base);
+  color: var(--accent);
+}
+
+.trajectoryLabel {
+  font-size: 9px;
+  color: var(--text-sub);
 }
 
 .stats {

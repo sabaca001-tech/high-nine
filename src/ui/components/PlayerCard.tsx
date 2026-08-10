@@ -9,6 +9,7 @@ import { focusLabel } from '@/core/player/trainingFocus'
 import type { Motivation, Player } from '@/core/types/player'
 import type { UniformId } from '@/core/team/uniforms'
 import { BatterStats } from './BatterStats'
+import { TrajectoryArrow } from './TrajectoryArrow'
 import { AptitudeDiamond } from './AptitudeDiamond'
 import { PitchChart } from './PitchChart'
 import { PitcherStats } from './PitcherStats'
@@ -161,17 +162,22 @@ export function PlayerCard({
         </>
       ) : (
         /*
-          **野手は左に守備適性、右に能力。**
-          弾道は他の能力と同じ1行に混ぜる（ラベルの右に矢印）。
-          専用の枠を切っていた頃は、能力ひとつのために縦を大きく食っていた。
+          **野手は左に弾道と守備適性、右に能力。**
+          弾道はラベルの右に矢印を置くだけの1行にして、縦を食わないようにする。
         */
         <div className={styles.body}>
-          <span className={styles.chartBox}>
-            <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
-            <span className={styles.chartCaption}>守備適性</span>
-          </span>
+          <div className={styles.figures}>
+            <span className={styles.trajectoryRow}>
+              <span className={styles.trajectoryLabel}>弾道</span>
+              <TrajectoryArrow trajectory={player.batting.trajectory} size={13} />
+            </span>
+            <span className={styles.chartBox}>
+              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+              <span className={styles.chartCaption}>守備適性</span>
+            </span>
+          </div>
           <div className={styles.stats}>
-            <BatterStats batting={player.batting} compact columns={1} showTrajectory />
+            <BatterStats batting={player.batting} compact columns={1} />
           </div>
         </div>
       )}
