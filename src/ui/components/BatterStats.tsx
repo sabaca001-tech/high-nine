@@ -14,6 +14,9 @@ import styles from './PitcherStats.module.css'
  *
  * 並びは「ミート・パワー」で1行、「走力・肩力」で1行、「守備・捕球」で1行。
  * 打つ力・走る力と投げる力・守る力を、行で分けてある。
+ *
+ * 弾道も**他の能力と同じ1行**に混ぜる（ラベルの右に矢印）。
+ * 専用の枠を切っていた頃は、能力ひとつのために縦を大きく食っていた。
  */
 export function BatterStats({
   batting,
@@ -35,20 +38,21 @@ export function BatterStats({
 
   return (
     <div className={className}>
+      {/* 弾道は他の能力と同じ1行に混ぜる。ラベルの右に矢印を置くだけ */}
+      {showTrajectory && (
+        <span className={styles.cell}>
+          <span className={styles.label}>弾道</span>
+          <span className={styles.value} style={{ color: 'var(--accent)' }}>
+            <TrajectoryArrow trajectory={batting.trajectory} size={compact ? 13 : 16} />
+          </span>
+        </span>
+      )}
       <Cell label="ミート" value={batting.meet} />
       <Cell label="パワー" value={batting.power} />
       <Cell label="走力" value={batting.speed} />
       <Cell label="肩力" value={batting.arm} />
       <Cell label="守備" value={batting.fielding} />
       <Cell label="捕球" value={batting.catching} />
-      {showTrajectory && (
-        <span className={styles.cell}>
-          <span className={styles.label}>弾道</span>
-          <span className={styles.value} style={{ color: 'var(--accent)' }}>
-            <TrajectoryArrow trajectory={batting.trajectory} size={compact ? 12 : 16} />
-          </span>
-        </span>
-      )}
     </div>
   )
 }

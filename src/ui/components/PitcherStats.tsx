@@ -26,17 +26,10 @@ export function PitcherStats({
    * スタメン画面の右の枠は100pxしかなく、2列だと「スタミナ」がはみ出す。
    */
   columns = 2,
-  /**
-   * 守備・走力も並べる。
-   * 投手能力は4つしかないので、絵の横に縦一列で置くと右側だけ短くなる。
-   * 投手も守備位置には立つので、並べて困る値ではない。
-   */
-  batting,
 }: {
   pitching: PitchingAbilities
   compact?: boolean
   columns?: 1 | 2
-  batting?: { fielding: number; speed: number }
 }) {
   const className = [styles.grid, compact ? styles.compact : '', columns === 1 ? styles.single : '']
     .filter(Boolean)
@@ -54,12 +47,6 @@ export function PitcherStats({
       <Cell label="変化" value={pitching.breaking} />
       <Cell label="制球" value={pitching.control} />
       <Cell label="スタミナ" value={pitching.stamina} />
-      {batting && (
-        <>
-          <Cell label="守備" value={batting.fielding} />
-          <Cell label="走力" value={batting.speed} />
-        </>
-      )}
     </div>
   )
 }

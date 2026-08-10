@@ -9,7 +9,6 @@ import { focusLabel } from '@/core/player/trainingFocus'
 import type { Motivation, Player } from '@/core/types/player'
 import type { UniformId } from '@/core/team/uniforms'
 import { BatterStats } from './BatterStats'
-import { TrajectoryArrow } from './TrajectoryArrow'
 import { AptitudeDiamond } from './AptitudeDiamond'
 import { PitchChart } from './PitchChart'
 import { PitcherStats } from './PitcherStats'
@@ -140,46 +139,42 @@ export function PlayerCard({
         形が読めても球速が141km/hなのか135km/hなのか分からなかった。
         投手は数値4つと持ち球で判断する。
       */}
-      {/*
-        **左に絵、右に数字。**
-        弾道だけを投手の持ち球と同じ枠に置いていたが、
-        持ち球は「何を投げるか」という中身で、弾道は能力ひとつ。
-        並べる重みが違ううえ、能力値が上に離れて読みづらかった。
-        左は守備適性と弾道（投手は持ち球）、右に能力を縦に並べる。
-      */}
-      <div className={styles.body}>
-        <div className={styles.figures}>
+      {player.pitching ? (
+        <>
+          {/*
+            **投手は能力を上にまとめる。** 投球能力は4つしかないので、
+            絵の横に縦一列で置くと右側だけ短くなって釣り合わない
+          */}
+          <div className={styles.pitchStats}>
+            <PitcherStats pitching={player.pitching} compact />
+          </div>
+          <div className={styles.charts}>
+            <span className={styles.chartBox}>
+              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+              <span className={styles.chartCaption}>守備適性</span>
+            </span>
+            <span className={styles.chartBox}>
+              <PitchChart pitches={player.pitching.pitches} labels={false} compact />
+              <span className={styles.chartCaption}>持ち球</span>
+            </span>
+          </div>
+        </>
+      ) : (
+        /*
+          **野手は左に守備適性、右に能力。**
+          弾道は他の能力と同じ1行に混ぜる（ラベルの右に矢印）。
+          専用の枠を切っていた頃は、能力ひとつのために縦を大きく食っていた。
+        */
+        <div className={styles.body}>
           <span className={styles.chartBox}>
             <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
             <span className={styles.chartCaption}>守備適性</span>
           </span>
-          <span className={styles.chartBox}>
-            {player.pitching ? (
-              <PitchChart pitches={player.pitching.pitches} labels={false} compact />
-            ) : (
-              <span className={styles.trajectoryBox}>
-                <TrajectoryArrow trajectory={player.batting.trajectory} size={24} />
-              </span>
-            )}
-            <span className={styles.chartCaption}>
-              {player.pitching ? '持ち球' : '弾道'}
-            </span>
-          </span>
+          <div className={styles.stats}>
+            <BatterStats batting={player.batting} compact columns={1} showTrajectory />
+          </div>
         </div>
-
-        <div className={styles.stats}>
-          {player.pitching ? (
-            <PitcherStats
-              pitching={player.pitching}
-              batting={player.batting}
-              compact
-              columns={1}
-            />
-          ) : (
-            <BatterStats batting={player.batting} compact columns={1} />
-          )}
-        </div>
-      </div>
+      )}
 
       {footer}
     </>
