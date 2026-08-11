@@ -289,10 +289,12 @@ describe('名門校', () => {
   })
 
   it('全国には総合Aのスタメンを組む学校がある', () => {
-    // 「他校でAに届くところが1つも無い」のは、7,900校もあれば不自然
+    // 「他校でAに届くところが1つも無い」のは、7,900校もあれば不自然。
+    // **夏の時点**で見る（他校も年度の中で伸びるので、4月がいちばん低い）
     const schools = createRivals(createRng(20), 'kanagawa')
-    const best = nationalRepresentatives(schools, 'kanagawa', 3)
-      .map((school) => lineupRatingOf(school, 3))
+    const best = nationalRivals(schools, 'kanagawa')
+      .filter((school) => school.tradition >= 50)
+      .map((school) => lineupRatingOf(school, 3, 0.4))
       .sort((a, b) => b - a)[0]
 
     expect(best).toBeGreaterThanOrEqual(80)

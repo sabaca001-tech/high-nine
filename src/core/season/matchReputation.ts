@@ -10,6 +10,7 @@
  */
 
 import type { Player } from '@/core/types/player'
+import { rosterTalentOf } from '@/core/rival/rivalRoster'
 import type { Lineup } from '@/core/types/lineup'
 import { overallRating } from '@/core/player/rating'
 
@@ -24,17 +25,22 @@ import { overallRating } from '@/core/player/rating'
  * **強い学校ほど過大評価**になっていた
  * （戦力35の学校を総合78と見ていたが、実際のスタメン平均は68）。
  */
-export const OPPONENT_BASE_RATING = 49.5
+export const OPPONENT_BASE_RATING = 46.5
 
 /**
- * 戦力1あたり、スタメン平均がどれだけ上がるか。
- * 実測値（`rivalRoster` から実際にスタメンを組んで測った）。
+ * 相手チームのスタメンの平均総合。
+ *
+ * **戦力に比例させない。** 学校の力が選手の素質に変わるところで
+ * 上ほど詰まる（`rosterTalentOf`）ので、比例で見ると強豪を過大評価する。
+ * 素質1ぶんがスタメン平均1に相当する（578校の実測で確かめた）。
+ *
+ * | 戦力 | 0 | 10 | 20 | 30 | 55 |
+ * |---|---|---|---|---|---|
+ * | 実測 | 46.5 | 52.4 | 57.7 | 62.8 | 70.2 |
+ * | この式 | 46.5 | 52.0 | 57.5 | 63.0 | 70.0 |
  */
-export const OPPONENT_RATING_RATE = 0.53
-
-/** 相手チームのスタメンの平均総合 */
 export function opponentRating(opponentStrength: number): number {
-  return OPPONENT_BASE_RATING + opponentStrength * OPPONENT_RATING_RATE
+  return OPPONENT_BASE_RATING + rosterTalentOf(opponentStrength)
 }
 
 /** 自校の評価。実際に試合に出るスタメンで測る（控えの厚さは勝敗に効かない） */

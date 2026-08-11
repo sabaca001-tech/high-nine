@@ -155,7 +155,7 @@ export const NATIONAL_RIVALS = (REGIONS.length - 1) * NATIONAL_SCHOOLS_PER_REGIO
  * 178校の県なら、常連5校・強豪12校・中堅上位27校が出てくる。
  */
 const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
-  { weight: 0.35, min: 42, max: 68 }, // 全国区の名門
+  { weight: 0.35, min: 52, max: 84 }, // 全国区の名門
   { weight: 3, min: 28, max: 42 }, // 甲子園常連
   { weight: 7, min: 18, max: 28 }, // 強豪
   { weight: 15, min: 8, max: 18 }, // 中堅上位
@@ -176,10 +176,10 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
  * 県ごとの厚みがそのまま全国の厚みになる）。
  */
 const TOP_SCHOOL_FLOORS: { min: number; max: number }[] = [
-  { min: 26, max: 56 }, // 筆頭校
-  { min: 20, max: 40 }, // 2番手
-  { min: 14, max: 30 }, // 3番手
-  { min: 10, max: 24 }, // 4番手
+  { min: 34, max: 66 }, // 筆頭校
+  { min: 26, max: 48 }, // 2番手
+  { min: 18, max: 36 }, // 3番手
+  { min: 12, max: 28 }, // 4番手
 ]
 
 /**
@@ -196,7 +196,7 @@ const TOP_SCHOOL_FLOORS: { min: number; max: number }[] = [
  *
  * **保存は増えない。** 種（`rosterSeed`）と入学年から毎回同じ値を作る。
  */
-export const CLASS_SPREAD = 9
+export const CLASS_SPREAD = 7
 
 /**
  * その代の出来。同じ学校・同じ入学年なら必ず同じ値になる。

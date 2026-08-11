@@ -135,3 +135,21 @@ describe('resolveU18Squad', () => {
     expect(ourU18Players(squad, ourPlayers)).toHaveLength(ours.length)
   })
 })
+
+describe('代表の水準', () => {
+  it('90超えは数人、95以上は居るか居ないか', () => {
+    // **全員が95以上では、自校の選手がどう育っても届かない。**
+    // 他校の選手は練習の頭打ち（自校）と違って生成されるだけなので、
+    // 学校の力を素質に変えるところで詰めてある（`rosterTalentOf`）
+    const schools = createRivals(createRng(20), 'kanagawa', 1)
+    const squad = selectU18Squad({ schools, ourPlayers: [], year: 5, progress: 0.6 })
+    const ratings = squad.members
+      .map((member) => (member.snapshot ? overallRating(member.snapshot) : 0))
+      .sort((a, b) => b - a)
+
+    expect(ratings.filter((rating) => rating >= 95).length).toBeLessThanOrEqual(3)
+    expect(ratings.filter((rating) => rating >= 90).length).toBeLessThanOrEqual(10)
+    // 逆に弱すぎても代表の意味が無い
+    expect(ratings[0]).toBeGreaterThanOrEqual(90)
+  })
+})

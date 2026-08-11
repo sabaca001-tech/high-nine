@@ -22,9 +22,13 @@
   gap: var(--sp-1);
 }
 
-/* 9人ぶん。縦に伸びすぎないよう上限を置く */
+/*
+ * 9人ぶん。縦に伸びすぎないよう上限を置く。
+ * **能力を開けるようにしたぶん、上限を広げてある。**
+ * 180pxのままだと、開いた能力が枠の下で切れて読めなかった。
+ */
 .list {
-  max-height: 180px;
+  max-height: 300px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
@@ -35,19 +39,65 @@
   background: var(--bg-panel);
 }
 
+.entry {
+  border-bottom: 1px solid var(--line);
+}
+
+.entry:last-child {
+  border-bottom: none;
+}
+
+/* 行そのものが「能力を開く」ボタン。タップ領域は行の全幅 */
 .row {
   display: grid;
+  width: 100%;
   grid-template-columns: 1.2em 2.2em 1fr auto auto;
   grid-template-areas: 'order position name grade rating' '. . detail detail detail';
   align-items: baseline;
   gap: 2px var(--sp-1);
   font-size: var(--fs-xs);
-  padding: 2px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 4px 0;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
 }
 
-.row:last-child {
-  border-bottom: none;
+.rowOpen {
+  color: var(--accent);
+}
+
+/* 開いた能力。選手カードと同じ部品を使う */
+.abilities {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 var(--sp-2) 0;
+}
+
+/* 持ち球の図。**幅を決めないと300pxまで広がる**（SVGは幅いっぱいに伸びる） */
+.pitches {
+  display: flex;
+  justify-content: center;
+}
+
+.pitches > * {
+  max-width: 120px;
+}
+
+/* 弾道。ラベルの右に矢印を置くだけの1行 */
+.trajectory {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-sub);
+}
+
+/* 開いているかを示す小さな印 */
+.more {
+  margin-left: 4px;
+  color: var(--text-dim);
 }
 
 .order {

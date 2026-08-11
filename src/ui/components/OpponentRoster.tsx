@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { autoLineup } from '@/core/lineup/autoLineup'
+import { BatterStats } from './BatterStats'
+import { PitcherStats } from './PitcherStats'
+import { PitchChart } from './PitchChart'
+import { TrajectoryArrow } from './TrajectoryArrow'
 import { rivalRoster } from '@/core/rival/rivalRoster'
 import type { RivalSchool } from '@/core/rival/rivals'
 import { overallRating, toRank } from '@/core/player/rating'
@@ -37,6 +41,8 @@ export function OpponentRoster({
   defaultOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  // 能力を開いている選手。**1人ずつ**にする（9人ぶん開くと画面から溢れる）
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   if (!open) {
     return (
@@ -62,28 +68,74 @@ export function OpponentRoster({
           if (!player) return null
           const rating = overallRating(player)
 
+          const showing = detailId === player.id
+
           return (
-            <div key={slot.playerId} className={styles.row}>
-              <span className={styles.order}>{index + 1}</span>
-              <span className={styles.position}>{slot.position}</span>
-              <span className={styles.name}>
-                {player.name}
-                {/* こちらがスカウトで追いかけていた選手には印を付ける */}
-                {player.origin === 'scout' && <span className={styles.scouted}>スカウト</span>}
-              </span>
-              <span className={styles.grade}>{player.grade}年</span>
-              <span className={styles.rating} style={{ color: rankColorOf(toRank(rating)) }}>
-                {rating}
-              </span>
-              <span className={styles.detail}>{summaryOf(player)}</span>
+            <div key={slot.playerId} className={styles.entry}>
+              {/* 行そのものを押すと、残りの能力が開く */}
+              <button
+                type="button"
+                className={showing ? `${styles.row} ${styles.rowOpen}` : styles.row}
+                onClick={() => setDetailId(showing ? null : player.id)}
+              >
+                <span className={styles.order}>{index + 1}</span>
+                <span className={styles.position}>{slot.position}</span>
+                <span className={styles.name}>
+                  {player.name}
+                  {/* こちらがスカウトで追いかけていた選手には印を付ける */}
+                  {player.origin === 'scout' && <span className={styles.scouted}>スカウト</span>}
+                </span>
+                <span className={styles.grade}>{player.grade}年</span>
+                <span className={styles.rating} style={{ color: rankColorOf(toRank(rating)) }}>
+                  {rating}
+                </span>
+                <span className={styles.detail}>
+                  {summaryOf(player)}
+                  <span className={styles.more}>{showing ? '▴' : '▾'}</span>
+                </span>
+              </button>
+
+              {showing && <Abilities player={player} />}
             </div>
           )
         })}
       </div>
 
       <p className={styles.note}>
-        次に当たっても同じ顔ぶれです。3年生は夏で抜けます。
+        名前を押すと残りの能力が見られます。次に当たっても同じ顔ぶれで、3年生は夏で抜けます。
       </p>
+    </div>
+  )
+}
+
+/**
+ * 押したときに開く、残りの能力。
+ *
+ * **1行では3つしか出せない。** 肩も守備も捕球も見えないので、
+ * 「守れる相手か」「走れる相手か」が読めなかった。
+ * 自校の選手カードと同じ部品を使って、同じ物差しで並べる。
+ */
+function Abilities({ player }: { player: Player }) {
+  if (player.pitching) {
+    return (
+      <div className={styles.abilities}>
+        <PitcherStats pitching={player.pitching} compact columns={2} />
+        <BatterStats batting={player.batting} compact columns={2} />
+        {/* 持ち球は図と球種名で幅を使うので、横いっぱいに置く */}
+        <div className={styles.pitches}>
+          <PitchChart pitches={player.pitching.pitches} compact narrow />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.abilities}>
+      <span className={styles.trajectory}>
+        弾道
+        <TrajectoryArrow trajectory={player.batting.trajectory} size={13} />
+      </span>
+      <BatterStats batting={player.batting} compact columns={2} />
     </div>
   )
 }

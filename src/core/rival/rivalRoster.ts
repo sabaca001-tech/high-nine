@@ -41,6 +41,30 @@ const PER_GRADE = 5
  */
 export const ROSTER_TALENT_RATE = 0.55
 
+/**
+ * 学校の力を、選手ひとりの素質に変える。
+ *
+ * **上に行くほど詰める。** 素直に比例させていた頃は、
+ * 地力68の名門の3年生が素質37を受け取り、
+ * 学年のベース（50）と代の当たり（+9）が乗って**総合99**になっていた。
+ * U18の30人が全員90超え・6人が95以上という並びで、
+ * 自校の選手はどう育てても届かない。
+ *
+ * 自校の選手は練習の頭打ち（`diminishingMultiplier`）で
+ * 85を超えたあたりからほとんど伸びなくなるのに、
+ * 他校の選手だけ**その上限を無視して生成されていた**のが食い違いの正体。
+ * 同じように、高いところほど効きを鈍らせる。
+ */
+export function rosterTalentOf(strength: number): number {
+  const raw = strength * ROSTER_TALENT_RATE
+  return raw <= TALENT_KNEE ? raw : TALENT_KNEE + (raw - TALENT_KNEE) * TALENT_SLOPE
+}
+
+/** ここまでは素直に効く（戦力33ほど。県内の中堅上位まで） */
+const TALENT_KNEE = 18
+/** ここから上の効き */
+const TALENT_SLOPE = 0.45
+
 /** 各学年の何人目までを投手にするか */
 const PITCHERS_PER_GRADE = 2
 
@@ -54,7 +78,7 @@ const PITCHERS_PER_GRADE = 2
  *
  * 個人差は注目選手（`stars`）が担うので、名簿のほうは学校の格に寄せる。
  */
-const ROSTER_TALENT_SPREAD = 10
+const ROSTER_TALENT_SPREAD = 7
 
 /**
  * 他校の部員が**1年で伸びる量**。
@@ -159,9 +183,7 @@ export function rivalRoster(
         // **代ごとの当たり外れ**を足す。良い代を抱えた学校は3年かけて台頭し、
         // その代が卒業すると落ちる
         talentBonus:
-          Math.round(school.strength * ROSTER_TALENT_RATE) +
-          classBonus(school, enrolledYear) +
-          grown,
+          Math.round(rosterTalentOf(school.strength)) + classBonus(school, enrolledYear) + grown,
         talentSpread: ROSTER_TALENT_SPREAD,
         takenNames,
       })
