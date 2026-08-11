@@ -332,6 +332,7 @@ function ManagerRow({ manager }: { manager: TeamManager }) {
 
   return (
     <div className={styles.manager}>
+      <PlayerPortrait playerId={manager.id} size={34} variant="manager" />
       <span className={styles.managerBadge}>マネージャー</span>
       <span className={styles.managerWho}>
         <span className={styles.managerName}>{manager.name}</span>

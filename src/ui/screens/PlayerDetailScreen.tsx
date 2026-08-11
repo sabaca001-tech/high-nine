@@ -95,7 +95,7 @@ export function PlayerDetailScreen() {
 
       <div className={styles.profile} style={profileStyle}>
         <span className={styles.sprite}>
-          <PlayerPortrait playerId={player.id} size={68} cap />
+          <PlayerPortrait playerId={player.id} size={68} cap exchange={player.origin === 'exchange'} />
         </span>
         <div className={styles.nameBlock}>
           <div className={styles.badges}>

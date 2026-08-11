@@ -85,7 +85,7 @@ export function PlayerCard({
   const body = (
     <>
       <div className={styles.head}>
-        <PlayerPortrait playerId={player.id} size={30} cap />
+        <PlayerPortrait playerId={player.id} size={30} cap exchange={player.origin === 'exchange'} />
 
         {/* ネームプレート。左が本職の系統、右に他の適性の色が混ざる */}
         <span className={styles.plate} style={{ background: plateGradient(player) }}>

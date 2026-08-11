@@ -5,6 +5,7 @@ import { isInHallOfFame } from '@/core/types/career'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerCard } from '@/ui/components/PlayerCard'
+import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
 import { findManagerRole, managerEffectText } from '@/core/staff/managers'
 import type { TeamManager } from '@/core/staff/managers'
 import { toRank } from '@/core/player/rating'
@@ -143,6 +144,8 @@ function ManagerRow({ manager }: { manager: TeamManager }) {
 
   return (
     <div className={styles.managerRow}>
+      {/* **マネージャーにも顔を出す。** 部員なのにここだけ名前だけだった */}
+      <PlayerPortrait playerId={manager.id} size={34} variant="manager" />
       <span className={styles.managerRank} style={{ color: rankColorOf(toRank(ability)) }}>
         {toRank(ability)}
       </span>

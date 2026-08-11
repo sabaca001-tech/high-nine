@@ -40,11 +40,7 @@ export function PlayerEventScreen() {
 
       <div className={styles.body}>
         <div className={styles.card}>
-          <PlayerPortrait
-            playerId={player.id}
-            size={68}
-            cap
-          />
+          <PlayerPortrait playerId={player.id} size={68} cap exchange={player.origin === 'exchange'} />
           <div className={styles.who}>
             <span className={styles.name}>{player.name}</span>
             <span className={styles.meta}>
