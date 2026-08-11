@@ -19,6 +19,7 @@ import type { Player, Position } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { NamePlate } from '@/ui/components/NamePlate'
+import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
 import { DragGhost } from '@/ui/components/DragList'
 import { useDragAndDrop } from '@/ui/components/useDragAndDrop'
 import type { DragItem, DropTarget } from '@/ui/components/useDragAndDrop'
@@ -489,6 +490,14 @@ function AbilityPanel({ player }: { player: Player }) {
 
   return (
     <div className={styles.panel}>
+      {/* **顔を出す。** 名前だけだと、並べ替えているうちに誰の能力か分からなくなる */}
+      <PlayerPortrait
+        playerId={player.id}
+        size={56}
+        cap
+        exchange={player.origin === 'exchange'}
+        className={styles.panelFace}
+      />
       <p className={styles.panelName}>{player.name}</p>
       <p className={styles.panelSub}>
         {player.grade}年 / {player.position}

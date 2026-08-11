@@ -391,6 +391,8 @@ export function PlayerPortrait({
   const hairId = `hair-${playerId}`
   const irisId = `iris-${playerId}`
   const capId = `cap-${playerId}`
+  const shadeId = `shade-${playerId}`
+  const brimShadeId = `brimshade-${playerId}`
   const faceClip = `face-${playerId}`
 
   return (
@@ -427,6 +429,17 @@ export function PlayerPortrait({
           <stop offset="55%" stopColor="rgba(255,255,255,0)" />
           <stop offset="100%" stopColor="rgba(0,0,0,0.3)" />
         </linearGradient>
+        {/* 頬の陰。右上から左下へ、輪郭に向かって濃くなる */}
+        <linearGradient id={shadeId} x1="0.15" y1="0.1" x2="0.95" y2="0.9">
+          <stop offset="0%" stopColor={skin.shade} stopOpacity="0" />
+          <stop offset="55%" stopColor={skin.shade} stopOpacity="0" />
+          <stop offset="100%" stopColor={skin.shade} stopOpacity="0.65" />
+        </linearGradient>
+        {/* 帽子の下に落ちる影 */}
+        <linearGradient id={brimShadeId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(60,34,22,0.42)" />
+          <stop offset="100%" stopColor="rgba(60,34,22,0)" />
+        </linearGradient>
         {/* 頬や鼻の影が輪郭からはみ出さないよう切り抜く */}
         <clipPath id={faceClip}>
           <path d={face} />
@@ -455,12 +468,23 @@ export function PlayerPortrait({
       <path d={face} fill={`url(#${skinId})`} stroke={OUTLINE} strokeWidth="1.2" />
 
       <g clipPath={`url(#${faceClip})`}>
-        {/* 頬の陰。片側にだけ落として立体を出す */}
-        <ellipse cx={CHEEK * 0.62} cy={EYE_Y + 8} rx="13" ry="18" fill={skin.shade} opacity="0.55" />
-        {/* あご下の陰 */}
-        <ellipse cx="0" cy={CHIN_Y + 2} rx="16" ry="7" fill={skin.shade} opacity="0.5" />
-        {/* 帽子の下に落ちる影 */}
-        {cap && <rect x="-30" y={BRIM_Y} width="60" height="9" fill="rgba(60,34,22,0.28)" />}
+        {/*
+          頬の陰。**境目を作らない。**
+          不透明なだ円を置いていた頃は、輪郭のはっきりした濃い部分が頬に残り、
+          パンダの模様のように見えていた。
+          外側へ向けて透明になるグラデーションで塗る。
+        */}
+        <rect
+          x={-CHEEK}
+          y={HEAD_TOP}
+          width={CHEEK * 2}
+          height={CHIN_Y - HEAD_TOP + 4}
+          fill={`url(#${shadeId})`}
+        />
+        {/* 帽子の下に落ちる影。こちらは上から下へ薄くする */}
+        {cap && (
+          <rect x={-CHEEK} y={BRIM_Y} width={CHEEK * 2} height="10" fill={`url(#${brimShadeId})`} />
+        )}
       </g>
 
       {/*

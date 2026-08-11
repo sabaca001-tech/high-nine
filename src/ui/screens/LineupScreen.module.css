@@ -218,6 +218,12 @@
   font-weight: 800;
 }
 
+/* 能力パネルの顔。名前の上に置く */
+.panelFace {
+  display: block;
+  margin: 0 auto var(--sp-1);
+}
+
 .panelName {
   font-size: var(--fs-sm);
   font-weight: 700;
