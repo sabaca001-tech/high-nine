@@ -77,20 +77,17 @@ export const POSITION_WEIGHT: Record<Position, number> = {
 /**
  * その選手をその位置で起用したときの守備力。
  *
- * **画面に出るのもこの数字**（適性の段数×20%）。
- * 「適性C」のような別の物差しを画面に出すと、
- * 何割の力で守れるのかが読めない（CLAUDE.md「表示のランクと判定の尺度は…」）。
+ * **守備の能力（`fielding`）がそのまま出る。**
+ * 本職（5段）なら守備能力どおり、3段の位置ならその6割。
+ * 捕球や肩を混ぜていた頃は、**能力表の「守備 C69」と
+ * 守備適性の図に出る本職の数字（64）が食い違っていた**。
+ * 同じ「守備」という言葉で2つの数字が出るなら、どちらかが嘘になる。
+ *
+ * 捕球と肩は守備位置ごとの補正には使わない
+ * （捕球は捕手の盗塁阻止、肩は送球と総合に効く）。
  */
 export function defenseScore(player: Player, position: Position): number {
-  const aptitude = player.aptitudes[position]
-  const base =
-    position === 'P'
-      ? player.pitching
-        ? player.pitching.control * 0.5 + player.pitching.stamina * 0.5
-        : 0
-      : player.batting.fielding * 0.5 + player.batting.catching * 0.25 + player.batting.arm * 0.25
-
-  return base * APTITUDE_MULTIPLIER[aptitude]
+  return player.batting.fielding * APTITUDE_MULTIPLIER[player.aptitudes[position]]
 }
 
 /**

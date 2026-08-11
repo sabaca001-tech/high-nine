@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { overallRating, toRank } from '@/core/player/rating'
+import { toRank } from '@/core/player/rating'
 import { findSkill } from '@/core/skill/skillDefs'
-import type { Player } from '@/core/types/player'
-import { PLAYER_ORIGIN_LABELS } from '@/core/types/player'
 import { CAREER_PATH_LABELS } from '@/core/types/career'
 import type { GraduateRecord } from '@/core/types/season'
 import {
@@ -16,6 +14,7 @@ import { DEFAULT_UNIFORM, UNIFORMS, uniformName } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
 import { findRegion, REGIONS } from '@/core/types/region'
 import type { RegionId } from '@/core/types/region'
+import { PlayerCard } from '@/ui/components/PlayerCard'
 import { useGameStore } from '@/state/useGameStore'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
 import { rankColorOf, teamCapColor } from '@/ui/theme/playerColors'
@@ -67,15 +66,27 @@ export function SeasonScreen() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>新入生</h2>
-          {report.newcomers.map((player) => (
-            <NewcomerRow
-              capColor={capColor}
-              key={player.id}
-              player={player}
-              recommended={recommended.has(player.id)}
-            />
-          ))}
+          <h2 className={styles.sectionTitle}>新入生（{report.newcomers.length}人）</h2>
+          {/*
+            **部員一覧と同じカードで出す。**
+            名前と総合だけでは「何ができる選手か」が分からず、
+            結局あとから部員一覧で見直すことになっていた。
+            スカウトで獲った選手もここに並ぶ（`origin` で「スカウト」と出る）。
+          */}
+          <div className={styles.newcomerGrid}>
+            {report.newcomers.map((player) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                uniform={game.uniform}
+                badge={
+                  recommended.has(player.id) && !player.origin ? (
+                    <span className={styles.recommendBadge}>推薦</span>
+                  ) : undefined
+                }
+              />
+            ))}
+          </div>
           {/*
             **マネージャーも新入部員。** ログに一行流れるだけでは、
             誰が入ってきたのか・何ができるのかが分からなかった
@@ -219,41 +230,6 @@ function GraduateRow({ graduate, capColor }: { graduate: GraduateRecord; capColo
             })}
           </span>
         )}
-      </span>
-      <span className={styles.rank} style={{ '--rank-color': rankColorOf(rank) } as CSSProperties}>
-        {rank}
-      </span>
-    </div>
-  )
-}
-
-function NewcomerRow({
-  player,
-  recommended,
-  capColor,
-}: {
-  player: Player
-  recommended: boolean
-  capColor: string
-}) {
-  const rating = overallRating(player)
-  const rank = toRank(rating)
-
-  // 入部の経路（推薦・留学生）が分かるようにする。
-  // 留学生は名前だけでも分かるが、他の一覧と表記を揃えておく
-  const badge = player.origin ? PLAYER_ORIGIN_LABELS[player.origin] : recommended ? '推薦' : null
-
-  return (
-    <div className={badge ? `${styles.newcomer} ${styles.recommended}` : styles.newcomer}>
-      <PlayerPortrait playerId={player.id} size={34} cap capColor={capColor} />
-      <span>
-        <span className={styles.name}>
-          {player.name}
-          {badge && <span className={styles.recommendBadge}>{badge}</span>}
-        </span>
-        <span className={styles.sub}>
-          {player.position} / 総合{rating}
-        </span>
       </span>
       <span className={styles.rank} style={{ '--rank-color': rankColorOf(rank) } as CSSProperties}>
         {rank}

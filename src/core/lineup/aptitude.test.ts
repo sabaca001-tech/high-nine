@@ -49,11 +49,10 @@ describe('misplacementPenalty', () => {
 describe('適性は5段階、1段が守備力の20%', () => {
   const player = players.find((p) => !p.pitching)!
 
-  it('本職（5段）なら守備力がそのまま出る', () => {
+  it('本職（5段）なら守備の能力がそのまま出る', () => {
+    // **能力表の「守備」と、守備適性の図に出る本職の数字は必ず一致する**
     const full = defenseScore(withAptitude(player, APTITUDE_MAX), '1B')
-    const base =
-      player.batting.fielding * 0.5 + player.batting.catching * 0.25 + player.batting.arm * 0.25
-    expect(full).toBeCloseTo(base, 5)
+    expect(full).toBeCloseTo(player.batting.fielding, 5)
   })
 
   it('1段ごとに20%ずつ落ちる', () => {

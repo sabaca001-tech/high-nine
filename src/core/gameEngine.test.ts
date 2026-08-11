@@ -2982,3 +2982,57 @@ describe('治療カード', () => {
     }
   }, 60000)
 })
+
+describe('新入部員の一覧', () => {
+  it('スカウトで獲った選手も新入生に並ぶ', () => {
+    // **通って獲った選手が一覧に出てこなかった。**
+    // 名簿には加わるのに、世代交代の画面では別扱いだった。
+    // 自動プレイは視察に行かないので、通い切った状態を作って確かめる
+    for (let seed = 1; seed < 30; seed++) {
+      let state = playUntilMonth(startedGame({ seed }), SCOUT_OPEN_MONTH)
+      state = applyCommand(state, { type: 'visitScoutRegion', regionId: state.regionId }).state
+
+      const region = state.scouting.regions[0]
+      if (!region) continue
+
+      // 通い切って、評判も上げておく（獲得の見込みを上げる）
+      state = {
+        ...state,
+        reputation: 95,
+        scouting: {
+          ...state.scouting,
+          regions: [
+            { ...region, prospects: region.prospects.map((p) => ({ ...p, approaches: 4 })) },
+          ],
+        },
+      }
+
+      state = playUntilPhase(playUntilYearEnd(state), 'newSeason')
+      const scouted = state.pendingSeason?.newcomers.filter((p) => p.origin === 'scout') ?? []
+      if (scouted.length === 0) continue
+
+      // 一覧に出ている選手は、そのまま名簿にも居る
+      for (const player of scouted) {
+        expect(state.players.some((current) => current.id === player.id)).toBe(true)
+      }
+      return
+    }
+    throw new Error('スカウトで獲れたシードが見つからない')
+  }, 300000)
+
+  it('入部した1年生は全員が一覧に出る', () => {
+    let state = startedGame({ seed: 5 })
+    const before = new Set(state.players.map((player) => player.id))
+    state = playUntilPhase(playYear(state), 'newSeason')
+
+    const report = state.pendingSeason!
+    const joined = state.players.filter(
+      (player) => player.grade === 1 && !before.has(player.id),
+    )
+
+    expect(joined.length).toBeGreaterThan(0)
+    for (const player of joined) {
+      expect(report.newcomers.some((newcomer) => newcomer.id === player.id)).toBe(true)
+    }
+  }, 120000)
+})

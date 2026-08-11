@@ -2297,7 +2297,9 @@ function advanceYear(state: GameState): EngineResult {
   const pendingSeason = {
     year,
     graduates: change.graduates,
-    newcomers: change.newcomers,
+    // **スカウトで獲った選手も新入部員。**
+    // 別扱いにしていた頃は、通って獲った選手が新入生の一覧に出てこなかった
+    newcomers: [...scouted.joined, ...change.newcomers],
     recommendedIds: change.recommendedIds,
     joinedManager: managerChange.joined,
     graduatedManagers: managerChange.graduated,

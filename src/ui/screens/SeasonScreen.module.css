@@ -141,6 +141,13 @@
   padding-left: var(--sp-2);
 }
 
+/* 新入生。部員一覧と同じ2列のカードで並べる */
+.newcomerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-2);
+}
+
 .recommendBadge {
   display: inline-block;
   font-size: 9px;
