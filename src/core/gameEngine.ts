@@ -322,6 +322,9 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return choosePlayerEventChoice(state, command.choiceId)
     case 'closeGrowthReport':
       return closeGrowthReport(state)
+
+    case 'closeCampReport':
+      return closeCampReport(state)
     case 'chooseFriendlyMatch':
       return chooseFriendlyMatch(state, command.offerId)
     case 'buyItem':
@@ -634,7 +637,14 @@ function chooseCampPlan(state: GameState, planId: string): EngineResult {
       // 合宿の成果はしばらく練習にも効く
       practiceBoost: CAMP_AFTERGLOW,
       serial,
-      phase: 'cardSelect',
+      // **成果は一覧で見せてから盤面へ戻す。**
+      // ログに流すだけだと、年2回しかない合宿の結果が他の報告に混ざって流れていく
+      phase: 'campReport',
+      pendingCamp: {
+        label: `${CAMP_SEASON_LABELS[season]}：${plan.label}`,
+        granted,
+        missed,
+      },
       log,
     },
     events,
@@ -1371,6 +1381,12 @@ function finishMatch(state: GameState): EngineResult {
  * 先に解決しておかないと、報告を閉じるまで乱数の続きが決まらず、
  * 中断してセーブしたときに再開できなくなる。
  */
+/** 合宿の成果を閉じて、盤面へ戻る */
+function closeCampReport(state: GameState): EngineResult {
+  if (state.phase !== 'campReport') return { state, events: [] }
+  return { state: { ...state, pendingCamp: null, phase: 'cardSelect' }, events: [] }
+}
+
 function closeGrowthReport(state: GameState): EngineResult {
   const pending = state.pendingGrowth
   if (state.phase !== 'growthReport' || !pending) return { state, events: [] }

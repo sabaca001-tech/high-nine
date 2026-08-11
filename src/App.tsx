@@ -21,6 +21,7 @@ import { PlayerListScreen } from '@/ui/screens/PlayerListScreen'
 import { TitleScreen } from '@/ui/screens/TitleScreen'
 import { UpdateBanner } from '@/ui/components/UpdateBanner'
 import { GrowthReport } from '@/ui/components/GrowthReport'
+import { CampReport } from '@/ui/components/CampReport'
 
 /**
  * 画面の出し分けだけを行う。ゲームロジックは書かない。
@@ -37,6 +38,7 @@ export default function App() {
         マスの効果が画面を奪う前に、その日の結果を必ず見せるための足止め
       */}
       <GrowthReport />
+      <CampReport />
     </>
   )
 }

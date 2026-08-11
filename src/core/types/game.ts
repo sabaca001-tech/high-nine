@@ -94,6 +94,7 @@ export type Phase =
   | 'tournament' // 大会の進行中（次の試合を待っている）
   | 'camp' // 合宿の方針選択
   | 'growthReport' // その日の成長の報告（マスの効果が始まる前に挟む）
+  | 'campReport' // 合宿の成果の報告
   | 'matchOffer' // 練習試合の相手選び（断ることもできる）
   | 'playerEvent' // 部員1人に起きた出来事の選択
   | 'fork' // ルート分岐の選択
@@ -229,6 +230,8 @@ export type GameState = {
    * `nextPhase` は報告を閉じたあとに進むフェーズ。
    */
   pendingGrowth: PendingGrowth | null
+  /** 表示待ちの合宿の成果。無ければ null */
+  pendingCamp?: PendingCamp | null
   /**
    * 練習試合の相手候補。選ぶまで試合は始まらない。
    * **県内の候補が必ず1つ入る**ので、部費が無くても断らずに戦える。
@@ -251,6 +254,22 @@ export type PendingGrowth = {
   changes: import('./player').AbilityChange[]
   /** 報告を閉じたあとに進むフェーズ */
   nextPhase: Phase
+}
+
+/**
+ * 表示待ちの合宿の成果。
+ *
+ * **ログに流すだけでは読めなかった。** 合宿は年2回しかないのに、
+ * 誰が何を掴んだのかが他の報告に混ざって流れていく。
+ * 練習の成長（`pendingGrowth`）と同じ一覧で見せる。
+ */
+export type PendingCamp = {
+  /** 合宿の名前（「夏合宿：打ち込み合宿」） */
+  label: string
+  /** 身についた特殊能力 */
+  granted: import('@/core/camp/campDefs').CampSkillNews[]
+  /** 挑んだが届かなかったもの。次の目標になる */
+  missed: import('@/core/camp/campDefs').CampMissNews[]
 }
 
 /** ログの最大保持件数 */
@@ -304,6 +323,7 @@ export type GameCommand =
   | { type: 'choosePlayerEventChoice'; choiceId: string }
   /** その日の成長の報告を閉じて、止まったマスの効果へ進む */
   | { type: 'closeGrowthReport' }
+  | { type: 'closeCampReport' }
   /** 練習試合の相手を選ぶ。null なら試合を行わない */
   | { type: 'chooseFriendlyMatch'; offerId: string | null }
   /** ショップでアイテムを買う（買った瞬間に効果が出る） */

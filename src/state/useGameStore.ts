@@ -72,6 +72,7 @@ type GameStore = {
   chooseCampPlan: (planId: string) => void
   choosePlayerEventChoice: (choiceId: string) => void
   closeGrowthReport: () => void
+  closeCampReport: () => void
   chooseFriendlyMatch: (offerId: string | null) => void
   buyItem: (itemId: string) => void
   setTrainingFocus: (playerId: string, focus: TrainingFocus) => void
@@ -215,6 +216,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { game } = get()
     if (!game) return
     dispatch(set, game, { type: 'closeGrowthReport' })
+  },
+
+  closeCampReport: () => {
+    const { game } = get()
+    if (!game) return
+    dispatch(set, game, { type: 'closeCampReport' })
   },
 
   chooseFriendlyMatch: (offerId) => {

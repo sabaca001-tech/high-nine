@@ -91,6 +91,9 @@ export function playStep(state: GameState, options: AutoPlayOptions = {}): GameS
       // 自動プレイでは成長の報告をその場で閉じる
       return applyCommand(state, { type: 'closeGrowthReport' }).state
 
+    case 'campReport':
+      return applyCommand(state, { type: 'closeCampReport' }).state
+
     case 'matchOffer':
       return applyCommand(state, {
         type: 'chooseFriendlyMatch',

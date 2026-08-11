@@ -1,0 +1,31 @@
+/*
+ * 合宿の成果。並びと枠は `GrowthReport.module.css` を借りて、
+ * 合宿だけの色（金特・空振り）をここで足す。
+ */
+
+/* 金特。合宿でいちばん嬉しい結果なので、ここだけ色を変える */
+.gold {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 800;
+}
+
+/* 金特の「覚醒」。地の色が濃いので、文字は背景に合わせる */
+.goldNote {
+  color: var(--text-on-accent);
+  font-weight: 800;
+}
+
+/* 届かなかった挑戦。成果と並ぶが、沈めて区別する */
+.miss {
+  opacity: 0.6;
+}
+
+.missName {
+  color: var(--text-dim);
+}
+
+.missNote {
+  color: var(--text-dim);
+  font-weight: 700;
+}

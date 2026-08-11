@@ -1051,9 +1051,15 @@ describe('合宿', () => {
 
     const { state: next } = applyCommand(state, { type: 'chooseCampPlan', planId: 'batting' })
 
-    expect(next.phase).toBe('cardSelect')
+    // 成果を一覧で見せてから盤面へ戻る
+    expect(next.phase).toBe('campReport')
+    expect(next.pendingCamp).not.toBeNull()
     expect(sumMeet(next)).toBe(before)
     expect(sumSkills(next)).toBeGreaterThanOrEqual(sumSkills(state))
+
+    const closed = applyCommand(next, { type: 'closeCampReport' }).state
+    expect(closed.phase).toBe('cardSelect')
+    expect(closed.pendingCamp).toBeNull()
     // 合宿の余韻で練習効率バフが付く
     expect(next.practiceBoost).not.toBeNull()
   })
