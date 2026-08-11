@@ -1,77 +1,147 @@
 /**
  * 選手の顔。
  *
- * **写真ではなくベクターで描いた肖像**。
- * 実写素材を持つとオフライン動作とバンドルサイズの方針が崩れるため、
- * 陰影・髪型・目鼻立ちをパーツ化して、選手ごとに違う顔を生成する。
+ * **写真ではなくベクターで描く**（画像アセットを持たない方針）。
+ * 目指すのは野球漫画の絵柄で、そのために押さえているのは3つ。
+ *
+ * 1. **太い黒の輪郭線**。パーツごとに `stroke` を乗せる（陰影で見せない）
+ * 2. **尖った髪の束**。丸い帽子型ではなく、毛先を三角に切る
+ * 3. **大きくて角のある目**。白目・瞳・ハイライトの3層に、上まぶたの太い線
  *
  * 見た目は id から決まるので、同じ選手はいつでも同じ顔になる。
+ * マネージャーは `variant="manager"` で髪型の候補が変わる。
  */
 
 import type { CSSProperties } from 'react'
+import { capInitial, normalizeCap } from '@/core/team/cap'
+import type { CapDesign } from '@/core/team/cap'
+import { useGameStore } from '@/state/useGameStore'
+import { capColorOf } from '@/ui/theme/capColors'
 
 type Props = {
   playerId: string
   size?: number
   /** 帽子をかぶせる */
   cap?: boolean
-  capColor?: string
+  /** 帽子のデザイン。省略時は自校の設定を使う */
+  capDesign?: CapDesign
+  /** ロゴに使う学校名。省略時は自校の名前 */
+  schoolName?: string
+  /** マネージャーは髪型の候補が変わる */
+  variant?: 'player' | 'manager'
   className?: string
   style?: CSSProperties
 }
 
-/** 肌の色（明るい順） */
+/** 線の色。**黒に寄せた濃い茶**。真っ黒より紙面に近い */
+const INK = '#20191a'
+
+/** 肌の色（明るい順）。漫画なのでベタ塗り＋影1枚 */
 const SKIN_TONES = [
-  { base: '#f3d0b0', shade: '#dcae89', deep: '#c08e6a' },
-  { base: '#ecc09a', shade: '#d29a72', deep: '#b47b55' },
-  { base: '#dda87c', shade: '#bf8659', deep: '#9d6942' },
-  { base: '#c78f61', shade: '#a86f45', deep: '#875433' },
-  { base: '#a97247', shade: '#8b5730', deep: '#6d4123' },
+  { base: '#ffe0c4', shade: '#f0c19c' },
+  { base: '#fbd4b0', shade: '#e5b088' },
+  { base: '#f0c096', shade: '#d69a6f' },
+  { base: '#dda877', shade: '#c08a58' },
+  { base: '#c08a5e', shade: '#a06c43' },
 ]
 
-/** 髪の色 */
-const HAIR_COLORS = ['#1c1a19', '#2b2320', '#3d2c22', '#4a3324', '#221f1d', '#5a4030']
-
-/** 眉の濃さ */
-const BROW_STYLES = [
-  { d: 'M -13 -6 q 6 -4 12 -1', width: 3.4 },
-  { d: 'M -13 -5 q 6 -2 12 0', width: 4.2 },
-  { d: 'M -13 -4 q 6 -5 12 -3', width: 3 },
+/** 髪の色。黒〜栗色に、少しだけ明るい色を混ぜる */
+const HAIR_COLORS = [
+  { base: '#241d1b', light: '#3b302c' },
+  { base: '#2e2320', light: '#463630' },
+  { base: '#3d2b21', light: '#57402f' },
+  { base: '#1d1a1c', light: '#332e31' },
+  { base: '#4a3524', light: '#664a32' },
+  { base: '#5b4436', light: '#79604c' },
 ]
-
-/** 髪型。頭の輪郭に沿って描く */
-const HAIRSTYLES = [
-  // 短髪（丸刈りに近い）
-  'M -34 -6 a 34 40 0 0 1 68 0 q -6 -26 -34 -26 q -28 0 -34 26 z',
-  // 七三分け
-  'M -34 -4 a 34 40 0 0 1 68 0 q -2 -30 -30 -30 q -22 0 -30 14 q 14 6 30 4 q 16 -2 30 12 z',
-  // スポーツ刈り（前髪を上げる）
-  'M -33 -8 a 33 38 0 0 1 66 0 q -4 -30 -33 -30 q -29 0 -33 30 z',
-  // 少し長め
-  'M -35 4 a 35 42 0 0 1 70 0 q 2 -34 -35 -34 q -37 0 -35 34 z',
-]
-
-/** 口の形 */
-const MOUTHS = [
-  'M -8 16 q 8 5 16 0',
-  'M -8 17 q 8 2 16 0',
-  'M -7 16 q 7 7 14 0',
-]
-
-/** 顔の輪郭の始点（頭のてっぺんは ここから faceLength ぶん上） */
-const FACE_TOP_Y = -8
-
-/** 帽子のつばの高さ */
-const CAP_BRIM_Y = -14
-
-/** 帽子が頭を覆う余白。0にすると輪郭線が重なって見える */
-const CAP_MARGIN = 3
 
 /**
- * 描画範囲。帽子は顔より上に出るので、上を広めに取って丸みが切れないようにする。
- * 正方形を保つこと（縦横で潰れる）。
+ * 髪型（男子）。**毛先を尖らせる**のが漫画らしさの要。
+ * 頭の輪郭（半径 33 前後の円弧）に沿わせつつ、前髪を三角に切る。
  */
-const VIEW_BOX = '-52 -60 104 104'
+const HAIR_MALE = [
+  // 短いスパイク
+  'M -34 -10 q 2 -30 34 -30 q 32 0 34 30 l -8 -12 l -5 10 l -7 -14 l -6 12 l -8 -13 l -7 12 l -6 -10 l -6 12 z',
+  // 前髪を分ける
+  'M -34 -8 q 0 -32 34 -32 q 34 0 34 32 l -10 -14 l -10 8 l -12 -12 l -14 14 l -8 -8 l -6 12 z',
+  // 坊主に近い刈り上げ
+  'M -33 -12 q 1 -28 33 -28 q 32 0 33 28 q -8 -8 -33 -8 q -25 0 -33 8 z',
+  // 長めの前髪
+  'M -35 -4 q -1 -36 35 -36 q 36 0 35 36 l -9 -10 l -6 12 l -9 -14 l -8 14 l -9 -12 l -8 12 l -7 -10 l -7 10 z',
+  // 逆立てた髪
+  'M -34 -8 q 2 -34 34 -34 q 32 0 34 34 l -7 -18 l -6 8 l -6 -16 l -7 10 l -6 -18 l -8 12 l -6 -10 l -6 14 z',
+  // 七三
+  'M -34 -8 q 0 -32 34 -32 q 34 0 34 32 l -12 -16 q -14 10 -30 4 q -12 -4 -18 10 z',
+]
+
+/** 髪型（マネージャー）。輪郭の外まで下ろして長さを出す */
+const HAIR_MANAGER = [
+  // 肩までのストレート
+  'M -36 -6 q 0 -34 36 -34 q 36 0 36 34 v 44 q -6 -34 -10 -40 q -14 8 -26 8 q -12 0 -26 -8 q -4 6 -10 40 z',
+  // 前髪ぱっつん＋サイド
+  'M -36 -4 q 0 -36 36 -36 q 36 0 36 36 v 38 q -5 -30 -9 -34 h -54 q -4 4 -9 34 z',
+  // ポニーテール
+  'M -34 -8 q 0 -32 34 -32 q 34 0 34 32 q 8 6 8 20 q 0 12 -6 18 q 2 -18 -6 -26 q -12 6 -30 6 q -18 0 -30 -6 q -6 6 -4 22 z',
+  // 短めのボブ
+  'M -35 -6 q 0 -34 35 -34 q 35 0 35 34 v 20 q -6 -18 -9 -22 q -13 8 -26 8 q -13 0 -26 -8 q -3 4 -9 22 z',
+]
+
+/** 眉。角度で気性を出す */
+const BROWS = [
+  { d: 'M -14 -8 l 15 4', width: 3.6 },
+  { d: 'M -14 -5 l 15 -1', width: 4.4 },
+  { d: 'M -14 -3 l 15 -6', width: 3.2 },
+]
+
+/** 目の形。上まぶたの線と白目の形を変える */
+const EYES = [
+  // 鋭い（吊り目）
+  { lid: 'M -9 -3 l 18 3', height: 8, tilt: -4 },
+  // 大きい丸目
+  { lid: 'M -9 -2 q 9 -5 18 0', height: 10, tilt: 0 },
+  // 細い
+  { lid: 'M -9 -1 l 18 0', height: 6, tilt: 0 },
+  // たれ目
+  { lid: 'M -9 -1 q 9 -4 18 3', height: 9, tilt: 3 },
+]
+
+/**
+ * 前髪。**帽子をかぶると髪が全部隠れてしまう**ので、
+ * つばの下に出るぶんだけ別に描く。
+ * これがあるだけで「帽子をかぶった人」に見える。
+ */
+const BANGS = [
+  // 大きな房が2つ
+  'M 0 -3 l 10 16 l 4 -14 l 9 13 v -15 z',
+  // 斜めに流す
+  'M 0 -3 l 17 17 l 5 -16 v -4 z',
+  // 短く3房
+  'M 0 -3 l 7 11 l 4 -9 l 7 12 l 4 -10 l 6 9 v -13 z',
+]
+
+/** 口 */
+const MOUTHS = [
+  'M -7 0 q 7 4 14 0',
+  'M -6 0 l 12 0',
+  'M -7 -1 q 7 8 14 0',
+  'M -5 0 q 5 6 10 -1',
+]
+
+/** 描画範囲。帽子と髪が顔より上に出るので上を広く取る */
+const VIEW_BOX = '-52 -62 104 104'
+
+/**
+ * 顔の縦位置。**比率ではなく数字で置く。**
+ * 比率で組んでいた頃は、輪郭・帽子・肩が別々の式から出ていて、
+ * 選手によってあごが肩に埋まったり、帽子がずれたりした。
+ */
+const EYE_Y = -2
+
+/** あごの先。ここに個体差（0〜4）が乗る */
+const CHIN_Y = 22
+
+/** 帽子のつばの高さ。目より十分に上へ置く */
+const BRIM_Y = -22
 
 /** 文字列から安定した数値を作る */
 function hash(value: string): number {
@@ -94,60 +164,63 @@ function pick<T>(items: readonly T[], seed: number): T {
 }
 
 /** 符号なしで取り出す小さな値 */
-function slice(hash: number, shift: number, range: number): number {
-  return (hash >>> shift) % range
+function slice(value: number, shift: number, range: number): number {
+  return (value >>> shift) % range
 }
 
 export function PlayerPortrait({
   playerId,
   size = 44,
   cap = false,
-  capColor = 'var(--cap-a)',
+  capDesign,
+  schoolName,
+  variant = 'player',
   className,
   style,
 }: Props) {
+  /*
+   * **帽子は自校の設定をそのまま使う。**
+   * 呼び出し側ごとに色を渡していた頃は、画面によって帽子の色が違っていた。
+   * 明示的に渡されたときだけそちらを優先する（エディットの試着で使う）。
+   */
+  const game = useGameStore((s) => s.game)
+  const design = capDesign ?? normalizeCap(game?.cap)
+  const school = schoolName ?? game?.schoolName ?? ''
+
   const h = hash(playerId)
+  const manager = variant === 'manager'
 
   const skin = pick(SKIN_TONES, h)
-  const hairColor = pick(HAIR_COLORS, h >>> 3)
-  const hairstyle = pick(HAIRSTYLES, h >>> 6)
-  const brow = pick(BROW_STYLES, h >>> 9)
-  const mouth = pick(MOUTHS, h >>> 12)
+  const hair = pick(HAIR_COLORS, h >>> 3)
+  const hairstyle = pick(manager ? HAIR_MANAGER : HAIR_MALE, h >>> 6)
+  const brow = pick(BROWS, h >>> 9)
+  const eye = pick(EYES, h >>> 11)
+  const mouth = pick(MOUTHS, h >>> 14)
+  const bang = pick(BANGS, h >>> 16)
 
-  // 顔の輪郭を少しずつ変える
-  const jawWidth = 34 + slice(h, 15, 5) - 2
-  const faceLength = 42 + slice(h, 18, 7) - 3
-  const eyeGap = 13 + slice(h, 21, 4) - 1
-  const eyeSize = 3.6 + slice(h, 24, 3) * 0.4
+  /*
+   * **顔の寸法は数字で置く。**
+   * 比率で組んでいた頃は、輪郭・帽子・肩がそれぞれ別の式から出ていて、
+   * 選手によってあごが肩に埋まったり、帽子が頭からずれたりした。
+   */
+  const jaw = 26 + slice(h, 17, 5) // 顔の半幅
+  const chin = CHIN_Y + slice(h, 20, 5) // あごの先
+  const eyeGap = 13 + slice(h, 23, 3)
 
-  const gradientId = `skin-${playerId}`
-  const shadowId = `shadow-${playerId}`
-  const clipId = `face-${playerId}`
+  const crown = capColorOf(design.crown)
+  const brim = capColorOf(design.brim)
+  const logoColor = capColorOf(design.logoColor)
 
   /**
-   * 顔の輪郭。**必ず左右対称に閉じること。**
-   * 以前は右の頬から顎へ下りたあと、左の頬に戻らずに始点へ直線で閉じていたため、
-   * 顔の左半分が塗られず透明に見えていた。
+   * 顔の輪郭。**丸ではなく、頬から顎へ落とす。**
+   * 上半分は円弧、下半分は直線的に絞って輪郭を尖らせる。
    */
-  /**
-   * 帽子。**必ず頭の輪郭から導くこと。**
-   *
-   * 以前は帽子の丸みを `jawWidth` だけで決めていたので、
-   * 顔の縦幅（`faceLength`）が大きい選手では**頭のてっぺんが帽子から飛び出していた**。
-   * 顔と帽子で別々の乱数を使っているのが原因で、条件が揃った選手だけ崩れる。
-   *
-   * 頭のてっぺんは `FACE_TOP_Y - faceLength`。
-   * 帽子の高さをそこから逆算して、必ず `CAP_MARGIN` ぶん上を覆うようにする。
-   */
-  const capWidth = jawWidth + 2
-  const capHeight = CAP_BRIM_Y - FACE_TOP_Y + faceLength + CAP_MARGIN
-
   const facePath =
-    `M ${-jawWidth} ${FACE_TOP_Y}` +
-    ` a ${jawWidth} ${faceLength} 0 0 1 ${jawWidth * 2} 0` +
-    ` q 0 ${faceLength * 0.5} ${-jawWidth * 0.5} ${faceLength * 0.68}` +
-    ` q ${-jawWidth * 0.5} ${faceLength * 0.26} ${-jawWidth} 0` +
-    ` q ${-jawWidth * 0.5} ${-faceLength * 0.26} ${-jawWidth * 0.5} ${-faceLength * 0.68}` +
+    `M ${-jaw} ${EYE_Y - 4}` +
+    ` a ${jaw} ${jaw * 1.18} 0 0 1 ${jaw * 2} 0` +
+    ` l ${-jaw * 0.14} ${(chin - EYE_Y) * 0.52}` +
+    ` q ${-jaw * 0.2} ${(chin - EYE_Y) * 0.5} ${-jaw * 0.86} ${(chin - EYE_Y) * 0.5}` +
+    ` q ${-jaw * 0.66} 0 ${-jaw * 0.86} ${-(chin - EYE_Y) * 0.5}` +
     ` z`
 
   return (
@@ -160,120 +233,193 @@ export function PlayerPortrait({
       role="presentation"
       aria-hidden="true"
     >
-      <defs>
-        {/* 立体感を出すための肌のグラデーション */}
-        <radialGradient id={gradientId} cx="38%" cy="30%" r="78%">
-          <stop offset="0%" stopColor={skin.base} />
-          <stop offset="62%" stopColor={skin.shade} />
-          <stop offset="100%" stopColor={skin.deep} />
-        </radialGradient>
-        <linearGradient id={shadowId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(0,0,0,0)" />
-          <stop offset="100%" stopColor="rgba(0,0,0,0.35)" />
-        </linearGradient>
-        {/* 頬の陰が顎からはみ出さないよう、輪郭で切り抜く */}
-        <clipPath id={clipId}>
-          <path d={facePath} />
-        </clipPath>
-      </defs>
-
-      {/* 首と肩 */}
-      <path d={`M -12 ${faceLength - 8} h 24 v 10 h -24 z`} fill={skin.deep} />
+      {/* 首と肩。顔より暗くして、顔を前に出す */}
       <path
-        d={`M -42 44 q 10 -14 30 -16 h 24 q 20 2 30 16 z`}
+        d={`M -9 ${chin - 6} h 18 v 12 h -18 z`}
+        fill={skin.shade}
+        stroke={INK}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d={`M -46 46 q 12 -12 34 -14 h 24 q 22 2 34 14 z`}
         fill="var(--uniform-a)"
-        stroke="rgba(0,0,0,0.25)"
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+
+      {/* 髪。帽子で隠れるが、かぶらない場面ではこれが主役 */}
+      <path
+        d={hairstyle}
+        transform={`translate(0 ${EYE_Y - 4})`}
+        fill={hair.base}
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
       />
 
       {/* 耳 */}
-      <ellipse cx={-jawWidth + 2} cy="4" rx="4.5" ry="7" fill={skin.shade} />
-      <ellipse cx={jawWidth - 2} cy="4" rx="4.5" ry="7" fill={skin.shade} />
+      <path d={`M ${-jaw + 1} ${EYE_Y - 2} q -6 2 -5 8 q 1 6 6 4`} fill={skin.base} stroke={INK} strokeWidth="1.8" />
+      <path d={`M ${jaw - 1} ${EYE_Y - 2} q 6 2 5 8 q -1 6 -6 4`} fill={skin.base} stroke={INK} strokeWidth="1.8" />
 
-      {/* 顔の輪郭。下ぶくれにならないよう顎を絞る */}
-      <path d={facePath} fill={`url(#${gradientId})`} />
+      {/* 顔 */}
+      <path d={facePath} fill={skin.base} stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
 
-      {/* 頬の陰 */}
-      <ellipse
-        cx="0"
-        cy="14"
-        rx={jawWidth * 0.8}
-        ry="16"
-        fill={`url(#${shadowId})`}
-        opacity="0.5"
-        clipPath={`url(#${clipId})`}
+      {/* 頬の影。ベタ1枚だけ乗せる */}
+      <path
+        d={`M ${jaw * 0.5} ${EYE_Y + 2} q ${jaw * 0.35} ${(chin - EYE_Y) * 0.4} ${-jaw * 0.22} ${(chin - EYE_Y) * 0.78} q ${-jaw * 0.1} ${-(chin - EYE_Y) * 0.5} ${-jaw * 0.06} ${-(chin - EYE_Y) * 0.8} z`}
+        fill={skin.shade}
+        opacity="0.7"
       />
-
-      {/* 髪 */}
-      <path d={hairstyle} fill={hairColor} />
 
       {/* 眉 */}
       <path
         d={brow.d}
-        transform={`translate(${-eyeGap + 5} 0)`}
+        transform={`translate(${-eyeGap + 6} ${EYE_Y - 8})`}
         fill="none"
-        stroke={hairColor}
+        stroke={hair.base}
         strokeWidth={brow.width}
         strokeLinecap="round"
       />
       <path
         d={brow.d}
-        transform={`translate(${eyeGap + 7} 0) scale(-1 1)`}
+        transform={`translate(${eyeGap + 8} ${EYE_Y - 8}) scale(-1 1)`}
         fill="none"
-        stroke={hairColor}
+        stroke={hair.base}
         strokeWidth={brow.width}
         strokeLinecap="round"
       />
 
-      {/* 目。白目・虹彩・ハイライトの3層 */}
-      {[-eyeGap, eyeGap].map((x) => (
-        <g key={x}>
-          <ellipse cx={x} cy="4" rx={eyeSize + 1.6} ry={eyeSize} fill="#f7f3ef" />
-          <circle cx={x} cy="4" r={eyeSize * 0.72} fill="#3b2a1c" />
-          <circle cx={x} cy="4" r={eyeSize * 0.34} fill="#120c07" />
-          <circle cx={x - eyeSize * 0.3} cy={4 - eyeSize * 0.35} r={eyeSize * 0.22} fill="#fff" />
-          {/* まぶたの影 */}
+      {/* 目。白目・瞳・ハイライトの3層に、上まぶたの太い線 */}
+      {[-1, 1].map((side) => (
+        <g key={side} transform={`translate(${eyeGap * side} ${EYE_Y}) scale(${side} 1)`}>
+          <ellipse cx="0" cy="0" rx="7.4" ry={eye.height * 0.6} fill="#fffaf5" stroke={INK} strokeWidth="1.4" />
+          <ellipse cx="1" cy="0.5" rx="4.2" ry={eye.height * 0.5} fill={hair.base} />
+          <circle cx="2.2" cy={-eye.height * 0.16} r="1.9" fill="#ffffff" />
+          {/* 上まぶた。**ここを太くするだけで一気に漫画になる** */}
           <path
-            d={`M ${x - eyeSize - 1.6} 4 a ${eyeSize + 1.6} ${eyeSize} 0 0 1 ${(eyeSize + 1.6) * 2} 0`}
+            d={eye.lid}
+            transform={`translate(0 ${-eye.height * 0.5 + eye.tilt})`}
             fill="none"
-            stroke="rgba(0,0,0,0.4)"
-            strokeWidth="1.4"
+            stroke={INK}
+            strokeWidth="3"
+            strokeLinecap="round"
           />
         </g>
       ))}
 
-      {/* 鼻 */}
+      {/* 鼻。線1本で示す */}
       <path
-        d="M 0 6 q -2 8 -4 11 q 2 2 8 0"
+        d={`M 1 ${EYE_Y + 6} l -3 7 l 6 1`}
         fill="none"
-        stroke={skin.deep}
+        stroke={INK}
         strokeWidth="1.8"
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
 
       {/* 口 */}
-      <path d={mouth} fill="none" stroke="#8b4a42" strokeWidth="2.4" strokeLinecap="round" />
+      <path
+        d={mouth}
+        transform={`translate(0 ${chin - 9})`}
+        fill="none"
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
 
       {/* 帽子 */}
       {cap && (
-        <>
+        <g>
+          {/* 前髪。つばの下から出す。これが無いと帽子が地肌に載って見える */}
           <path
-            d={`M ${-capWidth} ${CAP_BRIM_Y} a ${capWidth} ${capHeight} 0 0 1 ${capWidth * 2} 0 z`}
-            fill={capColor}
+            d={bang}
+            transform={`translate(${-jaw * 0.62} ${BRIM_Y + 2})`}
+            fill={hair.base}
+            stroke={INK}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
           />
           <path
-            d={`M ${-capWidth} ${CAP_BRIM_Y} h ${capWidth * 2} q 6 0 6 5 h ${-(capWidth * 2 + 6)} z`}
-            fill={capColor}
-            opacity="0.85"
+            d={bang}
+            transform={`translate(${jaw * 0.62} ${BRIM_Y + 2}) scale(-1 1)`}
+            fill={hair.base}
+            stroke={INK}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
           />
-          <ellipse
-            cx="0"
-            cy={CAP_BRIM_Y - capHeight * 0.55}
-            rx="6"
-            ry="4"
-            fill="rgba(255,255,255,0.25)"
+
+          {/* 本体 */}
+          <path
+            d={`M ${-jaw - 2} ${BRIM_Y} a ${jaw + 2} ${jaw * 1.05} 0 0 1 ${jaw * 2 + 4} 0 z`}
+            fill={crown}
+            stroke={INK}
+            strokeWidth="2.4"
+            strokeLinejoin="round"
           />
-        </>
+          {/* つば */}
+          <path
+            d={`M ${-jaw - 3} ${BRIM_Y} h ${jaw * 2 + 6} q 8 1 7 5 q -1 3 -9 2 h ${-(jaw * 2 + 2)} q -6 0 -6 -3 z`}
+            fill={brim}
+            stroke={INK}
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+          {/* マーク */}
+          <CapLogo design={design} schoolName={school} color={logoColor} y={BRIM_Y - jaw * 0.5} />
+        </g>
       )}
     </svg>
+  )
+}
+
+/** 帽子のマーク。文字と図形で描き分ける */
+function CapLogo({
+  design,
+  schoolName,
+  color,
+  y,
+}: {
+  design: CapDesign
+  schoolName: string
+  color: string
+  y: number
+}) {
+  if (design.logo === 'none') return null
+
+  if (design.logo === 'initial') {
+    return (
+      <text
+        x="0"
+        y={y + 4}
+        textAnchor="middle"
+        fontSize="15"
+        fontWeight="800"
+        fill={color}
+        stroke={INK}
+        strokeWidth="0.8"
+        paintOrder="stroke"
+      >
+        {capInitial(schoolName)}
+      </text>
+    )
+  }
+
+  const marks: Record<string, string> = {
+    star: 'M 0 -9 l 2.6 5.6 l 6.2 0.7 l -4.6 4.2 l 1.3 6.1 l -5.5 -3.1 l -5.5 3.1 l 1.3 -6.1 l -4.6 -4.2 l 6.2 -0.7 z',
+    bolt: 'M 2 -10 l -8 11 h 5 l -3 10 l 9 -12 h -5 z',
+    leaf: 'M 0 -9 q 9 5 8 12 q -1 6 -8 6 q -7 0 -8 -6 q -1 -7 8 -12 z',
+  }
+
+  return (
+    <path
+      d={marks[design.logo]}
+      transform={`translate(0 ${y})`}
+      fill={color}
+      stroke={INK}
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
   )
 }

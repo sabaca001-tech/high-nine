@@ -59,8 +59,15 @@ export function GrowthReport() {
               </div>
             ))
           ) : (
-            <p className={styles.empty}>目に見える変化は無かった</p>
+            pending.notes === undefined && <p className={styles.empty}>目に見える変化は無かった</p>
           )}
+
+          {/* 能力以外に動いたもの。ミーティングやメンタル強化はここに出る */}
+          {pending.notes?.map((note) => (
+            <p key={note} className={styles.note}>
+              {note}
+            </p>
+          ))}
         </div>
 
         <button type="button" className={styles.closeButton} onClick={handleClose}>

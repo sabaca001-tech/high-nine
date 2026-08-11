@@ -11,13 +11,16 @@ import {
   REPUTATION_GRADE_LABELS,
 } from '@/core/types/season'
 import { DEFAULT_UNIFORM, UNIFORMS, uniformName } from '@/core/team/uniforms'
+import { normalizeCap } from '@/core/team/cap'
+import type { CapDesign } from '@/core/team/cap'
 import type { UniformId } from '@/core/team/uniforms'
 import { findRegion, REGIONS } from '@/core/types/region'
 import type { RegionId } from '@/core/types/region'
+import { CapEditor } from '@/ui/components/CapEditor'
 import { PlayerCard } from '@/ui/components/PlayerCard'
 import { useGameStore } from '@/state/useGameStore'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
-import { rankColorOf, teamCapColor } from '@/ui/theme/playerColors'
+import { rankColorOf } from '@/ui/theme/playerColors'
 import { findManagerRole, managerEffectText } from '@/core/staff/managers'
 import type { TeamManager } from '@/core/staff/managers'
 import styles from './SeasonScreen.module.css'
@@ -38,12 +41,12 @@ export function SeasonScreen() {
   const [schoolName, setSchoolName] = useState(game?.schoolName ?? '')
   const [uniform, setUniform] = useState<UniformId>(game?.uniform ?? DEFAULT_UNIFORM)
   const [regionId, setRegionId] = useState(game?.regionId ?? '')
+  const [cap, setCap] = useState<CapDesign>(normalizeCap(game?.cap))
 
   if (!game || !report) return null
 
   const grade = reputationGrade(game.reputation)
   // 帽子とユニフォームはチームで共通
-  const capColor = teamCapColor(game.uniform)
   const recommended = new Set(report.recommendedIds)
 
   return (
@@ -60,7 +63,7 @@ export function SeasonScreen() {
             <p className={styles.empty}>今年の卒業生はいません</p>
           ) : (
             report.graduates.map((graduate) => (
-              <GraduateRow key={graduate.id} graduate={graduate} capColor={capColor} />
+              <GraduateRow key={graduate.id} graduate={graduate} />
             ))
           )}
         </section>
@@ -78,7 +81,6 @@ export function SeasonScreen() {
               <PlayerCard
                 key={player.id}
                 player={player}
-                uniform={game.uniform}
                 badge={
                   recommended.has(player.id) && !player.origin ? (
                     <span className={styles.recommendBadge}>推薦</span>
@@ -162,6 +164,8 @@ export function SeasonScreen() {
             <TeamEditor
               schoolName={schoolName}
               uniform={uniform}
+              cap={cap}
+              onCap={setCap}
               regionId={regionId}
               onSchoolName={setSchoolName}
               onUniform={setUniform}
@@ -178,7 +182,7 @@ export function SeasonScreen() {
                 className={styles.editButton}
                 onClick={() => setEditing(true)}
               >
-                校名・ユニフォーム・所在地を変える
+                校名・ユニフォーム・帽子・所在地を変える
               </button>
             </>
           )}
@@ -192,7 +196,7 @@ export function SeasonScreen() {
           onClick={() =>
             finishSeason(
               editing
-                ? { schoolName, uniform, regionId }
+                ? { schoolName, uniform, regionId, cap }
                 : // 触っていなければ何も渡さない＝変更なし
                   {},
             )
@@ -205,12 +209,12 @@ export function SeasonScreen() {
   )
 }
 
-function GraduateRow({ graduate, capColor }: { graduate: GraduateRecord; capColor: string }) {
+function GraduateRow({ graduate }: { graduate: GraduateRecord }) {
   const rank = toRank(graduate.rating)
 
   return (
     <div className={styles.graduate}>
-      <PlayerPortrait playerId={graduate.id} size={34} cap capColor={capColor} />
+      <PlayerPortrait playerId={graduate.id} size={34} cap />
       <span>
         <span className={styles.name}>{graduate.name}</span>
         <span className={styles.sub}>
@@ -247,16 +251,20 @@ function GraduateRow({ graduate, capColor }: { graduate: GraduateRecord; capColo
 function TeamEditor({
   schoolName,
   uniform,
+  cap,
   regionId,
   onSchoolName,
   onUniform,
+  onCap,
   onRegionId,
 }: {
   schoolName: string
   uniform: UniformId
+  cap: CapDesign
   regionId: RegionId
   onSchoolName: (value: string) => void
   onUniform: (value: UniformId) => void
+  onCap: (value: CapDesign) => void
   onRegionId: (value: RegionId) => void
 }) {
   return (
@@ -290,6 +298,9 @@ function TeamEditor({
           </button>
         ))}
       </div>
+
+      <span className={styles.fieldLabel}>帽子</span>
+      <CapEditor design={cap} schoolName={schoolName} onChange={onCap} />
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>所在地</span>

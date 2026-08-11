@@ -148,3 +148,11 @@
     transform: none;
   }
 }
+
+/* 能力以外の変化（信頼度・やる気）。一覧の下に添える */
+.note {
+  padding: 4px 2px;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}

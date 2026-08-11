@@ -9,8 +9,6 @@ import { AbilityChart } from '@/ui/components/AbilityChart'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
-import { teamCapColor } from '@/ui/theme/playerColors'
-import { DEFAULT_UNIFORM } from '@/core/team/uniforms'
 import styles from './AlumniScreen.module.css'
 
 /** 状態ごとの色 */
@@ -37,7 +35,6 @@ export function AlumniScreen() {
   const game = useGameStore((s) => s.game)
   const setScreen = useGameStore((s) => s.setScreen)
   // 帽子はチームで共通（OBも在学時と同じ色）
-  const capColor = teamCapColor(game?.uniform ?? DEFAULT_UNIFORM)
   const [filter, setFilter] = useState<Filter>('all')
 
   if (!game) return null
@@ -78,13 +75,13 @@ export function AlumniScreen() {
             : '該当するOBはいません'}
         </p>
       ) : (
-        visible.map((alumnus) => <AlumnusCard capColor={capColor} key={alumnus.id} alumnus={alumnus} />)
+        visible.map((alumnus) => <AlumnusCard key={alumnus.id} alumnus={alumnus} />)
       )}
     </AppLayout>
   )
 }
 
-function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string }) {
+function AlumnusCard({ alumnus }: { alumnus: Alumnus }) {
   const [open, setOpen] = useState(false)
   const totals = careerTotals(alumnus)
   const hasStats = alumnus.proSeasons.length > 0
@@ -100,7 +97,7 @@ function AlumnusCard({ alumnus, capColor }: { alumnus: Alumnus; capColor: string
         数値の行と所属の行に分け、どちらも折り返さない。
       */}
       <div className={styles.head}>
-        <PlayerPortrait playerId={alumnus.id} size={38} cap capColor={capColor} />
+        <PlayerPortrait playerId={alumnus.id} size={38} cap />
         <span className={styles.who}>
           <span className={styles.name}>{alumnus.name}</span>
           <span className={styles.sub}>

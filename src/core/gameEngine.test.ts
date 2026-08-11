@@ -1813,8 +1813,16 @@ describe('グラウンド整備', () => {
         hand: base.hand.map((card) => ({ ...card, number: 3 as const, kind: 'batting' as const })),
         boardPosition: 0,
       }
-      const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
-      return next.players.reduce((total, p) => total + p.batting.meet + p.batting.power, 0)
+      // **1手では丸めに埋もれる。** 何手か重ねてから比べる
+      let current = state
+      for (let i = 0; i < 12; i++) {
+        current = applyCommand(current, { type: 'selectCard', cardId: current.hand[0].id }).state
+        if (current.phase === 'growthReport') {
+          current = applyCommand(current, { type: 'closeGrowthReport' }).state
+        }
+        if (current.phase !== 'cardSelect') break
+      }
+      return current.players.reduce((total, p) => total + p.batting.meet + p.batting.power, 0)
     }
     expect(build(5)).toBeGreaterThan(build(1))
   })

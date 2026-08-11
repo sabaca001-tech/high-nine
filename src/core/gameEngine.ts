@@ -155,6 +155,8 @@ import { DEFAULT_REGION_ID, findRegion, REGIONS } from '@/core/types/region'
 import { makeSchoolName } from '@/core/rival/rivalDefs'
 import { DEFAULT_UNIFORM, normalizeUniform } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
+import { DEFAULT_CAP, normalizeCap } from '@/core/team/cap'
+import type { CapDesign } from '@/core/team/cap'
 import type { RegionId } from '@/core/types/region'
 import { isTournamentOver, roundName } from '@/core/types/tournament'
 import type { Tournament, TournamentKind } from '@/core/types/tournament'
@@ -202,6 +204,7 @@ export function createInitialState(options: NewGameOptions = {}): GameState {
     rngState: rng.state,
     schoolName,
     uniform,
+    cap: DEFAULT_CAP,
     year: 1,
     month: SEASON_START_MONTH,
     // 入部の報告から始める
@@ -311,6 +314,7 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
         ...(command.schoolName !== undefined ? { schoolName: command.schoolName } : {}),
         ...(command.uniform !== undefined ? { uniform: command.uniform } : {}),
         ...(command.regionId !== undefined ? { regionId: command.regionId } : {}),
+        ...(command.cap !== undefined ? { cap: command.cap } : {}),
       })
     case 'playTournamentMatch':
       return playTournamentMatch(state)
@@ -1084,7 +1088,12 @@ function retireThirdYears(
 /** 世代交代の報告を閉じて新年度を始める */
 function finishSeason(
   state: GameState,
-  change: { schoolName?: string; uniform?: UniformId; regionId?: RegionId } = {},
+  change: {
+    schoolName?: string
+    uniform?: UniformId
+    regionId?: RegionId
+    cap?: Partial<CapDesign>
+  } = {},
 ): EngineResult {
   if (state.phase !== 'newSeason') {
     return { state, events: [] }
@@ -1106,6 +1115,8 @@ function finishSeason(
   if (uniform !== state.uniform) {
     events.push({ type: 'message', text: 'ユニフォームを新調した', tone: 'normal' })
   }
+
+  const cap = change.cap ? normalizeCap(change.cap) : normalizeCap(state.cap)
 
   // 所在地を変えると大会の回戦数も遠征費も変わる。
   // ライバル校は県ごとに置いているので、**引っ越し先の顔ぶれに入れ替える**
@@ -1137,6 +1148,7 @@ function finishSeason(
       ...state,
       ...(renamed ? { schoolName } : {}),
       uniform,
+      cap,
       regionId,
       rivals,
       rngState,
@@ -1658,6 +1670,28 @@ function setLineup(state: GameState, lineup: Lineup): EngineResult {
  * 月をまたいだ場合は、またいだ月の処理（部費・体力回復・固定イベント）を
  * その場でまとめて行う。
  */
+/**
+ * チーム全体で動いたもの（信頼度・やる気）を一言にする。
+ * 1人ずつ並べても読めないので、平均の変化だけを出す。
+ */
+function teamNotes(before: Player[], after: Player[]): string[] {
+  if (before.length === 0) return []
+
+  const average = (list: Player[], read: (player: Player) => number) =>
+    list.reduce((sum, player) => sum + read(player), 0) / list.length
+
+  const notes: string[] = []
+  const trust = Math.round(average(after, (p) => p.trust) - average(before, (p) => p.trust))
+  const motivation =
+    average(after, (p) => p.motivation) - average(before, (p) => p.motivation)
+
+  if (trust !== 0) notes.push(`チームの信頼度 ${trust > 0 ? '+' : ''}${trust}`)
+  if (motivation > 0.05) notes.push('チームのやる気が上がった')
+  if (motivation < -0.05) notes.push('チームのやる気が下がった')
+
+  return notes
+}
+
 function selectCard(state: GameState, cardId: string): EngineResult {
   // 他のフェーズ中は操作を受け付けない（連打対策）
   if (state.phase !== 'cardSelect') {
@@ -1819,8 +1853,18 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   // 試合マスに止まると練習の結果を見る前に試合が始まってしまっていた。
   // 効果はもう解決済みで、ここでは進むフェーズを先送りするだけ
   const grown = events.flatMap((event) => (event.type === 'ability' ? event.changes : []))
+
+  /*
+   * **能力以外の変化も報告する。**
+   * ミーティングやメンタル強化は能力を伸ばさないので、
+   * 一覧が空のまま「目に見える変化は無かった」と出ていた。
+   * 実際には信頼度とやる気が動いているのに、何も起きていないように見える。
+   */
+  const notes = teamNotes(state.players, outcome.players)
   const pendingGrowth: PendingGrowth | null =
-    grown.length > 0 ? { changes: grown, nextPhase: phase } : null
+    grown.length > 0 || notes.length > 0
+      ? { changes: grown, ...(notes.length > 0 ? { notes } : {}), nextPhase: phase }
+      : null
   if (pendingGrowth) phase = 'growthReport'
 
   const { log, serial: nextSerial } = appendLog(state.log, events, serial)

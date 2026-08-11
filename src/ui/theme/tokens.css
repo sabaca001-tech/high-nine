@@ -50,6 +50,15 @@
   --uniform-a: #f2f4f7;
   --uniform-b: #dfe6ee;
   --uniform-c: #ffe9c4;
+  /* 帽子のエディット用。本体・つば・マークで別々に選べる */
+  --cap-navy: #1f3d78;
+  --cap-crimson: #a52f39;
+  --cap-charcoal: #2e3138;
+  --cap-forest: #1f5c3d;
+  --cap-white: #f2efe6;
+  --cap-sky: #4a8fd0;
+  --cap-gold: #d8a72c;
+
   --cap-a: #2f6fd0;
   --cap-b: #d94f4f;
   --cap-c: #3b3f4a;

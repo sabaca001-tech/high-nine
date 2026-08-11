@@ -11,7 +11,6 @@ import { POSITION_LABELS } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
-import { teamCapColor } from '@/ui/theme/playerColors'
 import styles from './RecordsScreen.module.css'
 
 /**
@@ -26,7 +25,6 @@ export function RecordsScreen() {
 
   if (!game) return null
 
-  const capColor = teamCapColor(game.uniform)
   const roster = allTimeRoster(game.players, game.graduates)
   const nine = bestNine(roster)
 
@@ -46,7 +44,7 @@ export function RecordsScreen() {
           nine.map(({ position, entry }) => (
             <div key={position} className={styles.row}>
               <span className={styles.position}>{POSITION_LABELS[position]}</span>
-              <PlayerPortrait playerId={entry.id} size={30} cap capColor={capColor} />
+              <PlayerPortrait playerId={entry.id} size={30} cap />
               <span className={styles.identity}>
                 <span className={styles.name}>{entry.name}</span>
                 <span className={styles.note}>{entry.note}</span>

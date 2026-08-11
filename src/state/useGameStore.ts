@@ -66,6 +66,7 @@ type GameStore = {
     schoolName?: string
     uniform?: import('@/core/team/uniforms').UniformId
     regionId?: string
+    cap?: import('@/core/team/cap').CapDesign
   }) => void
   playTournamentMatch: () => void
   finishTournament: () => void

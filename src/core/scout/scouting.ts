@@ -25,7 +25,7 @@ import { findRegion, REGIONS } from '@/core/types/region'
 import { REPUTATION_INITIAL } from '@/core/types/season'
 import { findSkill, skillsFor } from '@/core/skill/skillDefs'
 import type { SkillId } from '@/core/types/skill'
-import { PITCHING_TRAIT_RATE, RAW_RATING_BONUS } from './scoutTraits'
+import { PITCHING_TRAIT_RATE, RAW_RATING_DOWN, RAW_RATING_UP } from './scoutTraits'
 import type { ScoutTrait } from './scoutTraits'
 
 /**
@@ -232,10 +232,19 @@ export function createProspects(
     const name = pickName(rng, names)
     names.push(name)
 
-    // 評判が高いほど上澄みが来る。素材型の県はさらに素質だけ高い
+    /*
+     * 評判が高いほど上澄みが来る。
+     * **素材型の県は振れ幅が広い**（上にも下にも振れる）。
+     * 一律の上乗せにしていた頃は、10人のうち誰かが必ずCに届き、
+     * 素材型の県へ行けば確実に当たりが見つかった。
+     */
     const base = LOCAL_BASE + Math.round((params.reputation - REPUTATION_INITIAL) * 0.18)
-    const raw = params.trait === 'raw' ? RAW_RATING_BONUS : 0
-    const rating = clampRating(base + rng.int(-10, 14) + raw)
+    const rating = clampRating(
+      base +
+        (params.trait === 'raw'
+          ? rng.int(-RAW_RATING_DOWN, RAW_RATING_UP)
+          : rng.int(-PROSPECT_SPREAD, PROSPECT_SPREAD)),
+    )
 
     prospects.push({
       id: `sc${params.year}-${params.serial}-${i}`,
@@ -266,6 +275,13 @@ export function createProspects(
  * 通う価値は残しつつ、**入学時点では上級生に届かない**水準に下げる。
  */
 const LOCAL_BASE = 40
+
+/**
+ * 県の候補の振れ幅（±）。
+ * **上下対称にしてある。** `-10〜+14` と上に振っていた頃は、
+ * どの県でも平均が2点ずつ底上げされていた。
+ */
+const PROSPECT_SPREAD = 12
 
 /**
  * U15日本代表の30人を作る。**年度の初めに一度だけ。**

@@ -7,14 +7,13 @@ import {
 } from '@/core/types/player'
 import { focusLabel } from '@/core/player/trainingFocus'
 import type { Motivation, Player } from '@/core/types/player'
-import type { UniformId } from '@/core/team/uniforms'
 import { BatterStats } from './BatterStats'
 import { TrajectoryArrow } from './TrajectoryArrow'
 import { AptitudeDiamond } from './AptitudeDiamond'
 import { PitchChart } from './PitchChart'
 import { PitcherStats } from './PitcherStats'
 import { PlayerPortrait } from './PlayerPortrait'
-import { plateGradient, rankColorOf, teamCapColor } from '@/ui/theme/playerColors'
+import { plateGradient, rankColorOf } from '@/ui/theme/playerColors'
 import styles from './PlayerCard.module.css'
 
 /**
@@ -57,7 +56,6 @@ const MOOD_CLASS: Record<Motivation, string> = {
 
 export function PlayerCard({
   player,
-  uniform,
   onClick,
   /** 選択中の枠を出す */
   selected = false,
@@ -67,8 +65,6 @@ export function PlayerCard({
   footer,
 }: {
   player: Player
-  /** 帽子の色はチームで共通。学校ごとに選んだユニフォームの色を使う */
-  uniform: UniformId
   onClick?: () => void
   selected?: boolean
   badge?: ReactNode
@@ -89,7 +85,7 @@ export function PlayerCard({
   const body = (
     <>
       <div className={styles.head}>
-        <PlayerPortrait playerId={player.id} size={30} cap capColor={teamCapColor(uniform)} />
+        <PlayerPortrait playerId={player.id} size={30} cap />
 
         {/* ネームプレート。左が本職の系統、右に他の適性の色が混ざる */}
         <span className={styles.plate} style={{ background: plateGradient(player) }}>

@@ -1,7 +1,6 @@
 import { overallRating } from '@/core/player/rating'
 import { firstSquadSet } from '@/core/player/squad'
 import type { Player } from '@/core/types/player'
-import type { UniformId } from '@/core/team/uniforms'
 import { isInHallOfFame } from '@/core/types/career'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -61,7 +60,6 @@ export function PlayerListScreen() {
         title="ベンチ入り"
         badgeClass={styles.grade3}
         players={first}
-        uniform={game.uniform}
         onSelect={showPlayer}
         note="練習の効果をそのまま受ける"
       />
@@ -70,7 +68,6 @@ export function PlayerListScreen() {
           title="ベンチ外"
           badgeClass={styles.grade1}
           players={second}
-          uniform={game.uniform}
           onSelect={showPlayer}
           note="指導が行き届かず、練習の伸びは75%"
         />
@@ -108,14 +105,12 @@ function Section({
   title,
   badgeClass,
   players,
-  uniform,
   onSelect,
   note,
 }: {
   title: string
   badgeClass: string
   players: Player[]
-  uniform: UniformId
   onSelect: (id: string) => void
   note: string
 }) {
@@ -133,7 +128,6 @@ function Section({
           <PlayerCard
             key={player.id}
             player={player}
-            uniform={uniform}
             onClick={() => onSelect(player.id)}
           />
         ))}

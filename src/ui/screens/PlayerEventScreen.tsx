@@ -4,7 +4,6 @@ import { overallRating, toRank } from '@/core/player/rating'
 import { POSITION_LABELS } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
-import { teamCapColor } from '@/ui/theme/playerColors'
 import { playSound } from '@/ui/sound/sound'
 import styles from './PlayerEventScreen.module.css'
 
@@ -45,7 +44,6 @@ export function PlayerEventScreen() {
             playerId={player.id}
             size={68}
             cap
-            capColor={teamCapColor(game.uniform)}
           />
           <div className={styles.who}>
             <span className={styles.name}>{player.name}</span>

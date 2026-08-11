@@ -21,6 +21,7 @@ import type { RivalSchool } from '@/core/rival/rivals'
 import type { ScoutingState } from '@/core/scout/scouting'
 import type { TraitMap } from '@/core/scout/scoutTraits'
 import type { UniformId } from '@/core/team/uniforms'
+import type { CapDesign } from '@/core/team/cap'
 import type { Tournament } from './tournament'
 import type { TeamManager } from '@/core/staff/managers'
 import type { PendingPlayerEvent } from '@/core/event/playerEvents'
@@ -122,6 +123,11 @@ export type GameState = {
    * 導いていた頃は、学校名を変えると色まで変わってしまい選べなかった。
    */
   uniform: UniformId
+  /**
+   * 帽子のデザイン（配色とマーク）。
+   * 省略されている古いセーブは既定の紺として読む（`normalizeCap`）。
+   */
+  cap?: CapDesign
   /** 通算年数（1年目＝1） */
   year: number
   month: Month
@@ -252,6 +258,14 @@ export type GameState = {
 export type PendingGrowth = {
   /** その日に動いた能力。伸びも下がりも含む */
   changes: import('./player').AbilityChange[]
+  /**
+   * 能力以外に動いたもの（信頼度・やる気）。
+   *
+   * **ミーティングやメンタル強化は能力を伸ばさない**ので、
+   * 一覧が空のまま「目に見える変化は無かった」と出ていた。
+   * 実際には効いているのに、何も起きていないように見えていた。
+   */
+  notes?: string[]
   /** 報告を閉じたあとに進むフェーズ */
   nextPhase: Phase
 }
@@ -312,6 +326,7 @@ export type GameCommand =
       schoolName?: string
       uniform?: UniformId
       regionId?: RegionId
+      cap?: CapDesign
     }
   /** 大会の次の試合を行う */
   | { type: 'playTournamentMatch' }

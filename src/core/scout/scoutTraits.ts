@@ -42,7 +42,7 @@ export const TRAIT_NOTES: Record<ScoutTrait, string> = {
   speed: '走力に恵まれた選手が多い。盗塁と守備範囲に効く。',
   defense: '守備・捕球の水準が高い。二遊間や捕手を探すなら。',
   pitching: '投手の比率が高く、球速も出ている。',
-  raw: '完成度は低いが素質は高い。育て切れるなら化ける。',
+  raw: '当たり外れが大きい。化ける選手もいれば、伸びない選手もいる。',
 }
 
 /** 傾向ごとに底上げされる能力 */
@@ -58,8 +58,18 @@ const TRAIT_BOOST: Record<ScoutTrait, GrowableKey[]> = {
 /** 傾向による能力の上乗せ */
 export const TRAIT_BONUS = 10
 
-/** 「素材型」は総合が高い代わりに、完成度（体力・信頼度）が低い */
-export const RAW_RATING_BONUS = 6
+/**
+ * 「素材型」の県は**当たり外れが大きい**。
+ *
+ * 一律に上乗せしていた頃は、10人の候補の誰かが必ずCに届き、
+ * **素材型の県へ行けば確実に当たりが見つかる**状態だった。
+ * 荒削りというのは「上振れも下振れもある」という意味なので、
+ * 上乗せをやめて振れ幅のほうを広げる。
+ * **下振れのほうを大きく取る**（上限は普通の県とほぼ同じ）。
+ * 上限まで広げると、結局「素材型へ行けば当たりが出る」に戻ってしまう。
+ */
+export const RAW_RATING_DOWN = 26
+export const RAW_RATING_UP = 14
 
 /** 投手王国では投手の割合が上がる */
 export const PITCHING_TRAIT_RATE = 0.6

@@ -110,15 +110,33 @@ describe('県ごとの傾向', () => {
     expect(pitching).toBeGreaterThan(normal)
   })
 
-  it('素材型の県は素質が高い', () => {
+  it('素材型の県は当たり外れが大きい', () => {
+    /*
+     * **上乗せではなく振れ幅。**
+     * 一律に上乗せしていた頃は、10人のうち誰かが必ずCに届き、
+     * 「素材型の県へ行けば当たりが見つかる」という一本道になっていた。
+     */
+    const spread = (list: { rating: number }[]) => {
+      const values = list.map((p) => p.rating)
+      return Math.max(...values) - Math.min(...values)
+    }
+
     let raw = 0
     let plain = 0
-
     for (let seed = 0; seed < 20; seed++) {
-      raw += average(generate(seed, 50, 'raw'))
-      plain += average(generate(seed, 50, 'contact'))
+      raw += spread(generate(seed, 50, 'raw'))
+      plain += spread(generate(seed, 50, 'contact'))
     }
     expect(raw).toBeGreaterThan(plain)
+  })
+
+  it('素材型でも、確実に当たりが出るわけではない', () => {
+    // 評判が低いうちは、素材型の県でもCには滅多に届かない
+    let hits = 0
+    for (let seed = 0; seed < 40; seed++) {
+      if (generate(seed, 20, 'raw').some((p) => p.rating >= 60)) hits += 1
+    }
+    expect(hits).toBeLessThan(8)
   })
 
   it('傾向は全県ぶん決まり、JSONに入れられる', () => {

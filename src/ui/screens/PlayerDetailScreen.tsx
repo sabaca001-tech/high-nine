@@ -36,7 +36,7 @@ import { AbilityChart } from '@/ui/components/AbilityChart'
 import type { ChartPoint } from '@/ui/components/AbilityChart'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
 import { PitchChart } from '@/ui/components/PitchChart'
-import { plateGradient, rankColorOf, teamCapColor } from '@/ui/theme/playerColors'
+import { plateGradient, rankColorOf } from '@/ui/theme/playerColors'
 import {
   average,
   era,
@@ -80,7 +80,6 @@ export function PlayerDetailScreen() {
 
   const rating = overallRating(player)
   const rank = toRank(rating)
-  const capColor = teamCapColor(game.uniform)
 
   const profileStyle = {
     // ヘッダーの色はポジション系統から取る（帽子はチーム共通なので区別にならない）
@@ -96,7 +95,7 @@ export function PlayerDetailScreen() {
 
       <div className={styles.profile} style={profileStyle}>
         <span className={styles.sprite}>
-          <PlayerPortrait playerId={player.id} size={68} cap capColor={capColor} />
+          <PlayerPortrait playerId={player.id} size={68} cap />
         </span>
         <div className={styles.nameBlock}>
           <div className={styles.badges}>

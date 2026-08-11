@@ -110,7 +110,7 @@ const VELOCITY_GAIN_RATE = 0.55
  * 釣り合っていないと、3年生になった選手が初期3年生を大きく追い越してしまう。
  * 変えたら必ず seasonBalance.test.ts を回すこと。
  */
-export const CARD_GROWTH_SCALE = 0.0165
+export const CARD_GROWTH_SCALE = 0.0135
 
 /**
  * 1日ぶんの体力・信頼度の倍率。

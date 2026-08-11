@@ -130,7 +130,9 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     description: '能力は伸びないが、信頼度が大きく上がる',
     gains: [],
     conditionDelta: -3,
-    trustDelta: 6,
+    // **6では動いた実感が無かった。** 1枚で1〜2しか上がらず、
+    // 報告にも出ないので「何も起きていない」と見える
+    trustDelta: 11,
     weight: 2,
   },
   rest: {
@@ -189,10 +191,10 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   meeting: {
     kind: 'meeting',
     label: 'ミーティング',
-    description: '全員のやる気が上がる',
+    description: '全員のやる気が上がり、信頼度も上がる',
     gains: [],
     conditionDelta: -2,
-    trustDelta: 4,
+    trustDelta: 7,
     weight: 3,
     special: 'motivationUp',
   },
