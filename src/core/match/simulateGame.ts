@@ -208,6 +208,10 @@ export function stepHalfInning(rng: Rng, state: MatchState): MatchState {
     nextOrder,
     // 9回以降はサヨナラで即終了する
     stopOnLead: inning >= REGULATION_INNINGS,
+    // **コールドは点差が届いた時点で終わる。**
+    // 回を終えてから見ていた頃は、7回裏に6点差から10点取って
+    // 「10点差でコールド」という試合になっていた
+    stopAtLead: next.mercy ? mercyLeadAt(inning) : null,
     tiebreak,
     autoSubstitute: true,
   })

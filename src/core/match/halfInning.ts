@@ -53,6 +53,17 @@ export type HalfContext = {
   nextOrder: () => number
   /** リードした時点で打ち切るか（サヨナラ） */
   stopOnLead: boolean
+  /**
+   * この点差に届いたら攻撃を打ち切る（コールド）。無ければ null。
+   *
+   * **7点差ついた時点で試合は終わる。**
+   * 回を終えてから点差を見ていた頃は、7回裏に6点差から10点取って
+   * 「10点差でコールド」という試合が普通に起きていた。
+   * 実際には7点目が入った瞬間に終わっている。
+   * 一打で複数点入ることはあるので、点差がぴったりになるとは限らない
+   * （満塁本塁打なら6点差から10点差になって終わる）。
+   */
+  stopAtLead?: number | null
   /** タイブレーク（無死一・二塁から開始） */
   tiebreak: boolean
   /** 自動で代打・継投を判断するか */
@@ -139,6 +150,10 @@ export function playHalf(rng: Rng, ctx: HalfContext): number {
 
     // サヨナラ
     if (ctx.stopOnLead && offense.runs > defenseTeam.runs) break
+
+    // コールド。点差が規定に届いた時点で、その打席を最後に終わる
+    const stopAtLead = ctx.stopAtLead ?? null
+    if (stopAtLead !== null && offense.runs - defenseTeam.runs >= stopAtLead) break
   }
 
   return runsThisHalf
