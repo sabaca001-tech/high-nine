@@ -57,6 +57,7 @@ import {
   schoolForProspect,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
+import { runRivalSeason } from '@/core/rival/rivalSeason'
 import { rivalRoster, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import {
   allProspects,
@@ -2253,13 +2254,23 @@ function advanceYear(state: GameState): EngineResult {
   serial = managerChange.serial
 
   // ライバル校の1年を進める。強豪は強豪のまま、力をつける学校も出てくる
-  const rivals: RivalSchool[] = []
+  const advanced: RivalSchool[] = []
   const rivalNews: string[] = []
   for (const school of scouted.rivals) {
     const update = advanceRival(rng, school, year)
-    rivals.push(update.school)
+    advanced.push(update.school)
     if (update.news) rivalNews.push(update.news)
   }
+
+  /*
+   * **全国の1年ぶんの結果を決める。**
+   * 強豪かどうかは地力ではなく戦績で決まるので、
+   * 毎年どこかの学校が県を勝ち、そのうちの1校が全国を獲る。
+   * 自県は実際の大会の結果を使う（自校が優勝した年は他校に付かない）。
+   */
+  const season = runRivalSeason(rng, advanced, state.regionId, state.year, state.nationalsBerth)
+  const rivals = season.schools
+  rivalNews.push(...season.news)
   // 新しい卒業生を先頭に、既存OBは進路が1年ぶん進んだものに差し替える。
   // 上限で切るときも、プロに届いた選手は落とさない
   const graduates = trimGraduates(

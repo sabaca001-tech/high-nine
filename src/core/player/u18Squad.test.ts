@@ -155,3 +155,16 @@ describe('代表の水準', () => {
     expect(ratings[0]).toBeGreaterThanOrEqual(85)
   })
 })
+
+describe('球速の水準', () => {
+  it('代表でも160km/hはまず出ない', () => {
+    const schools = createRivals(createRng(20), 'kanagawa', 1)
+    const squad = selectU18Squad({ schools, ourPlayers: [], year: 5, progress: 0.6 })
+    const velocities = squad.members
+      .map((member) => member.snapshot?.pitching?.velocity)
+      .filter((value): value is number => value !== undefined)
+
+    expect(velocities.length).toBeGreaterThan(0)
+    expect(Math.max(...velocities)).toBeLessThan(160)
+  })
+})

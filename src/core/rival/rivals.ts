@@ -84,6 +84,60 @@ export type RivalSchool = {
    * 読むときは `recordOf` を通すこと。
    */
   record?: RivalRecord
+  /**
+   * 戦績。**勝った学校が強豪**という扱いにするための記録。
+   * まだ何も勝っていない学校は持たない（`titlesOf` を通す）。
+   */
+  titles?: RivalTitles
+}
+
+/**
+ * その学校の**戦績**。
+ *
+ * **「強豪」を能力で決めるのをやめた。** 地力（`tradition`）という隠し値で
+ * 強豪を決めていたので、強豪＝選手が強いという直結になり、
+ * 学校を強くするたびにU18代表が総合95〜100で埋まった。
+ * 勝っている学校が強豪と呼ばれるほうが自然だし、
+ * **戦績なら選手の能力を上げなくても格を表せる。**
+ *
+ * まだ何も勝っていない学校は持たない（`titlesOf` を通して読む）。
+ */
+export type RivalTitles = {
+  /** 県大会の優勝回数 */
+  region: number
+  /** 甲子園への出場回数 */
+  nationals: number
+  /** 全国制覇の回数 */
+  championships: number
+}
+
+/** その学校の戦績。まだ何も勝っていなければ0 */
+export function titlesOf(school: RivalSchool): RivalTitles {
+  return school.titles ?? EMPTY_TITLES
+}
+
+const EMPTY_TITLES: RivalTitles = { region: 0, nationals: 0, championships: 0 }
+
+/**
+ * 戦績から見た「格」。**一覧の並べ替えと注目校の判定に使う。**
+ * 全国制覇がいちばん重く、県大会の優勝がいちばん軽い。
+ */
+export function prestigeOf(school: RivalSchool): number {
+  const titles = titlesOf(school)
+  return titles.championships * 12 + titles.nationals * 4 + titles.region * 2
+}
+
+/** 戦績を1年ぶん足す */
+export function addTitles(school: RivalSchool, gained: Partial<RivalTitles>): RivalSchool {
+  const titles = titlesOf(school)
+  return {
+    ...school,
+    titles: {
+      region: titles.region + (gained.region ?? 0),
+      nationals: titles.nationals + (gained.nationals ?? 0),
+      championships: titles.championships + (gained.championships ?? 0),
+    },
+  }
 }
 
 /** 1校との対戦成績 */
@@ -242,12 +296,16 @@ const DRIFT = 6
 /**
  * 注目選手の学年ごとの成長量。
  *
- * **12は伸びすぎだった。** 1年で素質75だった選手が3年で99になり、
- * U18代表が総合99〜100の選手で埋まっていた。
- * 自校の選手は練習の頭打ちで90台がやっとなので、そこに揃える。
+ * **開始時の3年生と、あとから入ってくる1年生を揃える。**
+ * 3〜8まで絞っていた頃は、1年生で入ってきた注目選手が
+ * 3年生になっても素質69ほどにしかならず、
+ * 開始時に3年生として作られた注目選手（素質86）と別物になっていた。
+ * U18代表の顔ぶれが年を追うごとに弱くなるので、開始年だけ強い世界に見える。
+ *
+ * 上限（`STAR_RATING_MAX`）で頭は止まるので、伸び幅は素直に取ってよい。
  */
-const STAR_GROWTH_MIN = 3
-const STAR_GROWTH_MAX = 8
+const STAR_GROWTH_MIN = 9
+const STAR_GROWTH_MAX = 16
 
 /**
  * ライバル校を作る。新規ゲームでだけ呼ぶ。

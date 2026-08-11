@@ -183,6 +183,16 @@
   color: var(--text-dim);
 }
 
+/* 戦績。**強豪はここで決まる**ので、いちばん目立たせる */
+.rivalTitles {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .trendUp {
   color: var(--good);
   font-weight: 700;

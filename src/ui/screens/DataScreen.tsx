@@ -19,6 +19,8 @@ import {
   recordOf,
   starsOf,
   rosterPowerOf,
+  titlesOf,
+  prestigeOf,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import type { ScoutResult } from '@/core/scout/scouting'
@@ -341,7 +343,11 @@ function pickRivals(
   // **良い代を抱えた学校が埋もれないよう、在校3代を均した力で絞る。**
   // `strength` だけで切ると、台頭してきた学校が一覧に出てこない。
   // 力は**先に1回だけ計算する**（比較のたびに出すと8000校で374msかかった）
-  const ranked = schools.map((school) => ({ school, power: rosterPowerOf(school, year) }))
+  const ranked = schools.map((school) => ({
+    school,
+    // 戦績のある学校は必ず候補に残す（勝ってきた学校が一覧から消えないように）
+    power: rosterPowerOf(school, year) + prestigeOf(school),
+  }))
   ranked.sort((a, b) => b.power - a.power)
 
   // 実測（`lineupRatingOf`）は1校0.2msかかるので、**候補を絞ってから測る**。
@@ -349,8 +355,21 @@ function pickRivals(
   return ranked
     .filter((entry, index) => index < limit * 2 || hasMet(recordOf(entry.school)))
     .map(({ school }) => ({ school, rating: lineupRatingOf(school, year, progress) }))
-    .sort((a, b) => b.rating - a.rating)
+    // **勝っている学校を上に出す。** 強豪は戦績で決まる
+    .sort(
+      (a, b) => prestigeOf(b.school) - prestigeOf(a.school) || b.rating - a.rating,
+    )
     .slice(0, limit)
+}
+
+/** 戦績の一言。何も勝っていなければ空 */
+function titleText(school: RivalSchool): string {
+  const titles = titlesOf(school)
+  const parts: string[] = []
+  if (titles.championships > 0) parts.push(`全国制覇${titles.championships}回`)
+  if (titles.nationals > 0) parts.push(`甲子園${titles.nationals}回`)
+  else if (titles.region > 0) parts.push(`県優勝${titles.region}回`)
+  return parts.join(' / ')
 }
 
 /** 一覧に既定で出す校数と、「もっと見る」で増える校数 */
@@ -622,6 +641,12 @@ function RivalRow({
         <span className={styles.rivalCaret}>{open ? '▴' : '▾'}</span>
       </button>
       <div className={styles.rivalMeta}>
+        {/*
+          **強豪かどうかは戦績で決まる。**
+          地力（隠し値）で決めていた頃は、強豪校を強くするとそこに居る個人も強くなり、
+          U18代表が総合95〜100で埋まった。勝った回数なら能力を上げずに格を表せる。
+        */}
+        {titleText(school) && <span className={styles.rivalTitles}>{titleText(school)}</span>}
         {hasMet(recordOf(school)) ? (
           <span className={styles.rivalRecord}>通算 {formatRecord(recordOf(school))}</span>
         ) : (

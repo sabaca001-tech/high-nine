@@ -17,7 +17,7 @@
 
 import { createRng } from '@/core/rng/random'
 import { dayOfCell, seasonProgressOfDay } from '@/core/calendar/days'
-import { createPlayer } from '@/core/player/createPlayer'
+import { createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
@@ -37,10 +37,10 @@ import { classBonus, starsOf } from './rivals'
  * 「層の厚さ」を学校の格の表し方として使う。
  */
 const PER_GRADE_MIN = 8
-const PER_GRADE_MAX = 16
+const PER_GRADE_MAX = 22
 
 function perGradeOf(strength: number): number {
-  return Math.min(PER_GRADE_MAX, PER_GRADE_MIN + Math.max(0, Math.round(strength / 8)))
+  return Math.min(PER_GRADE_MAX, PER_GRADE_MIN + Math.max(0, Math.round(strength / 5)))
 }
 
 /**
@@ -73,13 +73,28 @@ export const ROSTER_TALENT_RATE = 0.55
  */
 export function rosterTalentOf(strength: number): number {
   const raw = strength * ROSTER_TALENT_RATE
-  return raw <= TALENT_KNEE ? raw : TALENT_KNEE + (raw - TALENT_KNEE) * TALENT_SLOPE
+  const eased = raw <= TALENT_KNEE ? raw : TALENT_KNEE + (raw - TALENT_KNEE) * TALENT_SLOPE
+  return Math.min(TALENT_CAP, eased)
 }
 
 /** ここまでは素直に効く（戦力33ほど。県内の中堅上位まで） */
 const TALENT_KNEE = 18
 /** ここから上の効き */
 const TALENT_SLOPE = 0.45
+
+/**
+ * 学校の力が選手に乗る**上限**。
+ *
+ * **強豪校の格は選手の能力で表さない。**
+ * 学校を強くするたびに、そこに居る個人も強くなり、
+ * U18代表が総合95〜100（球速160km/h台）で埋まっていた。
+ * 「勝っている学校が強豪」という形（`RivalTitles`）に変えたので、
+ * 能力のほうは高校生として無理のない範囲で止める。
+ *
+ * 3年生の素質は 50（学年）＋22 に代の当たり外れが乗る程度。
+ * 名門との差は**部員の層の厚さ**（`perGradeOf`）で出す。
+ */
+const TALENT_CAP = 22
 
 /** 各学年の何人目までを投手にするか */
 const PITCHERS_PER_GRADE = 2
@@ -259,7 +274,7 @@ function materializeStar(star: RivalPlayer, slot: Player, grade: Grade, grown: n
     id: star.id,
     grade,
     isPitcher: star.isPitcher,
-    talentBonus: star.rating - BASE_RATING + grown,
+    talentBonus: star.rating - GRADE_BASE[grade] + grown,
     // 素質を示してから入学させるので、そこからさらに振らない
     talentSpread: 0,
     // 名前は注目選手のものを使うので、留学生としては作らない
@@ -276,11 +291,12 @@ function materializeStar(star: RivalPlayer, slot: Player, grade: Grade, grown: n
   }
 }
 
-/**
- * 素質の基準。`GRADE_BASE[1]` と揃える。
- * ここがずれると「素質60」と書いてあった選手が総合60で出てこない。
+/*
+ * **学年のベースを引く。** `GRADE_BASE[1]`（36）で固定して引いていた頃は、
+ * 3年生の注目選手が `50 + (rating - 36)` で作られ、
+ * **素質93と書いてあった選手が総合107相当（＝全能力100）**になっていた。
+ * 開始時の注目選手は3年生が多いので、U18代表が総合99で埋まる原因になっていた。
  */
-const BASE_RATING = 36
 
 /**
  * その注目選手の今の学年。卒業していれば null。
