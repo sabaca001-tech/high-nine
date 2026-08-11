@@ -33,11 +33,21 @@ export function ScoutScreen() {
 
   /** 中身を見ている県。出張中でなくても、訪問済みなら見返せる */
   const [openRegion, setOpenRegion] = useState<RegionId | null>(null)
+  /**
+   * 「県の一覧へ」で閉じた県。
+   *
+   * **出張中は候補一覧に貼り付いて戻れなかった。**
+   * 出張先（`visiting`）は誰かに会うまで残るので、
+   * 閉じても次の描画でまた開いてしまい、
+   * 「今回は誰にも会わない」という判断ができなかった。
+   */
+  const [dismissed, setDismissed] = useState<RegionId | null>(null)
 
   if (!game) return null
 
   const scouting = game.scouting
-  const showing = openRegion ?? scouting.visiting
+  const target = openRegion ?? scouting.visiting
+  const showing = target && target !== dismissed ? target : null
   const region = showing ? findScoutRegion(scouting, showing) : undefined
 
   // スカウトは秋に解禁され、年度末まで続く
@@ -49,7 +59,10 @@ export function ScoutScreen() {
         region={region}
         reputation={game.reputation}
         visiting={scouting.visiting === showing}
-        onBack={() => setOpenRegion(null)}
+        onBack={() => {
+          setOpenRegion(null)
+          setDismissed(showing)
+        }}
       />
     )
   }
@@ -84,7 +97,10 @@ export function ScoutScreen() {
         open={open}
         visiting={scouting.visiting}
         visited={scouting.regions}
-        onOpen={setOpenRegion}
+        onOpen={(regionId) => {
+          setOpenRegion(regionId)
+          setDismissed(null)
+        }}
       />
     </AppLayout>
   )
@@ -208,6 +224,8 @@ function RegionList({
         const poor = funds < cost
         // 出張中は別の県へ行けない（まず誰かに会う）
         const busy = visiting !== null
+        // いま出張している県。ここだけは候補一覧へ戻れるようにする
+        const here = visiting === region.id
 
         return (
           <section key={region.id} className={styles.region}>
@@ -236,14 +254,16 @@ function RegionList({
               <button
                 type="button"
                 className={styles.primary}
-                disabled={!open || poor || busy}
-                onClick={() => visitScoutRegion(region.id)}
+                disabled={!here && (!open || poor || busy)}
+                onClick={() => (here ? onOpen(region.id) : visitScoutRegion(region.id))}
               >
-                {busy
-                  ? '出張中'
-                  : poor
-                    ? `部費が足りない ${formatFunds(cost)}`
-                    : `視察する ${formatFunds(cost)}`}
+                {here
+                  ? 'いま視察中。候補を見る'
+                  : busy
+                    ? '出張中'
+                    : poor
+                      ? `部費が足りない ${formatFunds(cost)}`
+                      : `視察する ${formatFunds(cost)}`}
               </button>
             </div>
           </section>

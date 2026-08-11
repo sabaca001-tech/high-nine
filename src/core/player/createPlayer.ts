@@ -174,26 +174,39 @@ const TALENT_SPREAD = 18
  * 切片は「素質どおりの点数になる」ように取ってあり、
  * 素質60の投手は球速145km/h（＝60点、C）になる。
  *
- * 110を切片にしていた頃は、同じ素質でも球速だけが8点ほど低く出て、
- * **投手の総合が野手より一律に低くなっていた**（実測で投手48・野手55）。
+ * **145km/h から上は効きを鈍らせる**（`VELOCITY_KNEE`）。
+ * 素直に比例させていた頃は、素質の高い他校の3年生が軒並み160km/h超えで、
+ * U18代表の投手が**全員160〜165km/h**という並びになっていた。
+ * 実際の高校生で150km/h台後半は全国に数人いるかいないかで、
+ * 160km/hはほとんど出ない。
  *
  *  平均的な1年（base36）で134km/h、平均的な3年（base50）で141km/h、
- *  素質に恵まれた3年（base66）で149km/h。
+ *  素質に恵まれた3年（base66）で146km/h、
+ *  全国屈指（base90）でも153km/h。そこから先は練習で伸ばす領域。
  */
 function velocityFor(rng: Rng, base: number, grade: Grade): number {
-  // **上限で止める。** 止めていなかった頃は、素質の高い他校の投手が
-  // 169km/h で生成され、球速スコアが飽和して総合100の投手が量産されていた
   return Math.min(
     VELOCITY_MAX,
     Math.max(
       VELOCITY_MIN,
-      Math.round(VELOCITY_INTERCEPT + clampAbility(base) * 0.5 + grade * 1.2 + rng.int(-3, 3)),
+      Math.round(velocityFromBase(clampAbility(base)) + grade * 1.2 + rng.int(-3, 3)),
     ),
   )
 }
 
+/** 素質から球速（km/h）。上に行くほど鈍る */
+function velocityFromBase(base: number): number {
+  const straight = VELOCITY_INTERCEPT + Math.min(base, VELOCITY_KNEE) * 0.5
+  return straight + Math.max(0, base - VELOCITY_KNEE) * VELOCITY_KNEE_RATE
+}
+
 /** 素質0のときの球速。`velocityScore` の対応表から逆算した値 */
 const VELOCITY_INTERCEPT = 115
+
+/** ここまでは素質どおりに速くなる（素質60＝145km/h） */
+const VELOCITY_KNEE = 60
+/** そこから先の効き。素質90でも153km/hに収まる */
+const VELOCITY_KNEE_RATE = 0.26
 
 /**
  * 能力ごとのばらつき幅（±）。

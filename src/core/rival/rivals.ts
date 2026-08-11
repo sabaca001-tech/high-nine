@@ -156,7 +156,7 @@ export const NATIONAL_RIVALS = (REGIONS.length - 1) * NATIONAL_SCHOOLS_PER_REGIO
  * 178校の県なら、常連5校・強豪12校・中堅上位27校が出てくる。
  */
 const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
-  { weight: 0.08, min: 60, max: 82 }, // 全国区の名門
+  { weight: 0.08, min: 52, max: 70 }, // 全国区の名門
   { weight: 3, min: 28, max: 42 }, // 甲子園常連
   { weight: 7, min: 18, max: 28 }, // 強豪
   { weight: 15, min: 8, max: 18 }, // 中堅上位
@@ -239,9 +239,15 @@ const REGRESSION = 0.45
 /** 年ごとの戦力の揺れ */
 const DRIFT = 6
 
-/** 注目選手の学年ごとの成長量 */
-const STAR_GROWTH_MIN = 4
-const STAR_GROWTH_MAX = 12
+/**
+ * 注目選手の学年ごとの成長量。
+ *
+ * **12は伸びすぎだった。** 1年で素質75だった選手が3年で99になり、
+ * U18代表が総合99〜100の選手で埋まっていた。
+ * 自校の選手は練習の頭打ちで90台がやっとなので、そこに揃える。
+ */
+const STAR_GROWTH_MIN = 3
+const STAR_GROWTH_MAX = 8
 
 /**
  * ライバル校を作る。新規ゲームでだけ呼ぶ。
@@ -644,8 +650,16 @@ export function upperStarRatingAtRank(schools: RivalSchool[], rank: number): num
 }
 
 function clampRating(value: number): number {
-  return Math.min(99, Math.max(1, Math.round(value)))
+  return Math.min(STAR_RATING_MAX, Math.max(1, Math.round(value)))
 }
+
+/**
+ * 注目選手の素質の上限。
+ *
+ * 99にしていた頃は、地力の高い学校の注目選手が軒並み99で並んでいた。
+ * **上限に張り付いた瞬間、学校ごとの差が消える。**
+ */
+const STAR_RATING_MAX = 93
 
 /**
  * 整数に丸める。
