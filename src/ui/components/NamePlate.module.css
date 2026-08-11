@@ -116,8 +116,7 @@
   min-width: 1.5em;
   padding: 1px 3px;
   border-radius: 3px;
-  /* **白ベースでは黒い座布団が浮く。** 紙色の座布団に、濃いランク色を載せる */
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(0, 0, 0, 0.5);
   color: var(--rank-color);
   font-size: 11px;
   font-weight: 800;

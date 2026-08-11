@@ -5,8 +5,7 @@
   justify-content: center;
   gap: var(--sp-4);
   padding: var(--sp-2);
-  /* 空から芝へ。白ベースでも沈まないよう、薄い空色から紙色へ */
-  background: linear-gradient(to bottom, #cfe6f5, var(--bg-panel));
+  background: linear-gradient(to bottom, #2a5a7a, var(--bg-panel));
 }
 
 .field {
@@ -15,15 +14,15 @@
 
 /* 塁。走者がいると光る */
 .base {
-  fill: rgba(255, 255, 255, 0.7);
-  stroke: rgba(35, 33, 28, 0.35);
+  fill: rgba(255, 255, 255, 0.25);
+  stroke: rgba(255, 255, 255, 0.6);
   stroke-width: 1.5;
   transition: fill 0.25s ease;
 }
 
 .baseOccupied {
   fill: var(--accent);
-  stroke: rgba(35, 33, 28, 0.5);
+  stroke: #fff;
 }
 
 .status {

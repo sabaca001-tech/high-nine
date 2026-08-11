@@ -55,7 +55,7 @@
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
-  background: rgba(35, 33, 28, 0.06);
+  background: rgba(0, 0, 0, 0.4);
   color: var(--text-main);
 }
 
@@ -90,7 +90,7 @@
 .personality {
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(35, 33, 28, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-main);
   font-weight: 700;
   white-space: nowrap;
@@ -131,7 +131,7 @@
   justify-content: center;
   border-radius: 10px;
   border: 3px solid var(--rank-color);
-  background: rgba(35, 33, 28, 0.06);
+  background: rgba(0, 0, 0, 0.45);
   color: var(--rank-color);
   font-size: var(--fs-xl);
   font-weight: 800;
