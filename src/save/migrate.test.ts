@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { APTITUDE_MAX } from '@/core/types/player'
 import { validateLineup } from '@/core/lineup/autoLineup'
+import { ALL_POSITIONS } from '@/core/lineup/aptitude'
 import { createInitialState } from '@/core/gameEngine'
 import { SAVE_VERSION } from '@/core/types/game'
 import { REPUTATION_INITIAL } from '@/core/types/season'
@@ -62,7 +64,7 @@ describe('migrate', () => {
     expect(validateLineup(migrated!.lineup, migrated!.players)).toEqual([])
     for (const player of migrated!.players) {
       expect(player.skills).toEqual([])
-      expect(player.aptitudes[player.position]).toBe('S')
+      expect(player.aptitudes[player.position]).toBe(APTITUDE_MAX)
     }
   })
 
@@ -245,5 +247,38 @@ describe('migrate', () => {
     expect(migrate([])).toBeNull()
     expect(migrate({})).toBeNull()
     expect(migrate({ version: SAVE_VERSION, players: [] })).toBeNull()
+  })
+})
+
+describe('v38 → v39（適性を5段階へ）', () => {
+  it('記号の適性を段数に読み替える', () => {
+    // 記号で持っていた頃のセーブを作る
+    const state = createInitialState({ seed: 5 })
+    const letters = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
+    const base = JSON.parse(
+      JSON.stringify({
+        ...state,
+        version: 38,
+        players: state.players.map((player, index) => ({
+          ...player,
+          aptitudes: Object.fromEntries(
+            ALL_POSITIONS.map((position, i) => [position, letters[(index + i) % letters.length]]),
+          ),
+        })),
+      }),
+    )
+    const migrated = migrate(base)
+
+    expect(migrated).not.toBeNull()
+    for (const player of migrated!.players) {
+      for (const position of ALL_POSITIONS) {
+        const aptitude = player.aptitudes[position]
+        expect(Number.isInteger(aptitude)).toBe(true)
+        expect(aptitude).toBeGreaterThanOrEqual(0)
+        expect(aptitude).toBeLessThanOrEqual(APTITUDE_MAX)
+      }
+      // 本職は必ず最上段。ここが下がると本職の位置で全力を出せない
+      expect(player.aptitudes[player.position]).toBe(APTITUDE_MAX)
+    }
   })
 })

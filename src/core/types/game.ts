@@ -76,8 +76,10 @@ import type { FriendlyOffer } from '@/core/match/friendlyOffers'
  * v33 → v34: ProSeason に細かい成績（二塁打・盗塁・四球・投球回・セーブ）と
  *            titles（獲得タイトル）を追加。
  * v34 → v35: 大会に draw（開幕時の抽選で決まる山）を追加。
+ * v38 → v39: ポジション適性を S〜G の8段階から5段階の数値へ
+ *            （1段＝守備力の20%。0は守れない）。
  */
-export const SAVE_VERSION = 38
+export const SAVE_VERSION = 39
 
 /** 月（4月始まり。1〜12の暦月をそのまま使う） */
 export type Month = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12

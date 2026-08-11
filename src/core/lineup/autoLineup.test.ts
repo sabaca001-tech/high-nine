@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from '@/core/player/createPlayer'
 import { LINEUP_SIZE } from '@/core/types/lineup'
+import { APTITUDE_MAX } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { ALL_POSITIONS, createAptitudes, defenseScore, isPlayable } from './aptitude'
 import { overallRating } from '@/core/player/rating'
@@ -18,10 +19,10 @@ import { pitcherValue } from '@/core/match/teamState'
 import { YOUTH_TIEBREAK } from '@/core/player/squad'
 
 describe('createAptitudes', () => {
-  it('メインポジションは必ずS', () => {
+  it('メインポジションは必ず最上段（5）', () => {
     const rng = createRng(1)
     for (const position of ALL_POSITIONS) {
-      expect(createAptitudes(rng, position)[position]).toBe('S')
+      expect(createAptitudes(rng, position)[position]).toBe(APTITUDE_MAX)
     }
   })
 
@@ -316,7 +317,7 @@ describe('守備位置ごとの重み', () => {
     const fielders = roster.filter((p) => !p.pitching).slice(0, 8)
 
     const anyPosition = Object.fromEntries(
-      ALL_POSITIONS.map((position) => [position, 'S']),
+      ALL_POSITIONS.map((position) => [position, APTITUDE_MAX]),
     ) as Player['aptitudes']
 
     const glove: Player = {

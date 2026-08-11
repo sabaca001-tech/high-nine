@@ -18,6 +18,7 @@ import type { Rng } from '@/core/rng/random'
 import { pickName } from '@/core/player/createPlayer'
 import type { Grade } from '@/core/types/player'
 import type { RegionId } from '@/core/types/region'
+import { rosterTalentOf } from './rivalRoster'
 import { findRegion, REGIONS } from '@/core/types/region'
 import { makeSchoolName } from './rivalDefs'
 
@@ -155,7 +156,7 @@ export const NATIONAL_RIVALS = (REGIONS.length - 1) * NATIONAL_SCHOOLS_PER_REGIO
  * 178校の県なら、常連5校・強豪12校・中堅上位27校が出てくる。
  */
 const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
-  { weight: 0.35, min: 52, max: 84 }, // 全国区の名門
+  { weight: 0.08, min: 60, max: 82 }, // 全国区の名門
   { weight: 3, min: 28, max: 42 }, // 甲子園常連
   { weight: 7, min: 18, max: 28 }, // 強豪
   { weight: 15, min: 8, max: 18 }, // 中堅上位
@@ -176,10 +177,10 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
  * 県ごとの厚みがそのまま全国の厚みになる）。
  */
 const TOP_SCHOOL_FLOORS: { min: number; max: number }[] = [
-  { min: 34, max: 66 }, // 筆頭校
-  { min: 26, max: 48 }, // 2番手
-  { min: 18, max: 36 }, // 3番手
-  { min: 12, max: 28 }, // 4番手
+  { min: 38, max: 56 }, // 筆頭校
+  { min: 28, max: 44 }, // 2番手
+  { min: 20, max: 34 }, // 3番手
+  { min: 14, max: 26 }, // 4番手
 ]
 
 /**
@@ -196,7 +197,7 @@ const TOP_SCHOOL_FLOORS: { min: number; max: number }[] = [
  *
  * **保存は増えない。** 種（`rosterSeed`）と入学年から毎回同じ値を作る。
  */
-export const CLASS_SPREAD = 7
+export const CLASS_SPREAD = 5
 
 /**
  * その代の出来。同じ学校・同じ入学年なら必ず同じ値になる。
@@ -427,8 +428,16 @@ function makeStar(
   const name = pickName(rng, takenNames)
   takenNames.push(name)
 
-  // 1年生で30前後、3年生で60前後。地力の高い学校ほど上乗せされる
-  const base = 22 + grade * 14 + Math.round(tradition * 0.8)
+  /*
+   * 1年生で30前後、3年生で60前後。地力の高い学校ほど上乗せされる。
+   *
+   * **地力の乗り方は名簿と同じ式（`rosterTalentOf`）に揃える。**
+   * 素直に0.8で乗せていた頃は、地力60の学校の3年生が
+   * `22 + 42 + 48 = 112` で上限（99）に張り付き、
+   * 名門の注目選手が**全員99**になっていた。
+   * U18代表の30人がそれで埋まり、自校の選手はどう育てても届かない。
+   */
+  const base = 22 + grade * 14 + Math.round(rosterTalentOf(tradition))
 
   return {
     id,

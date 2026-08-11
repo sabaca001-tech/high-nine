@@ -63,12 +63,10 @@ export function groupOf(position: Position): PositionGroup {
 }
 
 /** ネームプレートに色を出す適性の下限。ここ未満は「守れない」扱い */
-const PLATE_APTITUDE_MIN: Aptitude = 'C'
-
-const APTITUDE_RANK: Aptitude[] = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
+const PLATE_APTITUDE_MIN: Aptitude = 3
 
 function isPlateWorthy(aptitude: Aptitude): boolean {
-  return APTITUDE_RANK.indexOf(aptitude) <= APTITUDE_RANK.indexOf(PLATE_APTITUDE_MIN)
+  return aptitude >= PLATE_APTITUDE_MIN
 }
 
 /**

@@ -159,6 +159,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 38) {
     data = migrateV37ToV38(data)
   }
+  if (version < 39) {
+    data = migrateV38ToV39(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -946,6 +949,42 @@ function migrateV37ToV38(raw: Record<string, unknown>): Record<string, unknown> 
     isRecord(value) && value.ability === undefined ? { ...value, ability: 50 } : value,
   )
   return { ...raw, version: 38, managers }
+}
+
+/**
+ * v38 → v39
+ *  - ポジション適性を S〜G の8段階から**5段階の数値**へ
+ *
+ * 1段が守備力の20%になり、0は「守れない」を表す。
+ * 記号のままだと倍率（S=1.0〜G=0.3）が画面から読めず、
+ * 「G でもどこでも守れる」状態でもあった。
+ *
+ * 近い段に読み替える。**本職（S）だけは必ず5**にしないと、
+ * 本職の位置で全力を出せない選手ができてしまう。
+ */
+function migrateV38ToV39(raw: Record<string, unknown>): Record<string, unknown> {
+  const level: Record<string, number> = { S: 5, A: 4, B: 3, C: 2, D: 2, E: 1, F: 1, G: 0 }
+
+  const convert = (value: unknown): unknown => {
+    if (!isRecord(value)) return value
+    const player = value as Record<string, unknown>
+    if (!isRecord(player.aptitudes)) return player
+
+    const aptitudes: Record<string, number> = {}
+    for (const [position, aptitude] of Object.entries(player.aptitudes)) {
+      aptitudes[position] =
+        typeof aptitude === 'number' ? aptitude : (level[String(aptitude)] ?? 0)
+    }
+    // 本職は必ず最上段
+    if (typeof player.position === 'string') aptitudes[player.position] = 5
+
+    return { ...player, aptitudes }
+  }
+
+  const players = Array.isArray(raw.players) ? raw.players.map(convert) : raw.players
+  const graduates = Array.isArray(raw.graduates) ? raw.graduates.map(convert) : raw.graduates
+
+  return { ...raw, version: 39, players, graduates }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

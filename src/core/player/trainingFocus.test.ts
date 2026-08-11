@@ -61,7 +61,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     personality: 'クール',
     growthAptitude: {},
     aptitudes: {
-      P: 'G', C: 'F', '1B': 'C', '2B': 'B', '3B': 'B', SS: 'C', LF: 'B', CF: 'S', RF: 'B',
+      P: 0, C: 1, '1B': 2, '2B': 3, '3B': 3, SS: 2, LF: 3, CF: 5, RF: 3,
     },
     skills: [],
     history: [],
@@ -141,17 +141,17 @@ describe('コンバート', () => {
 
   it(`${CONVERT_STEPS}回の練習で適性が1段階上がる`, () => {
     let player = makePlayer({ focus: { type: 'convert', position: '1B' } })
-    expect(player.aptitudes['1B']).toBe('C')
+    expect(player.aptitudes['1B']).toBe(2)
 
     for (let i = 0; i < CONVERT_STEPS - 1; i++) {
       player = advanceConvert(rng, player).player
       // 途中では上がらない
-      expect(player.aptitudes['1B']).toBe('C')
+      expect(player.aptitudes['1B']).toBe(2)
     }
 
     const step = advanceConvert(rng, player)
-    expect(step.promoted).toEqual({ position: '1B', from: 'C', to: 'B' })
-    expect(step.player.aptitudes['1B']).toBe('B')
+    expect(step.promoted).toEqual({ position: '1B', from: 2, to: 3 })
+    expect(step.player.aptitudes['1B']).toBe(3)
     expect(step.player.convertProgress).toBe(0)
   })
 
@@ -159,7 +159,7 @@ describe('コンバート', () => {
     let player = makePlayer({
       focus: { type: 'convert', position: '2B' },
       convertProgress: CONVERT_STEPS - 1,
-      aptitudes: { ...makePlayer().aptitudes, '2B': 'B' },
+      aptitudes: { ...makePlayer().aptitudes, '2B': 3 },
     })
 
     player = advanceConvert(rng, player).player
@@ -170,12 +170,12 @@ describe('コンバート', () => {
   it('本職より上（S）にはならない', () => {
     let player = makePlayer({
       focus: { type: 'convert', position: '2B' },
-      aptitudes: { ...makePlayer().aptitudes, '2B': 'A' },
+      aptitudes: { ...makePlayer().aptitudes, '2B': 4 },
     })
     // すでにAなので、方針ごと戻される
     player = advanceConvert(rng, player).player
 
-    expect(player.aptitudes['2B']).toBe('A')
+    expect(player.aptitudes['2B']).toBe(4)
     expect(player.focus).toEqual(DEFAULT_FOCUS)
   })
 
@@ -304,24 +304,24 @@ describe('本職の転向', () => {
   it('本職として指定すると S まで上がり、ポジションが入れ替わる', () => {
     const player = makePlayer({
       focus: { type: 'convert', position: '1B', main: true },
-      aptitudes: { ...makePlayer().aptitudes, '1B': 'A' },
+      aptitudes: { ...makePlayer().aptitudes, '1B': 4 },
     })
     // A → S で1段階ぶん
     const done = upTo(player, CONVERT_MAIN_STEPS)
 
     expect(done.position).toBe('1B')
-    expect(done.aptitudes['1B']).toBe('S')
+    expect(done.aptitudes['1B']).toBe(5)
     expect(done.focus).toEqual(DEFAULT_FOCUS)
   })
 
   it('サブなら A で止まり、本職は変わらない', () => {
     const player = makePlayer({
       focus: { type: 'convert', position: '1B' },
-      aptitudes: { ...makePlayer().aptitudes, '1B': 'B' },
+      aptitudes: { ...makePlayer().aptitudes, '1B': 3 },
     })
     const done = upTo(player, CONVERT_STEPS)
 
-    expect(done.aptitudes['1B']).toBe('A')
+    expect(done.aptitudes['1B']).toBe(4)
     expect(done.position).toBe(makePlayer().position)
   })
 
@@ -329,7 +329,7 @@ describe('本職の転向', () => {
     // 持たないまま投手にすると、登板しても何も投げられない
     const player = makePlayer({
       focus: { type: 'convert', position: 'P', main: true },
-      aptitudes: { ...makePlayer().aptitudes, P: 'A' },
+      aptitudes: { ...makePlayer().aptitudes, P: 4 },
     })
     const done = upTo(player, CONVERT_MAIN_STEPS)
 
@@ -343,7 +343,7 @@ describe('本職の転向', () => {
     const convert = (arm: number) => {
       const base = makePlayer({
         focus: { type: 'convert', position: 'P', main: true },
-        aptitudes: { ...makePlayer().aptitudes, P: 'A' },
+        aptitudes: { ...makePlayer().aptitudes, P: 4 },
       })
       const player = { ...base, batting: { ...base.batting, arm } }
       return upTo(player, CONVERT_MAIN_STEPS).pitching!.velocity
@@ -360,7 +360,7 @@ describe('本職の転向', () => {
       position: 'P',
       pitching: { velocity: 140, control: 60, stamina: 60, breaking: 60, pitches: [] },
       focus: { type: 'convert', position: 'LF', main: true },
-      aptitudes: { ...base.aptitudes, LF: 'A' },
+      aptitudes: { ...base.aptitudes, LF: 4 },
     }
     const done = upTo(pitcher, CONVERT_MAIN_STEPS)
 
@@ -373,7 +373,7 @@ describe('本職の転向', () => {
     const base = makePlayer()
     const player = makePlayer({
       focus: { type: 'convert', position: '2B', main: true },
-      aptitudes: { ...base.aptitudes, '2B': 'S' },
+      aptitudes: { ...base.aptitudes, '2B': 5 },
     })
     const done = advanceConvert(rng, player).player
     expect(done.position).toBe('2B')

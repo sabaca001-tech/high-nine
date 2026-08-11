@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from '@/core/player/createPlayer'
 import type { Aptitude, Player, Position } from '@/core/types/player'
-import { misplacementPenalty, POSITION_WEIGHT } from './aptitude'
+import { APTITUDE_MAX } from '@/core/types/player'
+import { createAptitudes, defenseScore, misplacementPenalty, POSITION_WEIGHT } from './aptitude'
 import { ALL_POSITIONS } from './aptitude'
 
 const players = createInitialRoster(createRng(7))
@@ -25,22 +26,56 @@ describe('POSITION_WEIGHT', () => {
 })
 
 describe('misplacementPenalty', () => {
-  it('C以上の適性なら罰は無い', () => {
-    for (const aptitude of ['S', 'A', 'B', 'C'] as Aptitude[]) {
+  it('3段以上の適性なら罰は無い', () => {
+    for (const aptitude of [5, 4, 3] as Aptitude[]) {
       expect(misplacementPenalty(withAptitude(players[0], aptitude), 'SS')).toBe(0)
     }
   })
 
   it('適性が低いほど大きくなる', () => {
-    const d = misplacementPenalty(withAptitude(players[0], 'D'), 'SS')
-    const g = misplacementPenalty(withAptitude(players[0], 'G'), 'SS')
+    const d = misplacementPenalty(withAptitude(players[0], 2), 'SS')
+    const g = misplacementPenalty(withAptitude(players[0], 0), 'SS')
     expect(g).toBeGreaterThan(d)
     expect(d).toBeGreaterThan(0)
   })
 
   it('同じ適性でも、重要な位置に置くほど罰が大きい', () => {
-    const bad = withAptitude(players[0], 'G')
+    const bad = withAptitude(players[0], 0)
     expect(misplacementPenalty(bad, 'SS')).toBeGreaterThan(misplacementPenalty(bad, 'LF'))
     expect(misplacementPenalty(bad, 'C')).toBeGreaterThan(misplacementPenalty(bad, '1B'))
+  })
+})
+
+describe('適性は5段階、1段が守備力の20%', () => {
+  const player = players.find((p) => !p.pitching)!
+
+  it('本職（5段）なら守備力がそのまま出る', () => {
+    const full = defenseScore(withAptitude(player, APTITUDE_MAX), '1B')
+    const base =
+      player.batting.fielding * 0.5 + player.batting.catching * 0.25 + player.batting.arm * 0.25
+    expect(full).toBeCloseTo(base, 5)
+  })
+
+  it('1段ごとに20%ずつ落ちる', () => {
+    const at = (level: Aptitude) => defenseScore(withAptitude(player, level), '1B')
+    const full = at(APTITUDE_MAX)
+
+    expect(at(4)).toBeCloseTo(full * 0.8, 5)
+    expect(at(3)).toBeCloseTo(full * 0.6, 5)
+    expect(at(1)).toBeCloseTo(full * 0.2, 5)
+    // 0段は守れない
+    expect(at(0)).toBe(0)
+  })
+
+  it('本職は必ず5段、それ以外は5段にならない', () => {
+    const rng = createRng(11)
+    for (const main of ALL_POSITIONS) {
+      const aptitudes = createAptitudes(rng, main)
+      expect(aptitudes[main]).toBe(APTITUDE_MAX)
+      for (const position of ALL_POSITIONS) {
+        if (position === main) continue
+        expect(aptitudes[position]).toBeLessThan(APTITUDE_MAX)
+      }
+    }
   })
 })

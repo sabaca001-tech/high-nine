@@ -151,7 +151,7 @@ export function PlayerCard({
           </div>
           <div className={styles.charts}>
             <span className={styles.chartBox}>
-              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+              <AptitudeDiamond player={player} main={player.position} />
               <span className={styles.chartCaption}>守備適性</span>
             </span>
             <span className={styles.chartBox}>
@@ -172,7 +172,7 @@ export function PlayerCard({
               <TrajectoryArrow trajectory={player.batting.trajectory} size={13} />
             </span>
             <span className={styles.chartBox}>
-              <AptitudeDiamond aptitudes={player.aptitudes} main={player.position} />
+              <AptitudeDiamond player={player} main={player.position} />
               <span className={styles.chartCaption}>守備適性</span>
             </span>
           </div>

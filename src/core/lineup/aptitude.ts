@@ -1,7 +1,7 @@
 /** ポジション適性の生成と評価 */
 
 import type { Rng } from '@/core/rng/random'
-import { APTITUDE_MULTIPLIER } from '@/core/types/player'
+import { APTITUDE_MAX, APTITUDE_MULTIPLIER } from '@/core/types/player'
 import type { Aptitude, Player, Position } from '@/core/types/player'
 
 export const ALL_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -13,6 +13,8 @@ const OUTFIELD: Position[] = ['LF', 'CF', 'RF']
 /**
  * メインポジションから全ポジションの適性を作る。
  * 近い位置は守れるが、投手・捕手は専門職なので他の選手にはほぼ適性が付かない。
+ *
+ * **本職は必ず5**。そこから離れるほど段が下がり、0なら守れない。
  */
 export function createAptitudes(rng: Rng, main: Position): Record<Position, Aptitude> {
   const result = {} as Record<Position, Aptitude>
@@ -20,32 +22,32 @@ export function createAptitudes(rng: Rng, main: Position): Record<Position, Apti
   for (const position of ALL_POSITIONS) {
     result[position] = rollAptitude(rng, main, position)
   }
-  result[main] = 'S'
+  result[main] = APTITUDE_MAX
   return result
 }
 
 function rollAptitude(rng: Rng, main: Position, target: Position): Aptitude {
-  if (main === target) return 'S'
+  if (main === target) return APTITUDE_MAX
 
   // 投手は専門職。投手以外が投げるのも、投手が守るのも適性は低い
-  if (target === 'P' || main === 'P') return rng.pick<Aptitude>(['F', 'G', 'G'])
+  if (target === 'P' || main === 'P') return rng.pick<Aptitude>([1, 0, 0])
 
   // 捕手も専門職
-  if (target === 'C') return rng.pick<Aptitude>(['E', 'F', 'G'])
+  if (target === 'C') return rng.pick<Aptitude>([1, 1, 0])
   if (main === 'C') {
     // 捕手は一塁くらいなら守れる
-    return target === '1B' ? rng.pick<Aptitude>(['C', 'D']) : rng.pick<Aptitude>(['E', 'F'])
+    return target === '1B' ? rng.pick<Aptitude>([3, 2]) : rng.pick<Aptitude>([1, 1, 2])
   }
 
   // 一塁は誰でもある程度守れる
-  if (target === '1B') return rng.pick<Aptitude>(['B', 'C', 'C', 'D'])
+  if (target === '1B') return rng.pick<Aptitude>([4, 3, 3, 2])
 
   const sameGroup =
     (INFIELD.includes(main) && INFIELD.includes(target)) ||
     (OUTFIELD.includes(main) && OUTFIELD.includes(target))
 
-  if (sameGroup) return rng.pick<Aptitude>(['A', 'B', 'B', 'C'])
-  return rng.pick<Aptitude>(['D', 'E', 'E', 'F'])
+  if (sameGroup) return rng.pick<Aptitude>([4, 4, 3, 3])
+  return rng.pick<Aptitude>([2, 2, 1, 1])
 }
 
 /**
@@ -74,7 +76,10 @@ export const POSITION_WEIGHT: Record<Position, number> = {
 
 /**
  * その選手をその位置で起用したときの守備力。
- * 適性が低いほど下がる。スタメン自動編成と試合の判定に使う。
+ *
+ * **画面に出るのもこの数字**（適性の段数×20%）。
+ * 「適性C」のような別の物差しを画面に出すと、
+ * 何割の力で守れるのかが読めない（CLAUDE.md「表示のランクと判定の尺度は…」）。
  */
 export function defenseScore(player: Player, position: Position): number {
   const aptitude = player.aptitudes[position]
@@ -96,16 +101,18 @@ export function defenseScore(player: Player, position: Position): number {
  * この値が失策率とヒット率に効く。
  */
 export function misplacementPenalty(player: Player, position: Position): number {
-  const gap =
-    APTITUDE_ORDER.indexOf(player.aptitudes[position]) - APTITUDE_ORDER.indexOf('C')
+  const gap = PLAYABLE_APTITUDE - player.aptitudes[position]
   if (gap <= 0) return 0
   return gap * POSITION_WEIGHT[position]
 }
 
-/** 適性の見た目の並び順（S が最良） */
-export const APTITUDE_ORDER: Aptitude[] = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
+/** ここまでは無難に守れる。これを下回ると失策とヒットが増える */
+export const PLAYABLE_APTITUDE: Aptitude = 3
+
+/** 適性の見た目の並び順（5が最良） */
+export const APTITUDE_ORDER: Aptitude[] = [5, 4, 3, 2, 1, 0]
 
 /** 適性が「守れる」水準か。UI の色分けに使う */
 export function isPlayable(aptitude: Aptitude): boolean {
-  return APTITUDE_ORDER.indexOf(aptitude) <= APTITUDE_ORDER.indexOf('C')
+  return aptitude >= PLAYABLE_APTITUDE
 }

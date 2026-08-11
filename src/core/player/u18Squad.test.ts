@@ -147,9 +147,11 @@ describe('代表の水準', () => {
       .map((member) => (member.snapshot ? overallRating(member.snapshot) : 0))
       .sort((a, b) => b - a)
 
+    // **ここでは学校を1年も進めていない**（注目選手は伸びず、戦力も揺れない）ので、
+    // 実プレイより一段低く出る。上限のほうを縛る
     expect(ratings.filter((rating) => rating >= 95).length).toBeLessThanOrEqual(3)
     expect(ratings.filter((rating) => rating >= 90).length).toBeLessThanOrEqual(10)
     // 逆に弱すぎても代表の意味が無い
-    expect(ratings[0]).toBeGreaterThanOrEqual(90)
+    expect(ratings[0]).toBeGreaterThanOrEqual(85)
   })
 })

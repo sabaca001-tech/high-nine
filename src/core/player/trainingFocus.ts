@@ -13,6 +13,7 @@
  */
 
 import { APTITUDE_ORDER, ALL_POSITIONS } from '@/core/lineup/aptitude'
+import { APTITUDE_MAX } from '@/core/types/player'
 import type { Rng } from '@/core/rng/random'
 import type { Aptitude, GrowableKey, Player, Position } from '@/core/types/player'
 import { rollPitchingFor } from './convertPitching'
@@ -44,11 +45,11 @@ export const FOCUS_PENALTY = 0.6
 /** コンバート練習中は通常の練習効果が下がる */
 export const CONVERT_PRACTICE_PENALTY = 0.7
 
-/** サブポジとして鍛えたときの上限。本職(S)には届かない */
-export const CONVERT_MAX: Aptitude = 'A'
+/** サブポジとして鍛えたときの上限。本職（5）には届かない */
+export const CONVERT_MAX: Aptitude = 4
 
 /** 本職として転向したときの上限。ここまで来ると本職が入れ替わる */
-export const CONVERT_MAIN_MAX: Aptitude = 'S'
+export const CONVERT_MAIN_MAX: Aptitude = APTITUDE_MAX
 
 /** 適性が1段階上がるのに必要な練習回数 */
 export const CONVERT_STEPS = 8
@@ -71,7 +72,7 @@ export function convertSteps(focus: { main?: boolean }): number {
   return focus.main ? CONVERT_MAIN_STEPS : CONVERT_STEPS
 }
 
-/** APTITUDE_ORDER は S が0番。数字が小さいほど良い */
+/** 適性は数字が大きいほど良い（5が本職） */
 function rankIndex(aptitude: Aptitude): number {
   return APTITUDE_ORDER.indexOf(aptitude)
 }
@@ -289,8 +290,8 @@ function switchMainPosition(rng: Rng, player: Player, position: Position): Conve
   const base: Player = {
     ...backToTeam(player),
     position,
-    // 転向した位置は本職なので S にする
-    aptitudes: { ...player.aptitudes, [position]: 'S' as Aptitude },
+    // 転向した位置は本職なので最上段にする
+    aptitudes: { ...player.aptitudes, [position]: APTITUDE_MAX },
     isPitcher: toPitcher,
   }
 

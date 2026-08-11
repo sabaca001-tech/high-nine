@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
+import { ALL_POSITIONS, defenseScore, isPlayable } from '@/core/lineup/aptitude'
 import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import { overallRating, toRank } from '@/core/player/rating'
@@ -319,6 +319,8 @@ export function LineupEditor() {
                 const player = byId.get(slot.playerId)
                 if (!player) return null
                 const aptitude = player.aptitudes[slot.position]
+                // その位置で発揮できる守備力。適性0なら守れない
+                const defense = aptitude > 0 ? Math.round(defenseScore(player, slot.position)) : null
 
                 return (
                   <NamePlate
@@ -345,7 +347,7 @@ export function LineupEditor() {
                               : `${styles.aptitude} ${styles.aptBad}`
                           }
                         >
-                          {aptitude}
+                          {defense ?? '—'}
                         </span>
                       </>
                     }
@@ -606,23 +608,24 @@ const SKILL_RANK_CLASS: Record<string, string> = {
  *
  * **どこを守れるかが分からないと入れ替えの判断ができない。**
  * 能力だけ見て動かすと、適性の無い位置に置いて失策が増えていた。
- * 本職を先頭に、守れる位置（C以上）だけを適性つきで並べる。
+ * 本職を先頭に、守れる位置だけを**その位置での守備力**つきで並べる。
  */
 function PlayablePositions({ player }: { player: Player }) {
   const playable = ALL_POSITIONS.filter(
     (position) => position !== player.position && isPlayable(player.aptitudes[position]),
   )
+  const scoreAt = (position: Position) => Math.round(defenseScore(player, position))
 
   return (
     <div className={styles.aptRow}>
       <span className={`${styles.aptChip} ${styles.aptChipMain}`}>
         {player.position}
-        <span className={styles.aptChipRank}>{player.aptitudes[player.position]}</span>
+        <span className={styles.aptChipRank}>{scoreAt(player.position)}</span>
       </span>
       {playable.map((position) => (
         <span key={position} className={styles.aptChip}>
           {position}
-          <span className={styles.aptChipRank}>{player.aptitudes[position]}</span>
+          <span className={styles.aptChipRank}>{scoreAt(position)}</span>
         </span>
       ))}
       {playable.length === 0 && <span className={styles.aptNone}>他は守れない</span>}
@@ -665,7 +668,9 @@ function PositionSheet({
         <p className={styles.sheetTitle}>{player?.name ?? ''}の守備位置</p>
         <div className={styles.positionGrid}>
           {ALL_POSITIONS.map((position) => {
-            const aptitude = player?.aptitudes[position] ?? 'G'
+            const aptitude = player?.aptitudes[position] ?? 0
+            // 守れない位置は数字を出さない（0段は「守れない」の意味）
+            const score = player && aptitude > 0 ? Math.round(defenseScore(player, position)) : null
             return (
               <button
                 key={position}
@@ -679,7 +684,7 @@ function PositionSheet({
               >
                 <span>{position}</span>
                 <span className={isPlayable(aptitude) ? styles.aptGood : styles.aptBad}>
-                  {aptitude}
+                  {score ?? '—'}
                 </span>
               </button>
             )

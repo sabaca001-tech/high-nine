@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ALL_POSITIONS, isPlayable } from '@/core/lineup/aptitude'
+import { ALL_POSITIONS, defenseScore, isPlayable } from '@/core/lineup/aptitude'
 import {
   canConvert,
   CONVERT_MAIN_MAX,
@@ -530,13 +530,16 @@ function TrainingTab({ player }: { player: Player }) {
 
         <p className={styles.chartNote}>
           {mainConvert
-            ? `守らせたい位置をタップすると、本職を移す練習を始めます。適性が${CONVERT_MAIN_MAX}に届いた時点でポジションが入れ替わります（投手⇄野手も可）。`
-            : `守れるようにしたい位置をタップすると、その練習を始めます。${CONVERT_MAX}まで伸ばせます（本職${CONVERT_MAIN_MAX}には届きません）。`}
+            ? `守らせたい位置をタップすると、本職を移す練習を始めます。適性が${CONVERT_MAIN_MAX}段（本職）に届いた時点でポジションが入れ替わります（投手⇄野手も可）。`
+            : `守れるようにしたい位置をタップすると、その練習を始めます。${CONVERT_MAX}段まで伸ばせます（本職の${CONVERT_MAIN_MAX}段には届きません）。数字はその位置で出せる守備力です。`}
         </p>
 
         <div className={styles.aptitudeGrid}>
           {ALL_POSITIONS.map((position) => {
             const aptitude = player.aptitudes[position]
+            // 段数ではなく「その位置で出せる守備力」を出す。
+            // 守れない位置（0段）は数字を出さない
+            const defense = aptitude > 0 ? Math.round(defenseScore(player, position)) : null
             const convertible = canConvert(player, position, mainConvert)
             const active =
               focus.type === 'convert' &&
@@ -569,7 +572,7 @@ function TrainingTab({ player }: { player: Player }) {
                       : `${styles.aptitudeRank} ${styles.aptBad}`
                   }
                 >
-                  {aptitude}
+                  {defense ?? '—'}
                 </span>
               </button>
             )

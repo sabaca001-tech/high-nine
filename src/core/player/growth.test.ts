@@ -50,7 +50,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     personality: 'クール',
     growthAptitude: {},
     aptitudes: {
-      P: 'G', C: 'F', '1B': 'C', '2B': 'B', '3B': 'B', SS: 'C', LF: 'B', CF: 'S', RF: 'B',
+      P: 0, C: 1, '1B': 3, '2B': 4, '3B': 4, SS: 3, LF: 4, CF: 5, RF: 4,
     },
     skills: [],
     history: [],

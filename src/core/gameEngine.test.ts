@@ -1778,13 +1778,16 @@ describe('グラウンド整備', () => {
   })
 
   it('放っておくとグラウンドは荒れて下がる', () => {
-    // 荒れやすい高い段階で、月をまたぐ年を通して確かめる
-    let state: GameState = { ...startedGame({ seed: 210 }), groundLevel: 90 }
+    // 荒れるのは毎月の抽選なので、**1シードでは引かない年もある**。
+    // 荒れやすい高い段階で、いくつかのシードを1年ずつ回して確かめる
     let decayed = false
 
-    while (state.phase !== 'yearEnd' && !decayed) {
-      state = playStep(state)
-      if (state.groundLevel < 90) decayed = true
+    for (let seed = 210; seed < 216 && !decayed; seed++) {
+      let state: GameState = { ...startedGame({ seed }), groundLevel: 90 }
+      while (state.phase !== 'yearEnd' && !decayed) {
+        state = playStep(state)
+        if (state.groundLevel < 90) decayed = true
+      }
     }
     expect(decayed).toBe(true)
   })
@@ -2785,7 +2788,7 @@ describe('ライバル校', () => {
     let found = false
 
     // 鳥取（24校＝5回戦）でも全国に届くのは稀なので、何度も試す
-    for (let seed = 8000; seed < 8400 && !found; seed++) {
+    for (let seed = 8000; seed < 8600 && !found; seed++) {
       let state = startedGame({ seed, regionId: 'tottori' })
 
       for (let guard = 0; guard < 600 && !found; guard++) {

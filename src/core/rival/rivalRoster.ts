@@ -24,8 +24,24 @@ import type { Grade, Player } from '@/core/types/player'
 import type { RivalPlayer, RivalSchool } from './rivals'
 import { classBonus, starsOf } from './rivals'
 
-/** 1学年あたりの人数。3学年で15人 */
-const PER_GRADE = 5
+/**
+ * 1学年あたりの人数。**強い学校ほど多い。**
+ *
+ * **5人（15人）では層が薄すぎた。** スタメン9人を15人から選ぶので、
+ * 弱い選手まで必ず出場することになり、学校の力が上がらない。
+ * 人数を増やすと**選ばれる9人の質だけが上がる**ので、
+ * 突出した個人を作らずにチームを強くできる
+ * （個人の上限を上げるとU18代表が90台で埋まってしまう）。
+ *
+ * 名門に部員が集まるのは現実にもそうで、
+ * 「層の厚さ」を学校の格の表し方として使う。
+ */
+const PER_GRADE_MIN = 8
+const PER_GRADE_MAX = 16
+
+function perGradeOf(strength: number): number {
+  return Math.min(PER_GRADE_MAX, PER_GRADE_MIN + Math.max(0, Math.round(strength / 8)))
+}
 
 /**
  * 学校の戦力を、選手ひとりの素質にどれだけ乗せるか。
@@ -78,7 +94,7 @@ const PITCHERS_PER_GRADE = 2
  *
  * 個人差は注目選手（`stars`）が担うので、名簿のほうは学校の格に寄せる。
  */
-const ROSTER_TALENT_SPREAD = 7
+const ROSTER_TALENT_SPREAD = 5
 
 /**
  * 他校の部員が**1年で伸びる量**。
@@ -157,6 +173,8 @@ export function rivalRoster(
   // 年度の中でも伸びる。**乱数の引き方は変えない**ので、
   // 同じ学校・同じ年なら顔ぶれはそのままで能力だけが上がる
   const grown = seasonGrowth(progress)
+  // 強い学校ほど部員が多い。選ばれる9人の質が上がる
+  const perGrade = perGradeOf(school.strength)
 
   for (const grade of [3, 2, 1] as Grade[]) {
     // 入学年で種を決める。学年が上がっても同じ人物になる
@@ -169,7 +187,7 @@ export function rivalRoster(
     // 学年をまたいだ同姓同名は 120×120 の名前から選ぶので滅多に起きない
     const takenNames: string[] = []
 
-    for (let i = 0; i < PER_GRADE; i++) {
+    for (let i = 0; i < perGrade; i++) {
       // **選手ごとに種を分ける。** 代ぶんの乱数を1本で回していた頃は、
       // 前の選手が引いた回数（投手の持ち球の数は能力で変わる）が
       // 後ろの選手の名前をずらしていた。
