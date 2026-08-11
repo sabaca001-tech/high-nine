@@ -11,13 +11,20 @@
   background: var(--bg-base);
 }
 
+/*
+ * 8タブを375pxに並べるので、1つあたり42px。
+ * カタカナは全角なので11pxだと「スカウト」（4文字＝44px）が折り返す。
+ * **折り返さないと決めて、入る字の大きさにする。**
+ */
 .tab {
   flex: 1 1 0;
   min-height: 38px;
   border-radius: 6px;
   color: var(--text-sub);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 
 .tabActive {
