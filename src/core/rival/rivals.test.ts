@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { findRegion, REGIONS } from '@/core/types/region'
 import { lineupRatingOf } from './rivalRoster'
-import { toRank } from '@/core/player/rating'
 import {
   addStar,
   bestStarRating,
@@ -16,6 +15,9 @@ import {
   nationalRepresentatives,
   nationalRivals,
   upperStarRatingAtRank,
+  classBonus,
+  CLASS_SPREAD,
+  rosterPowerOf,
   advanceRival,
   createRivals,
   pickRivalFor,
@@ -270,24 +272,51 @@ describe('他校のデータは年を重ねても増えない', () => {
 })
 
 describe('名門校', () => {
-  it('どの県にも「甲子園に手が届く筆頭校」がいる', () => {
-    // 抽選任せだと、校数の少ない県には格上が1校も生まれなかった
+  it('どの県にも強豪が数校いる', () => {
+    // 抽選任せだと、校数の少ない県には格上が1校も生まれなかった。
+    // 1校だけ強くしても、そこを倒した時点で県内に敵がいなくなる
     for (const regionId of ['tottori', 'kanagawa', 'osaka'] as const) {
       const schools = createRivals(createRng(regionId.length * 97), regionId)
-      const top = localRivals(schools, regionId).reduce((a, b) =>
-        b.tradition > a.tradition ? b : a,
-      )
-      expect(top.tradition).toBeGreaterThanOrEqual(32)
+      const top = localRivals(schools, regionId)
+        .map((school) => school.tradition)
+        .sort((a, b) => b - a)
+
+      expect(top[0]).toBeGreaterThanOrEqual(26)
+      expect(top[1]).toBeGreaterThanOrEqual(20)
+      expect(top[2]).toBeGreaterThanOrEqual(14)
+      expect(top[3]).toBeGreaterThanOrEqual(10)
     }
   })
 
   it('全国には総合Aのスタメンを組む学校がある', () => {
-    // 「他校でAに届くところが1つも無い」のは、2818校もあれば不自然
+    // 「他校でAに届くところが1つも無い」のは、7,900校もあれば不自然
     const schools = createRivals(createRng(20), 'kanagawa')
-    const best = nationalRepresentatives(schools, 'kanagawa')
-      .map((school) => lineupRatingOf(school, 3, 4))
+    const best = nationalRepresentatives(schools, 'kanagawa', 3)
+      .map((school) => lineupRatingOf(school, 3))
       .sort((a, b) => b - a)[0]
 
-    expect(toRank(best)).toBe('A')
+    expect(best).toBeGreaterThanOrEqual(80)
+  })
+
+  it('代の当たり外れで、県内の序列が入れ替わる', () => {
+    const schools = localRivals(createRivals(createRng(12), 'kanagawa'), 'kanagawa')
+    const orderAt = (year: number) =>
+      [...schools]
+        .sort((a, b) => rosterPowerOf(b, year) - rosterPowerOf(a, year))
+        .slice(0, 10)
+        .map((school) => school.id)
+        .join()
+
+    // 良い新入生を迎えた学校が上がり、その代が抜けると落ちる。
+    // 戦力（`strength`）を動かさなくても顔ぶれが変わる
+    expect(orderAt(5)).not.toBe(orderAt(6))
+    expect(orderAt(5)).not.toBe(orderAt(8))
+  })
+
+  it('代の出来は、同じ学校・同じ入学年なら必ず同じ', () => {
+    // 保存していないので、毎回同じ値が出ないと選手が別人になる
+    const school = createRivals(createRng(3), 'kanagawa')[0]
+    expect(classBonus(school, 7)).toBe(classBonus(school, 7))
+    expect(Math.abs(classBonus(school, 7))).toBeLessThanOrEqual(CLASS_SPREAD)
   })
 })

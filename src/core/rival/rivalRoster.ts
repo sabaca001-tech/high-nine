@@ -16,14 +16,13 @@
  */
 
 import { createRng } from '@/core/rng/random'
-import { SEASON_START_MONTH } from '@/core/calendar/days'
-import type { Month } from '@/core/types/game'
+import { dayOfCell, seasonProgressOfDay } from '@/core/calendar/days'
 import { createPlayer } from '@/core/player/createPlayer'
 import { overallRating } from '@/core/player/rating'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
 import type { RivalPlayer, RivalSchool } from './rivals'
-import { starsOf } from './rivals'
+import { classBonus, starsOf } from './rivals'
 
 /** 1学年あたりの人数。3学年で15人 */
 const PER_GRADE = 5
@@ -71,7 +70,7 @@ const ROSTER_TALENT_SPREAD = 10
  * 下がるのは学校の平均のほうで、
  * 「よく育った3年生が抜けて、代わりに1年生が入る」ぶんだけ落ちる。
  *
- * **年度の真ん中を0にする**（4月は -4、3月は +4）。
+ * **年度の真ん中を0にする**（4月1日は -4、年度末は +4）。
  * 4月を0にして積み上げると、1年を通した平均が丸ごと上がってしまい、
  * 夏の大会がそれまでより一段厳しくなる。
  * 実測でも、甲子園出場が30年で7.6回から4.0回まで落ちた。
@@ -80,16 +79,26 @@ const ROSTER_TALENT_SPREAD = 10
 export const RIVAL_YEAR_GROWTH = 8
 
 /**
- * 年度のどこまで来ているか（0＝4月1日、1＝3月末）。
- * 1マス1日で進むので、月から見て十分。
+ * その時点の伸びぶん。年度の真ん中で0になるよう中心をずらす。
+ *
+ * **日で受け取る。** 月から出していた頃は1ヶ月に1回まとめて動く階段で、
+ * 月をまたいだ途端に相手が1段強くなった。
+ * 1マス1日なので、盤面の位置をそのまま渡せば毎日少しずつ動く。
  */
-export function seasonProgress(month: Month): number {
-  return ((month - SEASON_START_MONTH + 12) % 12) / 12
+export function seasonGrowth(progress: number): number {
+  return Math.round((clampProgress(progress) - 0.5) * RIVAL_YEAR_GROWTH)
 }
 
-/** その月の伸びぶん。年度の真ん中で0になるよう中心をずらす */
-export function seasonGrowth(month: Month): number {
-  return Math.round((seasonProgress(month) - 0.5) * RIVAL_YEAR_GROWTH)
+function clampProgress(progress: number): number {
+  return Math.min(1, Math.max(0, progress))
+}
+
+/**
+ * 盤面の位置から年度の進み具合を出す。
+ * 呼び出し側が `dayOfCell` を挟み忘れないよう、まとめてここに置く。
+ */
+export function seasonProgressOfCell(boardPosition: number): number {
+  return seasonProgressOfDay(dayOfCell(boardPosition))
 }
 
 /**
@@ -113,13 +122,17 @@ export function seasonGrowth(month: Month): number {
 export function rivalRoster(
   school: RivalSchool,
   year: number,
-  /** いまの月。年度が進むほど部員が伸びている */
-  month: Month = SEASON_START_MONTH,
+  /**
+   * 年度の進み具合（0＝4月1日、1＝年度末）。
+   * `seasonProgressOfDay(dayOfCell(boardPosition))` を渡す。
+   * 既定は年度の真ん中（伸びぶん0）。
+   */
+  progress = 0.5,
 ): Player[] {
   const players: Player[] = []
   // 年度の中でも伸びる。**乱数の引き方は変えない**ので、
   // 同じ学校・同じ年なら顔ぶれはそのままで能力だけが上がる
-  const grown = seasonGrowth(month)
+  const grown = seasonGrowth(progress)
 
   for (const grade of [3, 2, 1] as Grade[]) {
     // 入学年で種を決める。学年が上がっても同じ人物になる
@@ -143,7 +156,12 @@ export function rivalRoster(
         id: `${school.id}-r${enrolledYear}-${i}`,
         grade,
         isPitcher: i < PITCHERS_PER_GRADE,
-        talentBonus: Math.round(school.strength * ROSTER_TALENT_RATE) + grown,
+        // **代ごとの当たり外れ**を足す。良い代を抱えた学校は3年かけて台頭し、
+        // その代が卒業すると落ちる
+        talentBonus:
+          Math.round(school.strength * ROSTER_TALENT_RATE) +
+          classBonus(school, enrolledYear) +
+          grown,
         talentSpread: ROSTER_TALENT_SPREAD,
         takenNames,
       })
@@ -273,9 +291,10 @@ function hashId(id: string): number {
 export function lineupRatingOf(
   school: RivalSchool,
   year: number,
-  month: Month = SEASON_START_MONTH,
+  /** 年度の進み具合（0〜1）。既定は年度の真ん中 */
+  progress = 0.5,
 ): number {
-  const roster = rivalRoster(school, year, month)
+  const roster = rivalRoster(school, year, progress)
   const lineup = autoLineup(roster)
   const byId = new Map(roster.map((player) => [player.id, player]))
 

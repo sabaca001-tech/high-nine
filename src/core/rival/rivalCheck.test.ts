@@ -12,7 +12,7 @@ describe('診断: 他校の強さ', () => {
 
     const show = (label: string, list: typeof schools) => {
       const rated = list
-        .map((school) => ({ school, rating: lineupRatingOf(school, 3, 8) }))
+        .map((school) => ({ school, rating: lineupRatingOf(school, 3, 0.4) }))
         .sort((a, b) => b.rating - a.rating)
       const values = rated.map((r) => r.rating)
       const at = (p: number) => values[Math.floor(values.length * p)]
@@ -24,12 +24,12 @@ describe('診断: 他校の強さ', () => {
 
     show('県内', local)
     show('県外', national)
-    show('甲子園代表', nationalRepresentatives(schools, 'kanagawa'))
+    show('甲子園代表', nationalRepresentatives(schools, 'kanagawa', 3))
 
     // 年度をまたぐと下がり、その年のうちに戻していく
     const top = [...local].sort((a, b) => b.tradition - a.tradition)[0]
     console.log(
-      `${top.name} 3年目4月${lineupRatingOf(top, 3, 4).toFixed(1)} → 8月${lineupRatingOf(top, 3, 8).toFixed(1)} → 3月${lineupRatingOf(top, 3, 3).toFixed(1)} → 4年目4月${lineupRatingOf(top, 4, 4).toFixed(1)} → 3月${lineupRatingOf(top, 4, 3).toFixed(1)}`,
+      `${top.name} 3年目4月${lineupRatingOf(top, 3, 0).toFixed(1)} → 8月${lineupRatingOf(top, 3, 0.4).toFixed(1)} → 3月${lineupRatingOf(top, 3, 1).toFixed(1)} → 4年目4月${lineupRatingOf(top, 4, 0).toFixed(1)} → 3月${lineupRatingOf(top, 4, 1).toFixed(1)}`,
     )
   }, 300000)
 })

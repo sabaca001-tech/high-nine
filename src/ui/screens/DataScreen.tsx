@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import type { Month } from '@/core/types/game'
 import type { ReactNode } from 'react'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import { activeU18Players, resolveU18Squad, u18Players, U18_SQUAD_SIZE } from '@/core/player/u18Squad'
@@ -9,7 +8,7 @@ import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
 import type { GrowthRange } from '@/core/player/growthReport'
 import { ABILITY_LABELS } from '@/core/types/player'
 import { overallRating, ratingLabel, toRank } from '@/core/player/rating'
-import { lineupRatingOf } from '@/core/rival/rivalRoster'
+import { lineupRatingOf, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import type { Player } from '@/core/types/player'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import {
@@ -19,6 +18,7 @@ import {
   nationalRivals,
   recordOf,
   starsOf,
+  rosterPowerOf,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import type { ScoutResult } from '@/core/scout/scouting'
@@ -333,27 +333,45 @@ function FacilityTab() {
  */
 function pickRivals(
   schools: RivalSchool[],
-  preview: number,
-  all: boolean,
+  /** 何校まで出すか */
+  limit: number,
   year: number,
-  month: Month,
+  progress: number,
 ): { school: RivalSchool; rating: number }[] {
-  return [...schools]
-    .sort((a, b) => b.strength - a.strength)
-    .filter((school, index) => all || index < preview || hasMet(recordOf(school)))
-    .map((school) => ({ school, rating: lineupRatingOf(school, year, month) }))
+  // **良い代を抱えた学校が埋もれないよう、在校3代を均した力で絞る。**
+  // `strength` だけで切ると、台頭してきた学校が一覧に出てこない。
+  // 力は**先に1回だけ計算する**（比較のたびに出すと8000校で374msかかった）
+  const ranked = schools.map((school) => ({ school, power: rosterPowerOf(school, year) }))
+  ranked.sort((a, b) => b.power - a.power)
+
+  // 実測（`lineupRatingOf`）は1校0.2msかかるので、**候補を絞ってから測る**。
+  // 8000校を全部測ると1.6秒かかって画面が固まる
+  return ranked
+    .filter((entry, index) => index < limit * 2 || hasMet(recordOf(entry.school)))
+    .map(({ school }) => ({ school, rating: lineupRatingOf(school, year, progress) }))
     .sort((a, b) => b.rating - a.rating)
+    .slice(0, limit)
 }
 
-/** 一覧に既定で出す校数 */
+/** 一覧に既定で出す校数と、「もっと見る」で増える校数 */
 const LOCAL_PREVIEW = 20
 const NATIONAL_PREVIEW = 20
+const MORE_STEP = 20
+
+/**
+ * 一覧に出す上限。
+ *
+ * **全校は出せない。** 県外だけで7,900校あり、
+ * 実測（1校0.2ms）で1.6秒、行も7,900行になって画面が固まる。
+ * 強い順に見ていく画面なので、上位200校まで見られれば足りる。
+ */
+const RIVAL_LIST_MAX = 200
 
 /** ライバル校 */
 function RivalsTab() {
   const game = useGameStore((s) => s.game)!
-  const [showAll, setShowAll] = useState(false)
-  const [showAllNational, setShowAllNational] = useState(false)
+  const [localLimit, setLocalLimit] = useState(LOCAL_PREVIEW)
+  const [nationalLimit, setNationalLimit] = useState(NATIONAL_PREVIEW)
 
   /**
    * 出す学校を選んで、**スタメンの平均総合の順**に並べる。
@@ -362,18 +380,27 @@ function RivalsTab() {
    * 並べ替えと表示は実測なので、
    * 一覧の数字と開いたときの9人が食い違わない。
    */
-  const localAll = localRivals(game.rivals, game.regionId)
-  const nationalAll = nationalRivals(game.rivals, game.regionId)
-  // 他校の部員も年度の中で伸びるので、月まで見る
-  const { year, month } = game
+  // **8,000校を毎回ふるい直さない。** 依存に新しい配列を渡すと
+  // `useMemo` が毎描画で走り、並べ替えだけで40msかかる
+  const localAll = useMemo(
+    () => localRivals(game.rivals, game.regionId),
+    [game.rivals, game.regionId],
+  )
+  const nationalAll = useMemo(
+    () => nationalRivals(game.rivals, game.regionId),
+    [game.rivals, game.regionId],
+  )
+  // 他校の部員も年度の中で少しずつ伸びるので、今日までの進み具合を見る
+  const { year } = game
+  const progress = seasonProgressOfCell(game.boardPosition)
 
   const localShown = useMemo(
-    () => pickRivals(localAll, LOCAL_PREVIEW, showAll, year, month),
-    [localAll, showAll, year, month],
+    () => pickRivals(localAll, localLimit, year, progress),
+    [localAll, localLimit, year, progress],
   )
   const nationalShown = useMemo(
-    () => pickRivals(nationalAll, NATIONAL_PREVIEW, showAllNational, year, month),
-    [nationalAll, showAllNational, year, month],
+    () => pickRivals(nationalAll, nationalLimit, year, progress),
+    [nationalAll, nationalLimit, year, progress],
   )
 
   return (
@@ -382,33 +409,40 @@ function RivalsTab() {
         **県内は参加校ぶん全部ある（178校の県もある）。**
         全部並べると縦に長すぎて他のタブへ戻れなくなるので、
         強い順に上位だけを出し、戦ったことのある学校は必ず混ぜる。
+        「もっと見る」でも上限（`RIVAL_LIST_MAX`）までしか出さない。
       */}
       <Section title={`${findRegion(game.regionId).name}の学校（${localAll.length}校）`}>
         {localShown.map(({ school, rating }) => (
           <RivalRow key={school.id} school={school} rating={rating} />
         ))}
-        {!showAll && localAll.length > localShown.length && (
-          <button type="button" className={styles.moreRivals} onClick={() => setShowAll(true)}>
-            残り{localAll.length - localShown.length}校を見る
+        {localLimit < RIVAL_LIST_MAX && localAll.length > localShown.length && (
+          <button
+            type="button"
+            className={styles.moreRivals}
+            onClick={() => setLocalLimit((current) => Math.min(RIVAL_LIST_MAX, current + MORE_STEP))}
+          >
+            さらに{MORE_STEP}校を見る（{localAll.length}校中{localShown.length}校）
           </button>
         )}
       </Section>
 
       {/*
-        県外は全48地区に複数校ずつある。
-        全部並べると数百行になるので、県内と同じく強い順に上位だけ出す
+        県外は全48地区に165校ずつある（7,900校）。
+        全部並べると7,900行になるので、県内と同じく強い順に上位だけ出す
       */}
       <Section title={`県外の学校（${nationalAll.length}校）`}>
         {nationalShown.map(({ school, rating }) => (
           <RivalRow key={school.id} school={school} rating={rating} showRegion />
         ))}
-        {!showAllNational && nationalAll.length > nationalShown.length && (
+        {nationalLimit < RIVAL_LIST_MAX && nationalAll.length > nationalShown.length && (
           <button
             type="button"
             className={styles.moreRivals}
-            onClick={() => setShowAllNational(true)}
+            onClick={() =>
+              setNationalLimit((current) => Math.min(RIVAL_LIST_MAX, current + MORE_STEP))
+            }
           >
-            残り{nationalAll.length - nationalShown.length}校を見る
+            さらに{MORE_STEP}校を見る（{nationalAll.length}校中{nationalShown.length}校）
           </button>
         )}
       </Section>
@@ -437,10 +471,10 @@ function U18Tab() {
             ourPlayers: game.players,
             ourSchoolName: game.schoolName,
             year: game.year,
-            month: game.month,
+            progress: seasonProgressOfCell(game.boardPosition),
           })
         : [],
-    [squad, game.rivals, game.players, game.schoolName, game.year, game.month],
+    [squad, game.rivals, game.players, game.schoolName, game.year, game.boardPosition],
   )
 
   // スタメンはその場で組む。能力が伸びれば顔ぶれも入れ替わる。
@@ -609,7 +643,7 @@ function RivalRow({
         <OpponentRoster
           school={school}
           year={game.year}
-          month={game.month}
+          progress={seasonProgressOfCell(game.boardPosition)}
           label="スタメン"
           defaultOpen
         />

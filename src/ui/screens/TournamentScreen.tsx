@@ -3,6 +3,7 @@ import { findRegion } from '@/core/types/region'
 import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { formatFunds } from '@/core/shop/funds'
 import { tournamentTravel } from '@/core/shop/travel'
+import { seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import { useGameStore } from '@/state/useGameStore'
 import { BracketView } from '@/ui/components/BracketView'
 import { championOf, opponentAt } from '@/core/tournament/bracket'
@@ -137,7 +138,7 @@ export function TournamentScreen() {
           currentRound={Math.min(tournament.round, tournament.totalRounds)}
           schools={game.rivals}
           year={game.year}
-          month={game.month}
+          progress={seasonProgressOfCell(game.boardPosition)}
         />
 
         {over && !tournament.champion && champion && (

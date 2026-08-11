@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import { rivalRoster } from '@/core/rival/rivalRoster'
 import type { RivalSchool } from '@/core/rival/rivals'
-import type { Month } from '@/core/types/game'
 import { overallRating, toRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { rankColorOf } from '@/ui/theme/playerColors'
@@ -24,7 +23,7 @@ import styles from './OpponentRoster.module.css'
 export function OpponentRoster({
   school,
   year,
-  month,
+  progress,
   /** 畳んでいるときのボタンの文言。データ画面では「相手の」が付かない */
   label = '相手のスタメン',
   /** 最初から開いた状態にする */
@@ -32,8 +31,8 @@ export function OpponentRoster({
 }: {
   school: RivalSchool
   year: number
-  /** いまの月。年度が進むほど部員が伸びている */
-  month?: Month
+  /** 年度の進み具合（0〜1）。年度が進むほど部員が伸びている */
+  progress?: number
   label?: string
   defaultOpen?: boolean
 }) {
@@ -47,7 +46,7 @@ export function OpponentRoster({
     )
   }
 
-  const roster = rivalRoster(school, year, month)
+  const roster = rivalRoster(school, year, progress)
   const lineup = autoLineup(roster)
   const byId = new Map(roster.map((player) => [player.id, player]))
 

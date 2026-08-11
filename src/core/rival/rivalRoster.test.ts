@@ -3,7 +3,6 @@ import { createRng } from '@/core/rng/random'
 import { createRivals, localRivals } from './rivals'
 import type { RivalSchool } from './rivals'
 import { lineupRatingOf, rivalRoster } from './rivalRoster'
-import type { Month } from '@/core/types/game'
 import { starsOf } from './rivals'
 import { overallRating } from '@/core/player/rating'
 
@@ -178,16 +177,29 @@ describe('idの重複', () => {
 describe('年度の中で伸び、卒業で一度下がる', () => {
   const schools = createRivals(createRng(31), 'kanagawa', 1)
   const local = localRivals(schools, 'kanagawa').slice(0, 60)
-  const average = (year: number, month: Month) =>
-    local.reduce((sum, school) => sum + lineupRatingOf(school, year, month), 0) / local.length
+  /** 年度の頭（0）と年度末（1） */
+  const START = 0
+  const END = 1
+  const average = (year: number, progress: number) =>
+    local.reduce((sum, school) => sum + lineupRatingOf(school, year, progress), 0) / local.length
 
-  it('4月より3月のほうが強い（年度の中で伸びる）', () => {
-    expect(average(3, 3)).toBeGreaterThan(average(3, 4) + 3)
+  it('年度の頭より終わりのほうが強い（年度の中で伸びる）', () => {
+    expect(average(3, END)).toBeGreaterThan(average(3, START) + 3)
   })
 
   it('年度が替わると下がる（3年生が抜ける）', () => {
     // こちらの卒業と同じタイミングで、他校も3年生を送り出す
-    expect(average(4, 4)).toBeLessThan(average(3, 3) - 3)
+    expect(average(4, START)).toBeLessThan(average(3, END) - 3)
+  })
+
+  it('伸びは少しずつで、途中で大きく跳ねない', () => {
+    // 月にまとめて動かしていた頃は、月をまたいだ途端に相手が1段強くなった
+    let previous = average(3, 0)
+    for (let step = 1; step <= 12; step++) {
+      const now = average(3, step / 12)
+      expect(now - previous).toBeLessThan(2)
+      previous = now
+    }
   })
 
   it('同じ月どうしで比べると弱くならない', () => {
@@ -197,7 +209,7 @@ describe('年度の中で伸び、卒業で一度下がる', () => {
     // 卒業して減っていくだけになる
     const plain = local.filter((school) => !school.notable)
     const plainAverage = (year: number) =>
-      plain.reduce((sum, school) => sum + lineupRatingOf(school, year, 4), 0) / plain.length
+      plain.reduce((sum, school) => sum + lineupRatingOf(school, year, START), 0) / plain.length
 
     expect(plainAverage(4)).toBeGreaterThan(plainAverage(3) - 1)
     expect(plainAverage(5)).toBeGreaterThan(plainAverage(3) - 1)
@@ -205,8 +217,8 @@ describe('年度の中で伸び、卒業で一度下がる', () => {
 
   it('選手ひとりの能力は年度をまたいでも途切れない', () => {
     const school = local[0]
-    const march = rivalRoster(school, 3, 3).filter((player) => player.grade === 1)
-    const april = rivalRoster(school, 4, 4).filter((player) => player.grade === 2)
+    const march = rivalRoster(school, 3, END).filter((player) => player.grade === 1)
+    const april = rivalRoster(school, 4, START).filter((player) => player.grade === 2)
 
     // 3月の1年生（学年ベース36＋1年ぶんの伸び）と、
     // 4月の2年生（学年ベース44）がほぼ並ぶ

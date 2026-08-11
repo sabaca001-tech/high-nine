@@ -6,7 +6,6 @@ import { ratingLabel } from '@/core/player/rating'
 import { opponentRating } from '@/core/season/matchReputation'
 import { lineupRatingOf } from '@/core/rival/rivalRoster'
 import type { RivalSchool } from '@/core/rival/rivals'
-import type { Month } from '@/core/types/game'
 import styles from './BracketView.module.css'
 
 /**
@@ -26,7 +25,7 @@ export function BracketView({
   currentRound,
   schools,
   year,
-  month,
+  progress,
 }: {
   bracket: Bracket
   totalRounds: number
@@ -34,8 +33,8 @@ export function BracketView({
   /** 実在の学校。スタメンの平均を実測するのに使う */
   schools: RivalSchool[]
   year: number
-  /** いまの月。他校の部員は年度が進むほど伸びている */
-  month?: Month
+  /** 年度の進み具合（0〜1）。他校の部員は年度が進むほど伸びている */
+  progress?: number
 }) {
   const [round, setRound] = useState(currentRound)
   if (bracket.slots.length === 0) return null
@@ -51,7 +50,7 @@ export function BracketView({
    */
   const rate = (team: BracketTeam): number => {
     const school = team.schoolId ? schools.find((item) => item.id === team.schoolId) : undefined
-    return school ? lineupRatingOf(school, year, month) : opponentRating(team.strength)
+    return school ? lineupRatingOf(school, year, progress) : opponentRating(team.strength)
   }
 
   return (

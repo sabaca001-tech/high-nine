@@ -3,7 +3,7 @@ import { formatRecord, hasMet, recordOf } from '@/core/rival/rivals'
 import type { RivalRecord } from '@/core/rival/rivals'
 import { matchupLabel, opponentRating, teamRating } from '@/core/season/matchReputation'
 import { ratingLabel } from '@/core/player/rating'
-import { lineupRatingOf } from '@/core/rival/rivalRoster'
+import { lineupRatingOf, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -62,7 +62,7 @@ export function PreMatchScreen() {
         <span className={styles.opponentRating}>
           {ratingLabel(
             school
-              ? lineupRatingOf(school, game.year, game.month)
+              ? lineupRatingOf(school, game.year, seasonProgressOfCell(game.boardPosition))
               : opponentRating(setup.opponentStrength),
           )}
         </span>

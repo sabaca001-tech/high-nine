@@ -76,6 +76,17 @@ export function cellOfDay(day: number): number {
   return Math.min(CELLS_IN_YEAR - 1, Math.floor(clampDay(day) / DAYS_PER_CELL))
 }
 
+/**
+ * 年度のどこまで来たか（0＝4月1日、1＝年度末）。
+ *
+ * **1マス1日なので、盤面の位置がそのまま進み具合になる。**
+ * 月から出すと1ヶ月に1回まとめて動く階段になり、
+ * 月初に組んだ練習試合と月末の練習試合で相手の強さが変わってしまう。
+ */
+export function seasonProgressOfDay(day: number): number {
+  return clampDay(day) / (DAYS_IN_YEAR - 1)
+}
+
 /** 年度の何日目か → 月 */
 export function monthOfDay(day: number): Month {
   const target = clampDay(day)

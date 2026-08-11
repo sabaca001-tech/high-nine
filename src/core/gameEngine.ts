@@ -57,7 +57,7 @@ import {
   schoolForProspect,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
-import { rivalRoster } from '@/core/rival/rivalRoster'
+import { rivalRoster, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import {
   allProspects,
   createNationalTeam,
@@ -1602,7 +1602,7 @@ function opponentRangeFor(
 function rosterOfSchool(state: GameState, schoolId?: string): Player[] | undefined {
   if (!schoolId) return undefined
   const school = state.rivals.find((rival) => rival.id === schoolId)
-  return school ? rivalRoster(school, state.year, state.month) : undefined
+  return school ? rivalRoster(school, state.year, seasonProgressOfCell(state.boardPosition)) : undefined
 }
 
 /**
@@ -2129,7 +2129,7 @@ export function applyOneMonth(
       schools: state.rivals,
       ourPlayers: players,
       year: state.year,
-      month,
+      progress: seasonProgressOfCell(state.boardPosition),
     })
 
     const selected = ourU18Players(u18Squad, players)

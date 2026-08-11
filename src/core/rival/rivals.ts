@@ -134,7 +134,7 @@ export const RIVALS_PER_REGION = 10
  *
  * 名簿は種から作り直すので、増えるのは名前と数値だけ。
  */
-export const NATIONAL_SCHOOLS_PER_REGION = 55
+export const NATIONAL_SCHOOLS_PER_REGION = 165
 
 /**
  * 県外に置く学校の総数。
@@ -155,7 +155,7 @@ export const NATIONAL_RIVALS = (REGIONS.length - 1) * NATIONAL_SCHOOLS_PER_REGIO
  * 178校の県なら、常連5校・強豪12校・中堅上位27校が出てくる。
  */
 const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
-  { weight: 1, min: 42, max: 68 }, // 全国区の名門
+  { weight: 0.35, min: 42, max: 68 }, // 全国区の名門
   { weight: 3, min: 28, max: 42 }, // 甲子園常連
   { weight: 7, min: 18, max: 28 }, // 強豪
   { weight: 15, min: 8, max: 18 }, // 中堅上位
@@ -164,33 +164,70 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
 ]
 
 /**
- * 県外の学校の地力。
+ * 県の上位校の地力の下限。**どの県にも強豪が数校いる。**
  *
- * **1県の中でも序列を付ける。** 全部を「全国クラス」にすると、
- * どの県へ遠征しても格上ばかりになり、
- * 甲子園に出てくる代表校（各県の最上位）の重みも消える。
+ * 抽選任せだと、名門の段（101分の1）を1校も引かない県が普通に出る。
+ * 24校の鳥取なら期待値0.24校で、
+ * 「甲子園に手が届く学校」が1つも存在しない県が生まれていた。
  *
- * 先頭が県の代表クラス、後ろほど地元の有力校どまり。
- * 数が足りないぶんは最後の段を繰り返す。
+ * 逆に上位を1校だけ強くすると、その1校を倒せば県内に敵がいなくなる。
+ * **上位4校まで下限を置いて、県内に序列のある強豪を残す。**
+ * 県外も同じ配り方にしてある（甲子園に出てくるのは各県の最上位なので、
+ * 県ごとの厚みがそのまま全国の厚みになる）。
  */
-const NATIONAL_TRADITION_TIERS: { min: number; max: number }[] = [
-  { min: 20, max: 68 }, // 県の代表クラス。名門はここに混ざる
-  { min: 10, max: 34 }, // それに続く強豪
-  { min: 2, max: 18 }, // 中堅上位
-  { min: -4, max: 12 }, // 中堅
-  { min: -10, max: 6 }, // 中堅下位
-  { min: -16, max: 2 }, // 下位
+const TOP_SCHOOL_FLOORS: { min: number; max: number }[] = [
+  { min: 26, max: 56 }, // 筆頭校
+  { min: 20, max: 40 }, // 2番手
+  { min: 14, max: 30 }, // 3番手
+  { min: 10, max: 24 }, // 4番手
 ]
 
 /**
- * 県の筆頭校の地力。
+ * **代ごとの当たり外れ**（±）。
  *
- * **どの県にも「甲子園に手が届く学校」を1つは置く。**
- * 県外（`NATIONAL_TRADITION_TIERS` の先頭）では各県の代表クラスを
- * 必ず作っているのに、自県だけ抽選任せだと、
- * 県によっては格上が1校も存在しないまま3年目には県内最強になっていた。
+ * 名簿を「学年のベース＋学校の戦力」だけで作っていた頃は、
+ * 3学年とも同じ基準で作られるので、
+ * **どの代も同じ出来**だった。良い代・悪い代が無いので、
+ * 卒業しても学校の格が動かず、県内の序列も年々ほぼ固定されていた。
+ *
+ * 入学年ごとに出来をずらすと、
+ * 「良い新入生が揃った学校が3年かけて台頭し、卒業と同時に落ちる」
+ * という入れ替わりが自然に起きる。
+ *
+ * **保存は増えない。** 種（`rosterSeed`）と入学年から毎回同じ値を作る。
  */
-const FLAGSHIP_TRADITION = { min: 32, max: 68 }
+export const CLASS_SPREAD = 9
+
+/**
+ * その代の出来。同じ学校・同じ入学年なら必ず同じ値になる。
+ * 単位は選手の素質（`talentBonus`）と同じ。
+ */
+export function classBonus(school: RivalSchool, enrolledYear: number): number {
+  // **ハッシュだけで出す。** 8000校を並べ替えるのに使うので、
+  // 1件ごとに `createRng` を作ると一覧の描画で数百msかかる（実測374ms）
+  let hash = (school.rosterSeed ^ Math.imul(enrolledYear + 1, 2654435761)) >>> 0
+  hash = Math.imul(hash ^ (hash >>> 15), 2246822519)
+  hash = Math.imul(hash ^ (hash >>> 13), 3266489917)
+  hash = (hash ^ (hash >>> 16)) >>> 0
+
+  // 一様分布を2つ足して平均する（真ん中に寄せる。当たり外れは極端すぎないほうがいい）
+  const a = (hash & 0xffff) / 0xffff
+  const b = ((hash >>> 16) & 0xffff) / 0xffff
+  return Math.round((a + b - 1) * CLASS_SPREAD)
+}
+
+/**
+ * いま在籍している3代を均した「学校の実際の力」。
+ *
+ * `strength` だけで並べると、良い代を抱えて台頭している学校が
+ * 一覧の下のほうに埋もれる（一覧に出す学校を戦力で絞っているため）。
+ * 名簿を作らずに比べられる**安い指標**として使う。
+ * 実測が要る場面では `lineupRatingOf` を使うこと。
+ */
+export function rosterPowerOf(school: RivalSchool, year: number): number {
+  const classes = [year, year - 1, year - 2].map((enrolled) => classBonus(school, enrolled))
+  return school.strength + classes.reduce((sum, value) => sum + value, 0) / classes.length
+}
 
 /** 1校が抱える注目選手の数 */
 const STARS_PER_SCHOOL = 2
@@ -257,22 +294,7 @@ export function createRivals(
   const localCount = findRegion(homeRegionId).schools
 
   // 地力の高い順に並べて作る。先頭の RIVALS_PER_REGION 校が注目校になる
-  const traditions = Array.from({ length: localCount }, () => rollTradition(rng)).sort(
-    (a, b) => b - a,
-  )
-
-  /*
-   * **県の筆頭校は必ず名門にする。**
-   *
-   * 抽選任せだと、名門の段（101分の1）を1校も引かない県が普通に出る。
-   * 24校の鳥取なら期待値0.24校で、実際その県には
-   * 「甲子園に手が届く学校」が1つも存在しないことになっていた。
-   * 県外は `NATIONAL_TRADITION_TIERS` の先頭で同じことをしているので、
-   * 自県だけ弱いのも筋が通らない。
-   */
-  traditions[0] = Math.max(traditions[0], rng.int(FLAGSHIP_TRADITION.min, FLAGSHIP_TRADITION.max))
-
-  traditions.forEach((tradition, index) => {
+  traditionsFor(rng, localCount).forEach((tradition, index) => {
     add(`rs${index + 1}`, homeRegionId, tradition, index < RIVALS_PER_REGION)
   })
 
@@ -284,16 +306,34 @@ export function createRivals(
 
   let serial = 0
   for (const region of elsewhere) {
-    for (let rank = 0; rank < NATIONAL_SCHOOLS_PER_REGION; rank++) {
-      const tier = NATIONAL_TRADITION_TIERS[Math.min(rank, NATIONAL_TRADITION_TIERS.length - 1)]
+    // **自県と同じ配り方にする。** 県ごとの厚みが揃っていないと、
+    // 甲子園（各県の最上位）に出てくる顔ぶれの強さも歪む
+    traditionsFor(rng, NATIONAL_SCHOOLS_PER_REGION).forEach((tradition, rank) => {
       serial++
       // 注目選手を抱えるのは各県の筆頭校だけ。
       // 全校に置くと、注目選手だけで名簿が数百人ぶんに膨らむ
-      add(`rn${serial}`, region.id, rng.int(tier.min, tier.max), rank === 0)
-    }
+      add(`rn${serial}`, region.id, tradition, rank === 0)
+    })
   }
 
   return schools
+}
+
+/**
+ * 1県ぶんの地力を、強い順に並べて返す。
+ * 校数のピラミッドで配ったうえで、上位数校には下限を置く。
+ */
+function traditionsFor(rng: Rng, count: number): number[] {
+  const list = Array.from({ length: count }, () => rollTradition(rng))
+
+  list.sort((a, b) => b - a)
+  TOP_SCHOOL_FLOORS.forEach((floor, index) => {
+    if (index >= list.length) return
+    list[index] = Math.max(list[index], rng.int(floor.min, floor.max))
+  })
+
+  // 下限を当てた結果、順番が入れ替わることがある
+  return list.sort((a, b) => b - a)
 }
 
 /** 校数のピラミッドから地力を1つ引く */
@@ -323,13 +363,17 @@ export function nationalRivals(schools: RivalSchool[], regionId: RegionId): Riva
 export function nationalRepresentatives(
   schools: RivalSchool[],
   homeRegionId: RegionId,
+  /** その年。渡すと、良い代を抱えた学校が代表になれる */
+  year?: number,
 ): RivalSchool[] {
   const best = new Map<RegionId, RivalSchool>()
+  const power = (school: RivalSchool) =>
+    year === undefined ? school.strength : rosterPowerOf(school, year)
 
   for (const school of schools) {
     if (school.regionId === homeRegionId) continue
     const current = best.get(school.regionId)
-    if (!current || school.strength > current.strength) best.set(school.regionId, school)
+    if (!current || power(school) > power(current)) best.set(school.regionId, school)
   }
   return [...best.values()]
 }
@@ -436,7 +480,7 @@ export function advanceRival(rng: Rng, school: RivalSchool, year: number): Rival
 
   const updated: RivalSchool = { ...school, strength: next, trend, stars }
 
-  return { school: updated, news: newsFor(updated) }
+  return { school: updated, news: newsFor(updated, year) }
 }
 
 /**
@@ -446,12 +490,18 @@ export function advanceRival(rng: Rng, school: RivalSchool, year: number): Rival
  * 178校を毎年見ていると、揺れ幅6以上の学校が数十校出てきて
  * 世代交代の画面が他校の話で埋まる。
  */
-function newsFor(school: RivalSchool): string | null {
+function newsFor(school: RivalSchool, year: number): string | null {
   if (!school.notable) return null
   if (school.trend >= 6) return `${school.name}が力をつけてきた`
   if (school.trend <= -6) return `${school.name}は主力が抜けて苦しそうだ`
+  // **当たりの代が入ってきた学校は、3年かけて台頭する。**
+  // 戦力の数字には出ないので、ここで知らせないと入れ替わりの理由が読めない
+  if (classBonus(school, year) >= GOOD_CLASS_NEWS) return `${school.name}に有望な新入生が揃った`
   return null
 }
+
+/** この出来の代が入ってきたら報告する */
+const GOOD_CLASS_NEWS = 6
 
 /**
  * 逃した選手が入る学校。実力に見合った学校へ行く。

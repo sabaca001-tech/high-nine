@@ -1,7 +1,7 @@
 import { formatFunds } from '@/core/shop/funds'
 import { teamRating, matchupLabel, opponentRating } from '@/core/season/matchReputation'
 import { ratingLabel } from '@/core/player/rating'
-import { lineupRatingOf } from '@/core/rival/rivalRoster'
+import { lineupRatingOf, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import { useGameStore } from '@/state/useGameStore'
 import { playSound } from '@/ui/sound/sound'
 import styles from './MatchOfferScreen.module.css'
@@ -48,7 +48,7 @@ export function MatchOfferScreen() {
             ? game.rivals.find((item) => item.id === offer.opponentSchoolId)
             : undefined
           const rating = school
-            ? lineupRatingOf(school, game.year, game.month)
+            ? lineupRatingOf(school, game.year, seasonProgressOfCell(game.boardPosition))
             : opponentRating(offer.opponentStrength)
 
           return (
