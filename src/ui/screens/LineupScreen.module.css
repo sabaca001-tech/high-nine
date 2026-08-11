@@ -119,8 +119,8 @@
   min-width: 30px;
   min-height: 26px;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.32);
-  color: #fff;
+  background: rgba(35, 33, 28, 0.08);
+  color: var(--text-main);
   font-size: var(--fs-xs);
   font-weight: 800;
 }
@@ -314,7 +314,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(35, 33, 28, 0.45);
   animation: fade 0.15s ease-out;
 }
 
@@ -505,7 +505,7 @@
   margin-right: 2px;
   padding: 0 2px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(35, 33, 28, 0.06);
 }
 
 .skillUp {

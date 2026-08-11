@@ -5,46 +5,53 @@
  */
 
 :root {
-  /* 背景 */
-  --bg-base: #10201a;
-  --bg-panel: #172c24;
-  --bg-panel-2: #1f3a30;
-  --bg-raised: #27473b;
+  /*
+   * 背景。**白ベース。**
+   * 暗い画面は雰囲気が出る代わりに、能力値の色分けが全部「光る色」になり、
+   * どれも同じ強さに見えていた。紙に近い明るさにして、色は濃さで区別する。
+   */
+  --bg-base: #f3f1ea;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #f7f5ef;
+  --bg-raised: #eae7dd;
 
   /* 文字 */
-  --text-main: #eaf5ef;
-  --text-sub: #9db8ac;
-  --text-dim: #6b8b7d;
-  --text-on-accent: #0d1a15;
+  --text-main: #23211c;
+  --text-sub: #5c584e;
+  --text-dim: #8d887c;
+  --text-on-accent: #2a1e05;
 
   /* アクセント（グラウンドの土と芝） */
-  --accent: #ffc857;
-  --accent-strong: #ffb020;
-  --field: #2f6b4f;
-  --dirt: #8a5a3b;
+  --accent: #e8a417;
+  --accent-strong: #c9820a;
+  --field: #3c8a63;
+  --dirt: #a06a44;
 
   /* 状態 */
-  --good: #5fd39a;
-  --bad: #f2706e;
-  --line: #2c4a3e;
+  --good: #1f8a5a;
+  --bad: #c8383c;
+  --line: rgba(35, 33, 28, 0.14);
 
   /* ポジション系統の色。ネームプレートの色分けに使う */
-  --pos-pitcher: #f79ac0;
-  --pos-catcher: #8fd6f0;
-  --pos-infield: #f5d76e;
-  --pos-outfield: #8fdc9a;
+  --pos-pitcher: #f7c2d8;
+  --pos-catcher: #bde3f5;
+  --pos-infield: #f7e3a8;
+  --pos-outfield: #bfe8c6;
   /* プレートの上に載せる文字。どの系統でも読めるよう濃い色にする */
   --pos-text: #17251f;
 
-  /* ランク色 */
-  --rank-s: #ff5f7a;
-  --rank-a: #ff9f45;
-  --rank-b: #ffd447;
-  --rank-c: #7ed957;
-  --rank-d: #4fc3f7;
-  --rank-e: #9b8cf0;
-  --rank-f: #8fa3ad;
-  --rank-g: #6b7c85;
+  /*
+   * ランク色。**白地で読める濃さにする。**
+   * 暗い画面用の明るい色をそのまま置くと、白の上では黄色も緑も飛んでしまう。
+   */
+  --rank-s: #d81f5a;
+  --rank-a: #e2661b;
+  --rank-b: #b8860b;
+  --rank-c: #3f8f2f;
+  --rank-d: #1f7fc0;
+  --rank-e: #6a5acd;
+  --rank-f: #6b7a83;
+  --rank-g: #8b959b;
 
   /* スプライトの色（ユニフォーム・帽子・道具） */
   --uniform-a: #f2f4f7;
@@ -87,7 +94,7 @@
   --window: #7fa8c9;
   --trunk: #7a5334;
   --pole: #9aa7ad;
-  --net-line: rgba(255, 255, 255, 0.35);
+  --net-line: rgba(255, 255, 255, 0.5);
 
   /* 練習カードの色（種別ごとに2色グラデーション） */
   --practice-batting-a: #ff8a4c;

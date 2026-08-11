@@ -10,20 +10,24 @@
 
 .field {
   fill: var(--field);
-  opacity: 0.35;
+  opacity: 0.28;
 }
 
 .infield {
   fill: var(--dirt);
-  opacity: 0.5;
+  opacity: 0.42;
 }
 
+/*
+ * 数字は**白で縁取る**。
+ * 黒で縁取っていた頃は、白ベースの画面で色が濁って読めなかった。
+ */
 .letter {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.8);
-  stroke-width: 2.5px;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 3px;
   stroke-linejoin: round;
 }
 
