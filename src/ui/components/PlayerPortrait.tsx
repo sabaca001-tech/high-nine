@@ -65,23 +65,38 @@ const FEATURE = 'rgba(48, 28, 20, 0.85)'
 // ── 位置（全員共通）──────────────────────
 
 /** 目の高さ */
-const EYE_Y = 0
+const EYE_Y = 1
 /** 目の中心の左右の位置 */
-const EYE_X = 14
+const EYE_X = 13
 /** 眉の高さ */
-const BROW_Y = -11
+const BROW_Y = -9
 /** あごの先 */
-const CHIN_Y = 24
+const CHIN_Y = 30
 /** 頬（顔の最大幅の半分）。耳もここに付く */
-const CHEEK = 27
+const CHEEK = 32
 /** 頭のてっぺん */
-const HEAD_TOP = -40
+const HEAD_TOP = -46
 /** 鼻の付け根 */
-const NOSE_Y = 2
+const NOSE_Y = 5
 /** 口の高さ */
-const MOUTH_Y = 17
+const MOUTH_Y = 20
 /** 帽子のつばの高さ */
-const BRIM_Y = -22
+const BRIM_Y = -26
+
+/**
+ * 髪型のパスは頬32・てっぺん-46より小さい頭（27／-40）を前提に描いてある。
+ * 顔を大きくしたぶん、まとめて引き伸ばす。
+ */
+const HAIR_SCALE = 1.18
+
+/**
+ * 目鼻立ちの縮尺。
+ *
+ * **顔に対してパーツが大きすぎた。** 目は左右で顔幅の8割を占めていて、
+ * 人の顔というより記号に見えていた。
+ * パスはそのままに、描くときだけ縮める。
+ */
+const FEATURE_SCALE = 0.74
 
 /** 描画範囲。帽子と髪が顔より上に出るので上を広く取る */
 const VIEW_BOX = '-52 -62 104 104'
@@ -415,24 +430,30 @@ export function PlayerPortrait({
 
       {/* 首と肩。顔より暗くして、顔を前に出す */}
       <path
-        d={`M -9 ${CHIN_Y - 6} h 18 v 12 h -18 z`}
+        d={`M -10 ${CHIN_Y - 6} h 20 v 12 h -20 z`}
         fill={skin.shade}
         stroke={OUTLINE}
         strokeWidth="1"
       />
       <path
-        d="M -46 46 q 12 -12 34 -14 h 24 q 22 2 34 14 z"
+        d="M -48 48 q 12 -10 36 -12 h 24 q 24 2 36 12 z"
         fill="var(--uniform-a)"
         stroke="rgba(0,0,0,0.28)"
         strokeWidth="1.2"
       />
 
       {/* 髪（後ろ側）。帽子で隠れても、横と後ろは見える */}
-      <path d={hairstyle} fill={`url(#${hairId})`} stroke={OUTLINE} strokeWidth="1" />
+      <path
+        d={hairstyle}
+        transform={`scale(${HAIR_SCALE})`}
+        fill={`url(#${hairId})`}
+        stroke={OUTLINE}
+        strokeWidth="0.9"
+      />
 
       {/* 耳 */}
-      <ellipse cx={-CHEEK + 1} cy="4" rx="4.6" ry="7" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
-      <ellipse cx={CHEEK - 1} cy="4" rx="4.6" ry="7" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
+      <ellipse cx={-CHEEK + 1} cy="6" rx="4.4" ry="7.5" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
+      <ellipse cx={CHEEK - 1} cy="6" rx="4.4" ry="7.5" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
 
       {/* 顔 */}
       <path d={face} fill={`url(#${skinId})`} stroke={OUTLINE} strokeWidth="1.2" />
@@ -449,7 +470,7 @@ export function PlayerPortrait({
       {/* 眉 */}
       <path
         d={brow.d}
-        transform={`translate(${-EYE_X + 6} ${BROW_Y})`}
+        transform={`translate(${-EYE_X + 4} ${BROW_Y}) scale(${FEATURE_SCALE})`}
         fill="none"
         stroke={hair.base}
         strokeWidth={brow.width}
@@ -458,7 +479,7 @@ export function PlayerPortrait({
       />
       <path
         d={brow.d}
-        transform={`translate(${EYE_X + 7} ${BROW_Y}) scale(-1 1)`}
+        transform={`translate(${EYE_X + 5} ${BROW_Y}) scale(${-FEATURE_SCALE} ${FEATURE_SCALE})`}
         fill="none"
         stroke={hair.base}
         strokeWidth={brow.width}
@@ -468,7 +489,10 @@ export function PlayerPortrait({
 
       {/* 目。白目・虹彩・瞳孔・ハイライトの4層 */}
       {[-1, 1].map((side) => (
-        <g key={side} transform={`translate(${EYE_X * side} ${EYE_Y}) scale(${side} 1)`}>
+        <g
+          key={side}
+          transform={`translate(${EYE_X * side} ${EYE_Y}) scale(${side * FEATURE_SCALE} ${FEATURE_SCALE})`}
+        >
           <ellipse cx="0" cy="0" rx={eye.rx} ry={eye.ry} fill="#fdf7f2" />
           <ellipse cx="0.8" cy="0.4" rx={eye.iris * 0.92} ry={eye.iris} fill={`url(#${irisId})`} />
           <ellipse cx="0.8" cy="0.4" rx={eye.iris * 0.42} ry={eye.iris * 0.46} fill="#140f10" />
@@ -495,10 +519,10 @@ export function PlayerPortrait({
       {/* 鼻。線と影で示す */}
       <path
         d={nose}
-        transform={`translate(0 ${NOSE_Y})`}
+        transform={`translate(0 ${NOSE_Y}) scale(${FEATURE_SCALE})`}
         fill="none"
         stroke={FEATURE}
-        strokeWidth="1.3"
+        strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
         opacity="0.8"
@@ -507,7 +531,7 @@ export function PlayerPortrait({
       {/* 口。マネージャーは唇を塗る */}
       {manager ? (
         <path
-          d={`M -6 ${MOUTH_Y} q 6 -3 12 0 q -6 5 -12 0 z`}
+          d={`M -5 ${MOUTH_Y} q 5 -2.5 10 0 q -5 4 -10 0 z`}
           fill="#c9736f"
           stroke={FEATURE}
           strokeWidth="0.8"
@@ -515,10 +539,10 @@ export function PlayerPortrait({
       ) : (
         <path
           d={mouth}
-          transform={`translate(0 ${MOUTH_Y})`}
+          transform={`translate(0 ${MOUTH_Y}) scale(${FEATURE_SCALE})`}
           fill="none"
           stroke={FEATURE}
-          strokeWidth="1.6"
+          strokeWidth="2"
           strokeLinecap="round"
         />
       )}
