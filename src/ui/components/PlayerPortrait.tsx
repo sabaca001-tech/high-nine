@@ -84,10 +84,15 @@ const MOUTH_Y = 20
 const BRIM_Y = -26
 
 /**
- * 髪型のパスは頬32・てっぺん-46より小さい頭（27／-40）を前提に描いてある。
- * 顔を大きくしたぶん、まとめて引き伸ばす。
+ * 髪型のパスは、顔より小さい頭（男子±28／マネージャー±30）を前提に描いてある。
+ * **顔より確実に外側へ出す**ように引き伸ばす。
+ *
+ * ここが足りないと、髪が顔の裏に隠れて**坊主頭に見える**。
+ * 帽子をかぶる選手は前髪で誤魔化せるが、
+ * かぶらないマネージャーは髪が1本も見えなくなっていた。
  */
-const HAIR_SCALE = 1.18
+const HAIR_SCALE_MALE = 1.3
+const HAIR_SCALE_MANAGER = 1.22
 
 /**
  * 目鼻立ちの縮尺。
@@ -442,15 +447,6 @@ export function PlayerPortrait({
         strokeWidth="1.2"
       />
 
-      {/* 髪（後ろ側）。帽子で隠れても、横と後ろは見える */}
-      <path
-        d={hairstyle}
-        transform={`scale(${HAIR_SCALE})`}
-        fill={`url(#${hairId})`}
-        stroke={OUTLINE}
-        strokeWidth="0.9"
-      />
-
       {/* 耳 */}
       <ellipse cx={-CHEEK + 1} cy="6" rx="4.4" ry="7.5" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
       <ellipse cx={CHEEK - 1} cy="6" rx="4.4" ry="7.5" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
@@ -466,6 +462,20 @@ export function PlayerPortrait({
         {/* 帽子の下に落ちる影 */}
         {cap && <rect x="-30" y={BRIM_Y} width="60" height="9" fill="rgba(60,34,22,0.28)" />}
       </g>
+
+      {/*
+        髪。**顔の上に描く。**
+        顔の裏に敷いていた頃は、輪郭からはみ出した縁しか見えず、
+        帽子をかぶらないマネージャーが坊主頭に見えていた。
+        髪型のパスは頭全体を覆う形なので、前に置けば生え際がそのまま出る。
+      */}
+      <path
+        d={hairstyle}
+        transform={`scale(${manager ? HAIR_SCALE_MANAGER : HAIR_SCALE_MALE})`}
+        fill={`url(#${hairId})`}
+        stroke={OUTLINE}
+        strokeWidth="0.9"
+      />
 
       {/* 眉 */}
       <path
