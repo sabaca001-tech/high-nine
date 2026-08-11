@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
+import { startedGame } from '@/core/autoPlay'
+import { applyCommand } from '@/core/gameEngine'
+import type { GameState } from '@/core/types/game'
 import { createInitialRoster } from './createPlayer'
 import { overallRating } from './rating'
 import {
@@ -147,5 +150,51 @@ describe('ベンチ入りの学年', () => {
     for (let i = 1; i < promoted.length; i++) {
       expect(promoted[i]).toBeLessThanOrEqual(promoted[i - 1])
     }
+  })
+})
+
+describe('おまかせ編成はベンチ外も見る', () => {
+  it('ベンチ外に強い選手がいれば、弱いベンチ入りと入れ替わる', () => {
+    // **ベンチ入りの中だけで組んでいた頃は、
+    // ベンチ外に総合80がいてもベンチ入りの総合50が使われ続けていた**
+    const base = startedGame({ seed: 21 })
+
+    // わざと弱い選手だけをベンチ入りにする
+    const weakest = [...base.players]
+      .sort((a, b) => overallRating(a) - overallRating(b))
+      .slice(0, FIRST_SQUAD_SIZE)
+    const state: GameState = {
+      ...base,
+      squad: weakest.map((player) => player.id),
+    }
+
+    const after = applyCommand(state, { type: 'autoLineup' }).state
+    const rating = (ids: readonly string[]) =>
+      ids.reduce((sum, id) => {
+        const player = after.players.find((p) => p.id === id)
+        return sum + (player ? overallRating(player) : 0)
+      }, 0)
+
+    // ベンチ入りの総和が上がっている
+    expect(rating(after.squad)).toBeGreaterThan(rating(state.squad))
+    // スタメンは必ずベンチ入りから組む
+    for (const slot of after.lineup.slots) {
+      expect(after.squad).toContain(slot.playerId)
+    }
+  })
+
+  it('方針はベンチ入りの選び方にも効く', () => {
+    const state = startedGame({ seed: 33 })
+    const youth = applyCommand(state, { type: 'autoLineup', plan: 'youth' }).state
+    const ability = applyCommand(state, { type: 'autoLineup', plan: 'ability' }).state
+
+    const grades = (ids: readonly string[]) =>
+      ids.reduce((sum, id) => {
+        const player = state.players.find((p) => p.id === id)
+        return sum + (player ? player.grade : 0)
+      }, 0)
+
+    // 若手優先のほうが、ベンチ入りの学年の合計が小さい（下級生が多い）
+    expect(grades(youth.squad)).toBeLessThan(grades(ability.squad))
   })
 })

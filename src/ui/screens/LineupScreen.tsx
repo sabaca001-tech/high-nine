@@ -287,6 +287,8 @@ export function LineupEditor() {
                 <span className={styles.planNote}>{plan.description}</span>
               </button>
             ))}
+            {/* **ベンチ入りごと組み直す**ことを書いておく。黙って入れ替わると驚く */}
+            <p className={styles.planNote}>ベンチ外の選手も含めて選び直します</p>
           </div>
         )}
 

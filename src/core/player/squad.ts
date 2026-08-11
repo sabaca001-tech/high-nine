@@ -12,6 +12,7 @@
  */
 
 import { overallRating } from './rating'
+import type { AutoLineupPlan } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
 
@@ -49,9 +50,23 @@ const GRADE_BONUS: Record<Grade, number> = {
 /**
  * ベンチ入りの優先度。高いほど枠に残す。
  * `autoSquad` と `repairSquad` で**同じ物差しを使う**。
+ *
+ * 方針（おまかせ編成の3種）に合わせて重みを変える。
+ * スタメンの選び方と揃えないと、
+ * 「若手優先で組んだのにベンチ入りは3年生ばかり」という食い違いが出る。
  */
-export function squadPriority(player: Player): number {
-  return overallRating(player) + GRADE_BONUS[player.grade]
+export function squadPriority(player: Player, plan: AutoLineupPlan = 'balanced'): number {
+  const rating = overallRating(player)
+  if (plan === 'ability') return rating
+  if (plan === 'youth') return rating + YOUTH_PLAN_BONUS[player.grade]
+  return rating + GRADE_BONUS[player.grade]
+}
+
+/** 「若手優先」でベンチ入りに足す下駄。スタメンの `YOUTH_PLAN_BONUS` と揃える */
+const YOUTH_PLAN_BONUS: Record<Grade, number> = {
+  1: 44,
+  2: 22,
+  3: 0,
 }
 
 /**
@@ -73,19 +88,23 @@ export const MIN_SQUAD_PITCHERS = 3
  * **投手枠は先に取る。** 打力で並べると投手が押し出され、
  * 大会で継投が組めなくなる。
  */
-export function autoSquad(players: Player[]): string[] {
+export function autoSquad(players: Player[], plan: AutoLineupPlan = 'balanced'): string[] {
   const available = [...players].filter(isAvailable)
-  return fillSquad([], available)
+  return fillSquad([], available, plan)
 }
 
 /**
  * 空きを埋める。**投手を先に確保してから**、残りを優先度順に詰める。
  * `autoSquad` と `repairSquad` で同じ手順を使う。
  */
-function fillSquad(kept: string[], pool: Player[]): string[] {
+function fillSquad(
+  kept: string[],
+  pool: Player[],
+  plan: AutoLineupPlan = 'balanced',
+): string[] {
   const chosen = [...kept]
   const taken = new Set(chosen)
-  const byPriority = [...pool].sort((a, b) => squadPriority(b) - squadPriority(a))
+  const byPriority = [...pool].sort((a, b) => squadPriority(b, plan) - squadPriority(a, plan))
 
   const keptPitchers = pool.filter(
     (player) => taken.has(player.id) && player.isPitcher,

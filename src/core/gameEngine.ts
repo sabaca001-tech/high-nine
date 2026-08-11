@@ -31,6 +31,7 @@ import {
   replaceUselessCards,
 } from '@/core/card/drawCards'
 import { autoLineup, repairLineup, validateLineup } from '@/core/lineup/autoLineup'
+import type { AutoLineupPlan } from '@/core/lineup/autoLineup'
 import { createInitialRoster, createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
 import { recruitFreshmen } from '@/core/season/graduation'
 import { applyCardCost, applyPractice, clamp } from '@/core/player/growth'
@@ -86,6 +87,7 @@ import { findEventChoice, findPlayerEvent } from '@/core/event/playerEvents'
 import { advanceSeason } from '@/core/season/graduation'
 import { applyStreaks } from '@/core/player/streak'
 import {
+  autoSquad,
   firstSquadSet,
   repairSquad,
   squadMultiplierOf,
@@ -291,8 +293,7 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
     case 'setLineup':
       return setLineup(state, command.lineup)
     case 'autoLineup':
-      // ベンチ入りの中から組む。ベンチ外の選手を勝手にスタメンに入れない
-      return setLineup(state, autoLineup(matchRoster(state), command.plan))
+      return autoOrder(state, command.plan)
     case 'setSquad':
       return setSquad(state, command.squad)
     case 'setMatchSpeed':
@@ -783,6 +784,28 @@ function playTournamentMatch(state: GameState): EngineResult {
  * **ベンチ入り（squad）とスタメンだけ。** 部員全員を渡していた頃は、
  * ベンチ外の選手が代打や継投で出てきてしまい、ベンチ入りを決める意味が無かった。
  */
+/**
+ * おまかせ編成。**ベンチ入りから組み直す。**
+ *
+ * スタメンだけを組み直していた頃は、
+ * ベンチ外に総合80の選手がいてもベンチ入りの総合50が使われ続けていた。
+ * 「おまかせ」と言われて期待するのは**部員全員から選ぶ**ことなので、
+ * ベンチ入りごと選び直す。
+ *
+ * 方針（バランス／能力優先／若手優先）はベンチ入りの選び方にも効く。
+ * 揃えないと「若手優先で組んだのにベンチ入りは3年生ばかり」になる。
+ */
+function autoOrder(state: GameState, plan?: AutoLineupPlan): EngineResult {
+  const squad = autoSquad(state.players, plan)
+  const ids = new Set(squad)
+  const roster = state.players.filter((player) => ids.has(player.id))
+
+  return {
+    state: { ...state, squad, lineup: autoLineup(roster, plan) },
+    events: [],
+  }
+}
+
 export function matchRoster(state: GameState): Player[] {
   const ids = new Set(state.squad)
   for (const slot of state.lineup.slots) ids.add(slot.playerId)
