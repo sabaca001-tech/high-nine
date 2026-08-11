@@ -14,11 +14,17 @@
  *
  * ## 絵柄
  *
- * 野球漫画に寄せるために効くのは3つ。
+ * **陰影で立体を出す**（漫画のベタ塗りではなく、写真寄りの見え方）。
  *
- * 1. **太い黒の輪郭線**（陰影ではなく線で形を見せる）
- * 2. **尖った髪の束**（毛先を三角に切る）
- * 3. **大きな目**（白目・瞳・ハイライトの3層＋上まぶたの太い線）
+ * - 肌・髪・瞳は放射／線形グラデーションで塗る
+ * - 輪郭線は細く、色も黒ではなく**暗い肌色**にして線を目立たせない
+ * - 頬・鼻・帽子の下に落ちる影を1枚ずつ乗せる
+ *
+ * **写真そのものは生成できない。** 顔写真を作るにはモデル（数十〜数百MB）を
+ * 積むか外部サービスに投げるかで、どちらもこのゲームの前提
+ * （オフラインで動く・画像アセットを持たない・セーブは localStorage）と噛み合わない。
+ * 1人ぶんの顔写真は圧縮しても50〜200KBあり、30人×数十年ぶんを抱えると
+ * localStorage の上限（5MB）を軽く超える。
  */
 
 import type { CSSProperties } from 'react'
@@ -47,8 +53,14 @@ type Props = {
   style?: CSSProperties
 }
 
-/** 線の色。真っ黒より少し茶を混ぜて紙面に近づける */
-const INK = '#20191a'
+/**
+ * 輪郭線。**黒で囲まない。**
+ * 黒い線で囲むと絵が漫画になるので、暗い肌色に寄せて線を沈める。
+ */
+const OUTLINE = 'rgba(60, 34, 22, 0.55)'
+
+/** 目鼻立ちの線。ここだけは少し濃く取る */
+const FEATURE = 'rgba(48, 28, 20, 0.85)'
 
 // ── 位置（全員共通）──────────────────────
 
@@ -82,39 +94,46 @@ const VIEW_BOX = '-52 -62 104 104'
  * 褐色まで混ぜていた頃は、同じ学校に人種が混ざって見えていた。
  */
 const SKIN_JP = [
-  { base: '#ffe3c9', shade: '#f0c9a8' },
-  { base: '#fddcbe', shade: '#eec19c' },
-  { base: '#f9d3b1', shade: '#e8b78f' },
-  { base: '#f2c9a4', shade: '#dcab82' },
-  { base: '#eabf98', shade: '#d29e76' },
-  { base: '#e2b489', shade: '#c8916a' },
+  { light: '#fff0e0', base: '#ffe0c3', shade: '#e8bd97' },
+  { light: '#ffecd8', base: '#fbd9ba', shade: '#e0b28c' },
+  { light: '#fde5cd', base: '#f7d2ae', shade: '#d9a882' },
+  { light: '#f9dcc0', base: '#f1c9a2', shade: '#cf9c74' },
+  { light: '#f3d3b4', base: '#e9bf95', shade: '#c58e66' },
+  { light: '#eccaa8', base: '#e0b489', shade: '#b9825a' },
 ]
 
 /** 肌の色（留学生）。ここだけ広く取る */
 const SKIN_EXCHANGE = [
-  { base: '#d9a878', shade: '#bd8a5c' },
-  { base: '#c08a5e', shade: '#a06c43' },
-  { base: '#a5714a', shade: '#875734' },
-  { base: '#855636', shade: '#6b4127' },
-  { base: '#6f4529', shade: '#57341d' },
+  { light: '#e6bb90', base: '#d5a273', shade: '#b07f54' },
+  { light: '#cf9c72', base: '#bd8759', shade: '#96653c' },
+  { light: '#b5825a', base: '#a06e46', shade: '#7d5130' },
+  { light: '#96694a', base: '#835537', shade: '#633c24' },
+  { light: '#7d573c', base: '#6a442b', shade: '#4d2f1b' },
 ]
 
 /** 髪の色。日本人は黒〜焦げ茶が大半で、たまに明るい色 */
 const HAIR_COLORS = [
-  '#17161a',
-  '#1c1a1c',
-  '#221d1c',
-  '#28211f',
-  '#2e2521',
-  '#332723',
-  '#3b2d24',
-  '#45342a',
-  '#513c2d',
-  '#5d4634',
+  { light: '#3a3840', base: '#1d1c21', deep: '#0e0d10' },
+  { light: '#3e3940', base: '#221f24', deep: '#111015' },
+  { light: '#44393a', base: '#271f20', deep: '#150f10' },
+  { light: '#4b3d38', base: '#2c2320', deep: '#171210' },
+  { light: '#54453c', base: '#332822', deep: '#1b1411' },
+  { light: '#5b4a3e', base: '#392c23', deep: '#1f1713' },
+  { light: '#66523f', base: '#413124', deep: '#241a13' },
+  { light: '#725c46', base: '#4b3728', deep: '#2b1e15' },
+  { light: '#80684d', base: '#57402d', deep: '#33241a' },
+  { light: '#8f7658', base: '#634a34', deep: '#3c2b1e' },
 ]
 
 /** 瞳の色。黒目がちだが、少しだけ幅を持たせる */
-const EYE_COLORS = ['#1a1416', '#20181a', '#271c19', '#2f2119', '#3a281c', '#463020']
+const EYE_COLORS = [
+  { light: '#3a2c2a', base: '#241a1b', deep: '#120c0d' },
+  { light: '#453230', base: '#2b1e1c', deep: '#160e0d' },
+  { light: '#513a2d', base: '#33231a', deep: '#1a1109' },
+  { light: '#5d4430', base: '#3c2a1c', deep: '#20150c' },
+  { light: '#6b503a', base: '#453120', deep: '#261a0f' },
+  { light: '#7a5c42', base: '#4f3826', deep: '#2c1e12' },
+]
 
 // ── パーツ ──────────────────────────────
 
@@ -347,6 +366,13 @@ export function PlayerPortrait({
   const brim = capColorOf(design.brim)
   const logoColor = capColorOf(design.logoColor)
 
+  // グラデーションの id は選手ごとに分ける（同じ id が複数あると混ざる）
+  const skinId = `skin-${playerId}`
+  const hairId = `hair-${playerId}`
+  const irisId = `iris-${playerId}`
+  const capId = `cap-${playerId}`
+  const faceClip = `face-${playerId}`
+
   return (
     <svg
       width={size}
@@ -357,113 +383,145 @@ export function PlayerPortrait({
       role="presentation"
       aria-hidden="true"
     >
+      <defs>
+        {/* 肌。左上から光を当てて、輪郭に向かって落とす */}
+        <radialGradient id={skinId} cx="38%" cy="28%" r="82%">
+          <stop offset="0%" stopColor={skin.light} />
+          <stop offset="55%" stopColor={skin.base} />
+          <stop offset="100%" stopColor={skin.shade} />
+        </radialGradient>
+        {/* 髪。上を明るく、根元を暗く */}
+        <linearGradient id={hairId} x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0%" stopColor={hair.light} />
+          <stop offset="45%" stopColor={hair.base} />
+          <stop offset="100%" stopColor={hair.deep} />
+        </linearGradient>
+        {/* 瞳。中心を暗く、周辺を明るく */}
+        <radialGradient id={irisId} cx="50%" cy="38%" r="62%">
+          <stop offset="0%" stopColor={iris.light} />
+          <stop offset="70%" stopColor={iris.base} />
+          <stop offset="100%" stopColor={iris.deep} />
+        </radialGradient>
+        <linearGradient id={capId} x1="0.3" y1="0" x2="0.7" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.28)" />
+          <stop offset="55%" stopColor="rgba(255,255,255,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.3)" />
+        </linearGradient>
+        {/* 頬や鼻の影が輪郭からはみ出さないよう切り抜く */}
+        <clipPath id={faceClip}>
+          <path d={face} />
+        </clipPath>
+      </defs>
+
       {/* 首と肩。顔より暗くして、顔を前に出す */}
       <path
         d={`M -9 ${CHIN_Y - 6} h 18 v 12 h -18 z`}
         fill={skin.shade}
-        stroke={INK}
-        strokeWidth="2"
-        strokeLinejoin="round"
+        stroke={OUTLINE}
+        strokeWidth="1"
       />
       <path
         d="M -46 46 q 12 -12 34 -14 h 24 q 22 2 34 14 z"
         fill="var(--uniform-a)"
-        stroke={INK}
-        strokeWidth="2.2"
-        strokeLinejoin="round"
+        stroke="rgba(0,0,0,0.28)"
+        strokeWidth="1.2"
       />
 
-      {/* 髪。帽子で隠れるが、かぶらない場面ではこれが主役 */}
-      <path d={hairstyle} fill={hair} stroke={INK} strokeWidth="2.2" strokeLinejoin="round" />
+      {/* 髪（後ろ側）。帽子で隠れても、横と後ろは見える */}
+      <path d={hairstyle} fill={`url(#${hairId})`} stroke={OUTLINE} strokeWidth="1" />
 
       {/* 耳 */}
-      <path
-        d={`M ${-CHEEK + 1} -2 q -6 2 -5 8 q 1 6 6 4`}
-        fill={skin.base}
-        stroke={INK}
-        strokeWidth="1.8"
-      />
-      <path
-        d={`M ${CHEEK - 1} -2 q 6 2 5 8 q -1 6 -6 4`}
-        fill={skin.base}
-        stroke={INK}
-        strokeWidth="1.8"
-      />
+      <ellipse cx={-CHEEK + 1} cy="4" rx="4.6" ry="7" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
+      <ellipse cx={CHEEK - 1} cy="4" rx="4.6" ry="7" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
 
       {/* 顔 */}
-      <path d={face} fill={skin.base} stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
+      <path d={face} fill={`url(#${skinId})`} stroke={OUTLINE} strokeWidth="1.2" />
 
-      {/* 頬の影。ベタ1枚だけ乗せる */}
-      <path
-        d={`M ${CHEEK * 0.5} ${EYE_Y + 2} q ${CHEEK * 0.35} 10 ${-CHEEK * 0.22} 18 q ${-CHEEK * 0.1} -12 ${-CHEEK * 0.06} -19 z`}
-        fill={skin.shade}
-        opacity="0.7"
-      />
+      <g clipPath={`url(#${faceClip})`}>
+        {/* 頬の陰。片側にだけ落として立体を出す */}
+        <ellipse cx={CHEEK * 0.62} cy={EYE_Y + 8} rx="13" ry="18" fill={skin.shade} opacity="0.55" />
+        {/* あご下の陰 */}
+        <ellipse cx="0" cy={CHIN_Y + 2} rx="16" ry="7" fill={skin.shade} opacity="0.5" />
+        {/* 帽子の下に落ちる影 */}
+        {cap && <rect x="-30" y={BRIM_Y} width="60" height="9" fill="rgba(60,34,22,0.28)" />}
+      </g>
 
       {/* 眉 */}
       <path
         d={brow.d}
         transform={`translate(${-EYE_X + 6} ${BROW_Y})`}
         fill="none"
-        stroke={hair}
+        stroke={hair.base}
         strokeWidth={brow.width}
         strokeLinecap="round"
+        opacity="0.9"
       />
       <path
         d={brow.d}
         transform={`translate(${EYE_X + 7} ${BROW_Y}) scale(-1 1)`}
         fill="none"
-        stroke={hair}
+        stroke={hair.base}
         strokeWidth={brow.width}
         strokeLinecap="round"
+        opacity="0.9"
       />
 
-      {/* 目。白目・瞳・ハイライトの3層に、上まぶたの太い線 */}
+      {/* 目。白目・虹彩・瞳孔・ハイライトの4層 */}
       {[-1, 1].map((side) => (
         <g key={side} transform={`translate(${EYE_X * side} ${EYE_Y}) scale(${side} 1)`}>
-          <ellipse
-            cx="0"
-            cy="0"
-            rx={eye.rx}
-            ry={eye.ry}
-            fill="#fffaf5"
-            stroke={INK}
-            strokeWidth="1.4"
-          />
-          <ellipse cx="1" cy="0.4" rx={eye.iris * 0.9} ry={eye.iris} fill={iris} />
-          <circle cx="2" cy={-eye.iris * 0.35} r={eye.iris * 0.34} fill="#ffffff" />
-          {/* 上まぶた。**ここを太くするだけで一気に漫画になる** */}
+          <ellipse cx="0" cy="0" rx={eye.rx} ry={eye.ry} fill="#fdf7f2" />
+          <ellipse cx="0.8" cy="0.4" rx={eye.iris * 0.92} ry={eye.iris} fill={`url(#${irisId})`} />
+          <ellipse cx="0.8" cy="0.4" rx={eye.iris * 0.42} ry={eye.iris * 0.46} fill="#140f10" />
+          <circle cx="2.2" cy={-eye.iris * 0.42} r={eye.iris * 0.3} fill="#ffffff" opacity="0.95" />
+          {/* 上まぶた。細い線で目のふちを描く */}
           <path
             d={eye.lid}
-            transform={`translate(0 ${-eye.ry - 0.5 + eye.tilt})`}
+            transform={`translate(0 ${-eye.ry - 0.4 + eye.tilt})`}
             fill="none"
-            stroke={INK}
-            strokeWidth="3"
+            stroke={FEATURE}
+            strokeWidth="1.9"
             strokeLinecap="round"
+          />
+          {/* 下まぶた。薄く入れると目が丸く見える */}
+          <path
+            d={`M ${-eye.rx * 0.8} ${eye.ry * 0.8} q ${eye.rx * 0.8} ${eye.ry * 0.5} ${eye.rx * 1.6} ${-eye.ry * 0.1}`}
+            fill="none"
+            stroke={OUTLINE}
+            strokeWidth="0.9"
           />
         </g>
       ))}
 
-      {/* 鼻 */}
+      {/* 鼻。線と影で示す */}
       <path
         d={nose}
         transform={`translate(0 ${NOSE_Y})`}
         fill="none"
-        stroke={INK}
-        strokeWidth="1.8"
+        stroke={FEATURE}
+        strokeWidth="1.3"
         strokeLinecap="round"
         strokeLinejoin="round"
+        opacity="0.8"
       />
 
-      {/* 口 */}
-      <path
-        d={mouth}
-        transform={`translate(0 ${MOUTH_Y})`}
-        fill="none"
-        stroke={INK}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
+      {/* 口。マネージャーは唇を塗る */}
+      {manager ? (
+        <path
+          d={`M -6 ${MOUTH_Y} q 6 -3 12 0 q -6 5 -12 0 z`}
+          fill="#c9736f"
+          stroke={FEATURE}
+          strokeWidth="0.8"
+        />
+      ) : (
+        <path
+          d={mouth}
+          transform={`translate(0 ${MOUTH_Y})`}
+          fill="none"
+          stroke={FEATURE}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      )}
 
       {/* 帽子 */}
       {cap && (
@@ -472,35 +530,35 @@ export function PlayerPortrait({
           <path
             d={bang}
             transform={`translate(${-CHEEK * 0.62} ${BRIM_Y + 2})`}
-            fill={hair}
-            stroke={INK}
-            strokeWidth="1.6"
-            strokeLinejoin="round"
+            fill={`url(#${hairId})`}
+            stroke={OUTLINE}
+            strokeWidth="0.9"
           />
           <path
             d={bang}
             transform={`translate(${CHEEK * 0.62} ${BRIM_Y + 2}) scale(-1 1)`}
-            fill={hair}
-            stroke={INK}
-            strokeWidth="1.6"
-            strokeLinejoin="round"
+            fill={`url(#${hairId})`}
+            stroke={OUTLINE}
+            strokeWidth="0.9"
           />
 
           {/* 本体 */}
           <path
             d={`M ${-CHEEK - 2} ${BRIM_Y} a ${CHEEK + 2} ${CHEEK * 1.05} 0 0 1 ${CHEEK * 2 + 4} 0 z`}
             fill={crown}
-            stroke={INK}
-            strokeWidth="2.4"
-            strokeLinejoin="round"
+            stroke="rgba(0,0,0,0.35)"
+            strokeWidth="1"
+          />
+          <path
+            d={`M ${-CHEEK - 2} ${BRIM_Y} a ${CHEEK + 2} ${CHEEK * 1.05} 0 0 1 ${CHEEK * 2 + 4} 0 z`}
+            fill={`url(#${capId})`}
           />
           {/* つば */}
           <path
             d={`M ${-CHEEK - 3} ${BRIM_Y} h ${CHEEK * 2 + 6} q 8 1 7 5 q -1 3 -9 2 h ${-(CHEEK * 2 + 2)} q -6 0 -6 -3 z`}
             fill={brim}
-            stroke={INK}
-            strokeWidth="2.2"
-            strokeLinejoin="round"
+            stroke="rgba(0,0,0,0.35)"
+            strokeWidth="1"
           />
           {/* マーク */}
           <CapLogo design={design} schoolName={school} color={logoColor} y={BRIM_Y - CHEEK * 0.5} />
@@ -533,7 +591,7 @@ function CapLogo({
         fontSize="15"
         fontWeight="800"
         fill={color}
-        stroke={INK}
+        stroke="rgba(0,0,0,0.45)"
         strokeWidth="0.8"
         paintOrder="stroke"
       >
@@ -553,7 +611,7 @@ function CapLogo({
       d={marks[design.logo]}
       transform={`translate(0 ${y})`}
       fill={color}
-      stroke={INK}
+      stroke="rgba(0,0,0,0.45)"
       strokeWidth="1.2"
       strokeLinejoin="round"
     />

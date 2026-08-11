@@ -56,6 +56,17 @@ const GIVEN_NAMES = [
   '侑真', '誠也', '晴斗', '湊真', '唯斗', '諒介', '涼太', '真人', '将大', '晃平',
 ]
 
+/**
+ * 女子の名。**マネージャーに使う。**
+ * 男子の名簿から引いていた頃は、マネージャーが「翔太」「大輔」になっていた。
+ */
+const FEMALE_GIVEN_NAMES = [
+  '美咲', '陽菜', '結衣', '葵', '凛', '陽子', '彩花', '真央', '七海', '沙耶',
+  '瑞希', '千夏', '莉子', '愛美', '咲良', '楓', '碧', '未來', '結菜', '柚希',
+  '朝美', '菜月', '奈々', '心春', '琴音', '涼香', '桃花', '亜衣', '瞳', '春香',
+  '智恵', '志保', '由紀', '香織', '典子', '早苗', '真希', '恵理', '亜美', '直美',
+]
+
 /** 生成を諦めて重複を許すまでの試行回数 */
 const NAME_RETRY_LIMIT = 30
 
@@ -68,6 +79,16 @@ export function pickName(rng: Rng, taken: readonly string[]): string {
   let name = ''
   for (let i = 0; i < NAME_RETRY_LIMIT; i++) {
     name = `${rng.pick(SURNAMES)} ${rng.pick(GIVEN_NAMES)}`
+    if (!taken.includes(name)) return name
+  }
+  return name
+}
+
+/** 女子の名前を1つ選ぶ。マネージャー用 */
+export function pickFemaleName(rng: Rng, taken: readonly string[]): string {
+  let name = ''
+  for (let i = 0; i < NAME_RETRY_LIMIT; i++) {
+    name = `${rng.pick(SURNAMES)} ${rng.pick(FEMALE_GIVEN_NAMES)}`
     if (!taken.includes(name)) return name
   }
   return name

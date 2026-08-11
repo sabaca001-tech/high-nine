@@ -13,7 +13,7 @@
  */
 
 import type { Rng } from '@/core/rng/random'
-import { pickName } from '@/core/player/createPlayer'
+import { pickFemaleName } from '@/core/player/createPlayer'
 import type { Grade } from '@/core/types/player'
 
 export type ManagerRoleId = 'recorder' | 'trainer' | 'nutritionist' | 'analyst' | 'chief'
@@ -139,7 +139,8 @@ export function rollManagerJoin(
   return {
     manager: {
       id: `manager-${params.serial}`,
-      name: pickName(rng, params.takenNames),
+      // **マネージャーは女子**。男子の名簿から引くと「翔太」になっていた
+      name: pickFemaleName(rng, params.takenNames),
       roleId: role.id,
       grade: 1,
       joinedYear: params.year,
