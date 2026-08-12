@@ -362,6 +362,21 @@ function pickRivals(
     .slice(0, limit)
 }
 
+/**
+ * 校名・県名で絞る。空なら全部返す。
+ *
+ * 8,000校を毎回なめるが、文字列の一致だけなので数msで済む
+ * （重いのは名簿を作る `lineupRatingOf` のほう）。
+ */
+function searchRivals(schools: RivalSchool[], keyword: string): RivalSchool[] {
+  if (keyword.length === 0) return schools
+
+  return schools.filter(
+    (school) =>
+      school.name.includes(keyword) || findRegion(school.regionId).name.includes(keyword),
+  )
+}
+
 /** 戦績の一言。何も勝っていなければ空 */
 function titleText(school: RivalSchool): string {
   const titles = titlesOf(school)
@@ -391,6 +406,14 @@ function RivalsTab() {
   const game = useGameStore((s) => s.game)!
   const [localLimit, setLocalLimit] = useState(LOCAL_PREVIEW)
   const [nationalLimit, setNationalLimit] = useState(NATIONAL_PREVIEW)
+  /**
+   * 校名で絞る。
+   *
+   * **8,000校から目当ての1校を探せなかった。**
+   * 強い順に並ぶだけなので、一度戦った学校を見返すのも運任せだった。
+   * 県名でも引けるようにしてある（「鳥取」で鳥取の学校が並ぶ）。
+   */
+  const [query, setQuery] = useState('')
 
   /**
    * 出す学校を選んで、**スタメンの平均総合の順**に並べる。
@@ -413,17 +436,33 @@ function RivalsTab() {
   const { year } = game
   const progress = seasonProgressOfCell(game.boardPosition)
 
+  const keyword = query.trim()
   const localShown = useMemo(
-    () => pickRivals(localAll, localLimit, year, progress),
-    [localAll, localLimit, year, progress],
+    () => pickRivals(searchRivals(localAll, keyword), localLimit, year, progress),
+    [localAll, keyword, localLimit, year, progress],
   )
   const nationalShown = useMemo(
-    () => pickRivals(nationalAll, nationalLimit, year, progress),
-    [nationalAll, nationalLimit, year, progress],
+    () => pickRivals(searchRivals(nationalAll, keyword), nationalLimit, year, progress),
+    [nationalAll, keyword, nationalLimit, year, progress],
   )
 
   return (
     <>
+      <div className={styles.search}>
+        <input
+          className={styles.searchInput}
+          type="search"
+          value={query}
+          placeholder="学校名・県名で探す"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {keyword.length > 0 && (
+          <button type="button" className={styles.searchClear} onClick={() => setQuery('')}>
+            消す
+          </button>
+        )}
+      </div>
+
       {/*
         **県内は参加校ぶん全部ある（178校の県もある）。**
         全部並べると縦に長すぎて他のタブへ戻れなくなるので、

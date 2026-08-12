@@ -95,13 +95,23 @@ export function LineupEditor() {
         return
       }
 
-      // 控えから上げる。押し出された選手はベンチ入りへ回る
+      // 控えから上げる。**押し出された選手は、上げた選手が居た場所に入る**
       const pushedOut = slots[index].playerId
       slots[index] = { ...slots[index], playerId: item.id }
       setLineup({ slots })
 
-      const next = game.squad.includes(item.id) ? [...game.squad] : [...game.squad, item.id]
-      if (!next.includes(pushedOut)) next.push(pushedOut)
+      const next = [...game.squad]
+      const from = next.indexOf(item.id)
+      const to = next.indexOf(pushedOut)
+
+      if (from >= 0 && to >= 0) {
+        ;[next[from], next[to]] = [next[to], next[from]]
+      } else if (from < 0 && to >= 0) {
+        // ベンチ外から上げた。押し出された選手が入れ替わりで外れる
+        next[to] = item.id
+      } else if (from < 0) {
+        next.push(item.id)
+      }
       setSquad(next)
       return
     }
@@ -110,16 +120,34 @@ export function LineupEditor() {
     if (starterSet.has(item.id)) return
 
     if (target.to === ZONE_BENCH) {
-      if (game.squad.includes(item.id)) return
+      const next = [...game.squad]
+      const targetIndex = target.id ? next.indexOf(target.id) : -1
 
-      if (game.squad.length >= FIRST_SQUAD_SIZE) {
-        // 定員が埋まっていたら、スタメン以外のいちばん後ろと入れ替える
-        const droppable = [...game.squad].reverse().find((id) => !starterSet.has(id))
-        if (!droppable) return
-        setSquad([...game.squad.filter((id) => id !== droppable), item.id])
+      // ベンチ入り同士。**並び順を入れ替える**
+      if (game.squad.includes(item.id)) {
+        const fromIndex = next.indexOf(item.id)
+        if (fromIndex < 0 || targetIndex < 0 || fromIndex === targetIndex) return
+        ;[next[fromIndex], next[targetIndex]] = [next[targetIndex], next[fromIndex]]
+        setSquad(next)
         return
       }
-      setSquad([...game.squad, item.id])
+
+      // ベンチ外から。**落とした相手と入れ替える**（末尾に積まない）
+      if (targetIndex >= 0 && !starterSet.has(target.id ?? '')) {
+        next[targetIndex] = item.id
+        setSquad(next)
+        return
+      }
+
+      if (next.length >= FIRST_SQUAD_SIZE) {
+        // 落とす先が指定されていないときだけ、いちばん後ろと入れ替える
+        const droppable = [...next].reverse().find((id) => !starterSet.has(id))
+        if (!droppable) return
+        next[next.indexOf(droppable)] = item.id
+        setSquad(next)
+        return
+      }
+      setSquad([...next, item.id])
       return
     }
 
@@ -173,24 +201,55 @@ export function LineupEditor() {
       slots[index] = { ...slots[index], playerId: otherId }
       setLineup({ slots })
 
-      // 相手がベンチ外なら、押し出されたスタメンがベンチ外へ下がる。
-      // ベンチ入りなら両方ともベンチ入りのまま
-      const next = game.squad.filter((id) => id !== otherId && id !== starterId)
-      next.push(otherId)
-      if (otherZone === ZONE_BENCH) next.push(starterId)
+      /*
+       * **押し出された選手は、相手が居た場所に入る。**
+       * 入れ替えるたびに `push` していた頃は、
+       * 毎回ベンチのいちばん下へ飛んでいて、順番を作れなかった。
+       */
+      if (otherZone === ZONE_BENCH) {
+        const next = [...game.squad]
+        const from = next.indexOf(starterId)
+        const to = next.indexOf(otherId)
+        if (from >= 0 && to >= 0) {
+          ;[next[from], next[to]] = [next[to], next[from]]
+          setSquad(next)
+        }
+        return
+      }
+
+      // 相手がベンチ外。**押し出されたスタメンが相手の居た場所（ベンチ外）へ下がる**
+      const squadIndex = game.squad.indexOf(starterId)
+      const next = [...game.squad]
+      if (squadIndex >= 0) next[squadIndex] = otherId
+      else next.push(otherId)
       setSquad(next)
       return
     }
 
-    // ── ベンチ入りとベンチ外。所属を入れ替える ──
+    // ── ベンチ入りとベンチ外。**その場で**所属を入れ替える ──
     if (zoneA !== zoneB) {
       const benchId = zoneA === ZONE_BENCH ? aId : bId
       const outId = zoneA === ZONE_BENCH ? bId : aId
-      setSquad([...game.squad.filter((id) => id !== benchId), outId])
+      const benchIndex = game.squad.indexOf(benchId)
+      if (benchIndex < 0) return
+
+      const next = [...game.squad]
+      next[benchIndex] = outId
+      setSquad(next)
       return
     }
 
-    // 同じ列の控え同士。並び順に意味が無いので何もしない
+    // ── ベンチ入り同士。並び順を入れ替える ──
+    if (zoneA === ZONE_BENCH) {
+      const next = [...game.squad]
+      const i = next.indexOf(aId)
+      const j = next.indexOf(bId)
+      if (i < 0 || j < 0) return
+      ;[next[i], next[j]] = [next[j], next[i]]
+      setSquad(next)
+    }
+
+    // ベンチ外同士は並びを持たないので何もしない
   }
 
   const drag = useDragAndDrop(handleDrop)

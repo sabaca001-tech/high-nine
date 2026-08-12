@@ -440,3 +440,33 @@
   font-size: 9px;
   font-weight: 700;
 }
+
+/* 他校の検索。8,000校あるので、名前で引けないと目当ての1校に辿り着けない */
+.search {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+}
+
+.searchClear {
+  flex: 0 0 auto;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
