@@ -3,7 +3,12 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer, createGrowthAptitude, EXCHANGE_RATE } from './createPlayer'
-import { EXCHANGE_NAME_MAX, EXCHANGE_NAME_PARTS, pickExchangeName } from './exchangeNames'
+import {
+  EXCHANGE_NAME_MAX,
+  EXCHANGE_NAME_PARTS,
+  EXCHANGE_NAME_TOTAL_MAX,
+  pickExchangeName,
+} from './exchangeNames'
 import { battingRating, overallRating } from './rating'
 
 /** 留学生を1人作る */
@@ -22,10 +27,31 @@ describe('留学生', () => {
   })
 
   it('カードに収まる長さに収めてある', () => {
-    // 長いと選手カードのネームプレートで両方が切れて読めなくなる
+    // これを超えると、いちばん小さい字でもネームプレートに入らない
     for (const name of [...EXCHANGE_NAME_PARTS.surnames, ...EXCHANGE_NAME_PARTS.givenNames]) {
       expect(name.length).toBeLessThanOrEqual(EXCHANGE_NAME_MAX)
     }
+  })
+
+  it('短い名前ばかりにならない（長い名前も出る）', () => {
+    // 4文字までに縛っていた頃は、留学生の名前がどれも短く同じ響きに寄っていた。
+    // 長い名前は字を小さくして収める（`nameFontSize`）
+    const all = [...EXCHANGE_NAME_PARTS.surnames, ...EXCHANGE_NAME_PARTS.givenNames]
+    expect(all.filter((name) => name.length >= 5).length).toBeGreaterThan(10)
+    expect(all.filter((name) => name.length <= 3).length).toBeGreaterThan(5)
+  })
+
+  it('姓と名を合わせても、カードに収まる長さになる', () => {
+    // 6文字＋6文字を引くと、いちばん小さい字でも両方が切れて読めなくなる
+    const rng = createRng(31)
+    const names: string[] = []
+    for (let i = 0; i < 300; i++) {
+      const name = pickExchangeName(rng, names)
+      expect(name.replace(' ', '').length).toBeLessThanOrEqual(EXCHANGE_NAME_TOTAL_MAX)
+      names.push(name)
+    }
+    // 短い名前ばかりに寄せて解決していないことも見る
+    expect(names.some((name) => name.replace(' ', '').length >= 9)).toBe(true)
   })
 
   it('名前は姓名とも重複を避けて作られる', () => {
