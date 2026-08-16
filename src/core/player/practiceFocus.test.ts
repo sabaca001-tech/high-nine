@@ -10,6 +10,7 @@ import { createRng } from '@/core/rng/random'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
 import type { Player } from '@/core/types/player'
 import { applyPractice, TRAJECTORY_MAX } from './growth'
+import { pitchingRating } from './rating'
 import { emptyCareerStats } from './careerStats'
 import { canPracticePitch } from './trainingFocus'
 import { arsenalScore, PITCH_MAX_COUNT, PITCH_MAX_LEVEL } from './pitchDefs'
@@ -153,5 +154,65 @@ describe('球種の練習', () => {
 
   it('野手に指示はできない', () => {
     expect(canPracticePitch(makeBatter())).toBe(false)
+  })
+})
+
+describe('投手が野手の練習を受けたとき', () => {
+  /** その練習を1年ぶん（100手）繰り返す */
+  const repeat = (player: Player, kind: 'batting' | 'running' | 'shoulder' | 'fielding') => {
+    const rng = createRng(9)
+    let current = player
+    for (let i = 0; i < 100; i++) {
+      current = applyPractice(rng, [current], PRACTICE_DEFS[kind], { steps: 3 }).players[0]
+    }
+    return current
+  }
+
+  it('打撃練習で制球と球速が伸びる', () => {
+    // **投手にとって、打撃練習は打撃の練習ではない。**
+    // 振る力は投げる力、狙って当てる技術は狙って投げる技術
+    const before = makePitcher()
+    const after = repeat(before, 'batting')
+
+    expect(after.pitching!.control).toBeGreaterThan(before.pitching!.control)
+    expect(after.pitching!.velocity).toBeGreaterThan(before.pitching!.velocity)
+  })
+
+  it('走塁練習でスタミナが伸びる', () => {
+    const before = makePitcher()
+    const after = repeat(before, 'running')
+    expect(after.pitching!.stamina).toBeGreaterThan(before.pitching!.stamina)
+  })
+
+  it('遠投でノビが伸びる', () => {
+    const before = makePitcher()
+    const after = repeat(before, 'shoulder')
+    expect(after.pitching!.life).toBeGreaterThan(before.pitching!.life)
+  })
+
+  it('打撃は上がりにくいが、上がらないわけではない', () => {
+    const before = makePitcher()
+    const after = repeat(before, 'batting')
+    const pitcherGain = after.batting.meet - before.batting.meet
+
+    // 同じ練習を受けた野手のほうが、はっきり大きく伸びる
+    const fielder = repeat(makeBatter(), 'batting')
+    const fielderGain = fielder.batting.meet - makeBatter().batting.meet
+
+    expect(pitcherGain).toBeGreaterThan(0)
+    expect(pitcherGain).toBeLessThan(fielderGain)
+  })
+
+  it('守備練習はそのまま守備が伸びる（読み替えない）', () => {
+    const before = makePitcher()
+    const after = repeat(before, 'fielding')
+    expect(after.batting.fielding).toBeGreaterThan(before.batting.fielding)
+    expect(after.batting.catching).toBeGreaterThan(before.batting.catching)
+  })
+
+  it('野手の練習でも投手として伸びる', () => {
+    const before = makePitcher()
+    const after = repeat(before, 'batting')
+    expect(pitchingRating(after.pitching!)).toBeGreaterThan(pitchingRating(before.pitching!))
   })
 })

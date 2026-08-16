@@ -249,9 +249,18 @@ describe('migrate', () => {
       return { ...player, pitching }
     })
 
-    const migrated = migrate({ ...v39, players })
+    // **部員以外の写しも直す。** 世代交代の画面で待っている新入生や
+    // 試合中の写しが抜けていると、ノビ・キレの欄が空のまま並ぶ
+    const pitcher = players.find((p) => p.pitching) as Record<string, unknown>
+    const pendingSeason = { year: 3, newcomers: [pitcher], graduates: [], careerNews: [] }
+
+    const migrated = migrate({ ...v39, players, pendingSeason })
     expect(migrated).not.toBeNull()
     expect(migrated!.version).toBe(SAVE_VERSION)
+
+    const newcomer = migrated!.pendingSeason!.newcomers[0]
+    expect(newcomer.pitching!.life).toBeGreaterThan(0)
+    expect(newcomer.pitching!.sharpness).toBeGreaterThan(0)
 
     for (const player of migrated!.players) {
       if (!player.pitching) continue

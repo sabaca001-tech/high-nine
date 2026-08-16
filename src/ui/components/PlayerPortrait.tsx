@@ -161,16 +161,36 @@ const EYE_COLORS = [
  * 輪郭。**すべて同じ枠に収める**（頭のてっぺん・頬・あご先が共通）。
  * 変えるのは頬の張り方とあごの絞り方だけ。
  */
-function faceShape(cheekY: number, jawIn: number, chinIn: number): string {
-  return (
-    `M ${-CHEEK} ${cheekY}` +
-    ` C ${-CHEEK} ${HEAD_TOP + 4} ${-CHEEK * 0.62} ${HEAD_TOP} 0 ${HEAD_TOP}` +
-    ` C ${CHEEK * 0.62} ${HEAD_TOP} ${CHEEK} ${HEAD_TOP + 4} ${CHEEK} ${cheekY}` +
-    ` C ${CHEEK} ${cheekY + jawIn} ${chinIn} ${CHIN_Y - 6} 0 ${CHIN_Y}` +
-    ` C ${-chinIn} ${CHIN_Y - 6} ${-CHEEK} ${cheekY + jawIn} ${-CHEEK} ${cheekY}` +
-    ` z`
-  )
+function faceShape(cheekY: number, jawIn: number, chinIn: number): FaceShape {
+  return {
+    // **頬の高さを一緒に返す。** 耳はここに付く。
+    // 輪郭だけ返していた頃は耳を固定の高さに置いていたので、
+    // 頬の位置が高い顔では**あごの細くなった所に耳がぶら下がって**見えていた
+    cheekY,
+    d:
+      `M ${-CHEEK} ${cheekY}` +
+      ` C ${-CHEEK} ${HEAD_TOP + 4} ${-CHEEK * 0.62} ${HEAD_TOP} 0 ${HEAD_TOP}` +
+      ` C ${CHEEK * 0.62} ${HEAD_TOP} ${CHEEK} ${HEAD_TOP + 4} ${CHEEK} ${cheekY}` +
+      ` C ${CHEEK} ${cheekY + jawIn} ${chinIn} ${CHIN_Y - 6} 0 ${CHIN_Y}` +
+      ` C ${-chinIn} ${CHIN_Y - 6} ${-CHEEK} ${cheekY + jawIn} ${-CHEEK} ${cheekY}` +
+      ` z`,
+  }
 }
+
+/** 輪郭と、そこに耳を付ける高さ */
+type FaceShape = { d: string; cheekY: number }
+
+/**
+ * 耳。**頭に付く側を x=0 とした左耳**（右は左右反転で使う）。
+ *
+ * だ円を1つ置いていた頃は、耳とも頬の影とも付かない塊が
+ * 目より下に垂れ下がって見えていた。
+ * 実際の耳は**眉から鼻の高さ**に収まり、上が広く下（耳たぶ）へ向かって細くなる。
+ */
+const EAR = 'M 0 -5.5 C -5.8 -6 -6.6 0 -4.8 4.4 C -3.8 7 -1.6 9 0 8 z'
+
+/** 耳の内側のくぼみ。1本の線があるだけで、のっぺりした塊に見えなくなる */
+const EAR_INNER = 'M -1 -2 C -3.4 -1 -3.6 3.4 -1.6 5.6'
 
 /** 10種類。丸顔・面長・エラ張り・細面 など */
 const FACE_SHAPES = [
@@ -442,7 +462,7 @@ export function PlayerPortrait({
         </linearGradient>
         {/* 頬や鼻の影が輪郭からはみ出さないよう切り抜く */}
         <clipPath id={faceClip}>
-          <path d={face} />
+          <path d={face.d} />
         </clipPath>
       </defs>
 
@@ -460,12 +480,25 @@ export function PlayerPortrait({
         strokeWidth="1.2"
       />
 
-      {/* 耳 */}
-      <ellipse cx={-CHEEK + 1} cy="6" rx="4.4" ry="7.5" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
-      <ellipse cx={CHEEK - 1} cy="6" rx="4.4" ry="7.5" fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
+      {/* 耳。**顔がいちばん広い高さ（頬）に付ける。** */}
+      {[-1, 1].map((side) => (
+        <g
+          key={side}
+          transform={`translate(${side * (CHEEK - 1)} ${face.cheekY}) scale(${side} 1)`}
+        >
+          <path d={EAR} fill={skin.base} stroke={OUTLINE} strokeWidth="1" />
+          <path
+            d={EAR_INNER}
+            fill="none"
+            stroke={OUTLINE}
+            strokeWidth="0.8"
+            strokeLinecap="round"
+          />
+        </g>
+      ))}
 
       {/* 顔 */}
-      <path d={face} fill={`url(#${skinId})`} stroke={OUTLINE} strokeWidth="1.2" />
+      <path d={face.d} fill={`url(#${skinId})`} stroke={OUTLINE} strokeWidth="1.2" />
 
       <g clipPath={`url(#${faceClip})`}>
         {/*

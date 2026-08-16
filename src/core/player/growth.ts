@@ -286,6 +286,10 @@ export function applyPractice(
   const multiplier = (isRare ? RARE_MULTIPLIER : 1) * cellMultiplier * steps
   // 変化球の練習なら、能力値だけでなく持ち球も動く
   const isBreakingPractice = def.gains.some((gain) => gain.key === 'breaking')
+  // そのカードが投手向けに名指ししている能力。振り替えの二重取りを防ぐ
+  const pitcherKeys = new Set(
+    def.gains.filter((gain) => gain.target !== 'batter').map((gain) => gain.key),
+  )
 
   const updated = players.map((player) => {
     // 離脱中の選手は練習に参加できない
@@ -295,20 +299,22 @@ export function applyPractice(
     let current = player
 
     for (const gain of def.gains) {
-      if (!isTargetOf(player, gain)) continue
+      for (const actual of gainsFor(current, gain, pitcherKeys)) {
+        if (!isTargetOf(current, actual)) continue
 
-      // 選手ごとの練習方針。狙った能力は伸びやすく、それ以外は鈍る
-      const amount = calcGrowth(
-        rng,
-        current,
-        gain,
-        playerMultiplier * focusMultiplier(player, gain.key, growthPlan),
-      )
-      if (amount <= 0) continue
+        // 選手ごとの練習方針。狙った能力は伸びやすく、それ以外は鈍る
+        const amount = calcGrowth(
+          rng,
+          current,
+          actual,
+          playerMultiplier * focusMultiplier(player, actual.key, growthPlan),
+        )
+        if (amount <= 0) continue
 
-      const result = raiseAbility(current, gain.key, amount)
-      current = result.player
-      if (result.change) changes.push(result.change)
+        const result = raiseAbility(current, actual.key, amount)
+        current = result.player
+        if (result.change) changes.push(result.change)
+      }
     }
 
     /*
@@ -465,6 +471,64 @@ function roundRandom(rng: Rng, value: number): number {
 }
 
 /** その選手がこの効果の対象かどうか */
+/**
+ * 投手が野手向けの練習を受けたときの振り替え先。
+ *
+ * **投手にとって、打撃練習は打撃の練習ではない。**
+ * 以前は打撃・走塁・遠投のカードで投手が伸ばせるのは打力だけで、
+ * 手札の半分が「投手には意味の無いカード」になっていた。
+ * 投手が試合で使わない能力を伸ばすために、1年の半分を使うことになる。
+ *
+ * バットを振る力は投げる力、狙ったところへ当てる技術は狙ったところへ投げる技術、
+ * 走れる下半身は投げ続ける下半身、という読み替えをする。
+ * **守備（守備・捕球）は読み替えない。** 投手も守備はそのまま使う。
+ */
+const PITCHER_REDIRECT: Partial<Record<GrowableKey, GrowableKey>> = {
+  meet: 'control',
+  power: 'velocity',
+  speed: 'stamina',
+  // 肩力は球速に連動するので直接は動かさない。遠投は**球の伸び**に効く
+  arm: 'life',
+}
+
+/**
+ * 投手が受け取る打撃・走塁の伸び。
+ * **上がらないのではなく、上がりにくい。** 打てる投手が生まれる余地は残す。
+ */
+const PITCHER_BATTING_RATE = 0.35
+
+/** 振り替え先の投手能力に回る割合 */
+const PITCHER_REDIRECT_RATE = 0.45
+
+/**
+ * その選手がその練習から実際に受け取る伸び。
+ *
+ * 投手は野手向けの伸びを投手能力へ**振り替える**（`PITCHER_REDIRECT`）。
+ * ただし、その練習がすでに投手向けに同じ能力を与えている場合は振り替えない
+ * （ダッシュのように「投手にはスタミナ」と書いてあるカードで二重に入る）。
+ */
+function gainsFor(
+  player: Player,
+  gain: PracticeGain,
+  pitcherKeys: Set<GrowableKey>,
+): PracticeGain[] {
+  if (!player.isPitcher || !player.pitching) return [gain]
+  if (gain.target === 'batter') return [gain]
+
+  const to = PITCHER_REDIRECT[gain.key]
+  if (!to || pitcherKeys.has(to)) return [gain]
+
+  const redirected: PracticeGain = {
+    key: to,
+    amount: gain.amount * PITCHER_REDIRECT_RATE,
+    target: 'pitcher',
+  }
+  // 肩力は球速から導くので、打撃側は残さない
+  if (gain.key === 'arm') return [redirected]
+
+  return [{ ...gain, amount: gain.amount * PITCHER_BATTING_RATE }, redirected]
+}
+
 function isTargetOf(player: Player, gain: PracticeGain): boolean {
   // 投手能力は投手にしか存在しない
   if (gain.key === 'velocity' && !player.pitching) return false

@@ -1002,49 +1002,51 @@ function migrateV38ToV39(raw: Record<string, unknown>): Record<string, unknown> 
  * ここを忘れると再開した試合で球威が NaN になる。
  */
 function migrateV39ToV40(raw: Record<string, unknown>): Record<string, unknown> {
-  const convert = (value: unknown): unknown => {
-    if (!isRecord(value)) return value
-    const player = value as Record<string, unknown>
-    if (!isRecord(player.pitching)) return player
+  const fixed = fixPitchingDeep(raw) as Record<string, unknown>
+  return { ...fixed, version: 40 }
+}
 
-    const pitching = player.pitching as Record<string, unknown>
-    if (typeof pitching.life === 'number' && typeof pitching.sharpness === 'number') return player
+/**
+ * 保存データの**どこにある投手能力でも**ノビ・キレを足す。
+ *
+ * **選手の写しは1か所ではない。** 部員（`players`）と卒業生だけ直したところ、
+ * 世代交代の画面で待っている新入生（`pendingSeason.newcomers`）と
+ * 試合中の写し（`matchState`）が抜けていて、
+ * ノビ・キレの欄が空のまま並ぶ新入生ができた（実際に出た）。
+ * 型の場所を数え上げると必ず取りこぼすので、全体を歩いて形で見つける。
+ */
+function fixPitchingDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(fixPitchingDeep)
+  if (!isRecord(value)) return value
 
-    const velocity = typeof pitching.velocity === 'number' ? pitching.velocity : 130
-    const control = typeof pitching.control === 'number' ? pitching.control : 40
-    const breaking = typeof pitching.breaking === 'number' ? pitching.breaking : 40
-
+  if (isLegacyPitching(value)) {
+    const velocity = value.velocity as number
+    const control = value.control as number
+    const breaking = value.breaking as number
     return {
-      ...player,
-      pitching: {
-        ...pitching,
-        // ノビは速球の質なので球速と制球から、キレは変化球の質なので変化球と制球から
-        life: mid(velocityScore(velocity), control),
-        sharpness: mid(breaking, control),
-      },
+      ...value,
+      // ノビは速球の質なので球速と制球から、キレは変化球の質なので変化球と制球から。
+      // **一律50で入れてはいけない。** 変化球90の投手のキレが平均以下になり、
+      // セーブを読み直した瞬間にその投手だけ弱くなる
+      life: mid(velocityScore(velocity), control),
+      sharpness: mid(breaking, control),
     }
   }
 
-  const players = Array.isArray(raw.players) ? raw.players.map(convert) : raw.players
-  const graduates = Array.isArray(raw.graduates) ? raw.graduates.map(convert) : raw.graduates
+  const out: Record<string, unknown> = {}
+  for (const [key, child] of Object.entries(value)) out[key] = fixPitchingDeep(child)
+  return out
+}
 
-  // 試合の途中でセーブしていた場合、両チームの選手にも同じ変換をかける
-  let matchState = raw.matchState
-  if (isRecord(matchState)) {
-    const teams: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(matchState)) {
-      teams[key] =
-        isRecord(value) && Array.isArray((value as Record<string, unknown>).players)
-          ? {
-              ...value,
-              players: ((value as Record<string, unknown>).players as unknown[]).map(convert),
-            }
-          : value
-    }
-    matchState = teams
-  }
-
-  return { ...raw, version: 40, players, graduates, matchState }
+/** v39までの投手能力の形か（球速・制球・変化球・持ち球を持ち、ノビかキレが無い） */
+function isLegacyPitching(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.velocity === 'number' &&
+    typeof value.control === 'number' &&
+    typeof value.breaking === 'number' &&
+    Array.isArray(value.pitches) &&
+    (typeof value.life !== 'number' || typeof value.sharpness !== 'number')
+  )
 }
 
 /** 2つの値の真ん中（1〜100に収める） */
