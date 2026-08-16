@@ -285,6 +285,11 @@ export type Player = {
   focus?: import('@/core/player/trainingFocus').TrainingFocus
   /** コンバート練習の進み具合。CONVERT_STEPS で適性が1段階上がる */
   convertProgress?: number
+  /**
+   * 弾道練習の進み具合（能力値に換算した点数）。
+   * `TRAJECTORY_COST` に届くと弾道が1段上がる。
+   */
+  trajectoryProgress?: number
   /** 入学時からの能力の推移（古い順） */
   history: AbilitySnapshot[]
   /**

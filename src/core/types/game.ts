@@ -361,6 +361,8 @@ export type GameCommand =
   | { type: 'approachNationalProspect'; prospectId: string }
   /** 視察中の県で候補1人に会いに行く（出張を1回使う） */
   | { type: 'approachProspect'; prospectId: string }
+  /** 誰にも会わずに出張を終える。出張費は戻らない */
+  | { type: 'leaveScoutRegion' }
   /** ルート分岐で道筋を選ぶ */
   | { type: 'chooseRoute'; routeId: string }
 

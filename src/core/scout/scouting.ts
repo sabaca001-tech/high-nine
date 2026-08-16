@@ -190,6 +190,19 @@ function rollSkill(rng: Rng, isPitcher: boolean, rating: number): SkillId | null
   return null
 }
 
+/**
+ * 総合で見劣りする代表候補に持たせる一芸。
+ * **Cに届かない選手だけ**が対象で、青特を1つ確約する。
+ */
+function forcedSkill(rng: Rng, isPitcher: boolean, rating: number): SkillId | null {
+  if (rating >= FORCED_SKILL_MAX_RATING) return null
+  const blue = skillsFor({ forPitcher: isPitcher, rank: 'blue' })
+  return blue.length > 0 ? rng.pick(blue).id : null
+}
+
+/** ここに届かない代表候補には必ず一芸を持たせる（Cの下限） */
+const FORCED_SKILL_MAX_RATING = 60
+
 /** 中学の所属名。実在校を想起させない一般的な語で組み立てる */
 const JUNIOR_PREFIX = [
   '第一', '第二', '中央', '東', '西', '南', '北', '緑丘', '若葉', '桜台',
@@ -238,7 +251,12 @@ export function createProspects(
      * 一律の上乗せにしていた頃は、10人のうち誰かが必ずCに届き、
      * 素材型の県へ行けば確実に当たりが見つかった。
      */
-    const base = LOCAL_BASE + Math.round((params.reputation - REPUTATION_INITIAL) * 0.18)
+    /*
+     * **評判の効きは控えめ。** 0.18にしていた頃は、評判95で平均53・上位65となり、
+     * 県を回るだけでCが手に入った。Cは代表（U15）を追いかけて獲るもので、
+     * 県の候補で出会えたら「当たり」であってほしい。
+     */
+    const base = LOCAL_BASE + Math.round((params.reputation - REPUTATION_INITIAL) * 0.11)
     const rating = clampRating(
       base +
         (params.trait === 'raw'
@@ -302,7 +320,13 @@ export function createNationalTeam(rng: Rng, year: number): Prospect[] {
     const name = pickName(rng, names)
     names.push(name)
 
-    const rating = clampRating(NATIONAL_BASE + rng.int(-8, 12))
+    /*
+     * **基本はC（60〜69）。少しだけDが混ざる。**
+     * 全国から選ばれた30人なので、粒は揃っている。
+     * Dに落ちた選手は「総合では劣るが一芸がある」形にして、
+     * 数字だけでは決められないようにする（下で必ず特殊能力を持たせる）。
+     */
+    const rating = clampRating(NATIONAL_BASE + rng.int(-9, 6))
     const regionId = rng.pick(REGIONS).id
 
     prospects.push({
@@ -313,7 +337,9 @@ export function createNationalTeam(rng: Rng, year: number): Prospect[] {
       rating,
       regionId,
       approaches: 0,
-      skillId: rollSkill(rng, isPitcher, rating),
+      // **Dの選手は必ず一芸を持つ。** 総合だけで切ると、代表なのに
+      // 「弱いだけの選手」になってしまう
+      skillId: rollSkill(rng, isPitcher, rating) ?? forcedSkill(rng, isPitcher, rating),
       junior: rollJuniorStats(rng, isPitcher, rating),
       national: true,
     })
@@ -332,7 +358,7 @@ export function createNationalTeam(rng: Rng, year: number): Prospect[] {
  * **60は高すぎた。** 獲れた瞬間にチームで一番の選手になり、
  * 3年育てる意味が薄れていた。
  */
-const NATIONAL_BASE = 52
+const NATIONAL_BASE = 63
 
 /** 中学の成績を作る。素質と噛み合った数字にする */
 function rollJuniorStats(rng: Rng, isPitcher: boolean, rating: number): JuniorStats {

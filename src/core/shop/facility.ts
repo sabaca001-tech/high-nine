@@ -23,8 +23,14 @@ export const GROUND_LEVEL_MAX = 99
 /** 最大まで整備したときの練習効率 */
 const GROUND_MAX_MULTIPLIER = 1.6
 
-/** 1段階上げるのにかかる基本額。段階が上がるほど高くなる */
-const UPGRADE_BASE_COST = 3000
+/**
+ * 1段階上げるのにかかる額。**段階によらず一律。**
+ *
+ * 段階×3,000円にしていた頃は、Lv30で9万円・Lv60で18万円と際限なく上がり、
+ * 後半は「部費が貯まったらとりあえず整備」しかできなくなっていた。
+ * 一律にすると、**整備するか道具を買うか**の比較がいつでも同じ物差しでできる。
+ */
+const UPGRADE_COST = 50_000
 
 /** 段階を 1〜99 に丸める */
 export function clampGroundLevel(level: number): number {
@@ -45,9 +51,8 @@ export function groundMultiplier(level: number): number {
 
 /** 次の1段階にかかる部費。最大なら null */
 export function groundUpgradeCost(level: number): number | null {
-  const current = clampGroundLevel(level)
-  if (current >= GROUND_LEVEL_MAX) return null
-  return UPGRADE_BASE_COST * current
+  if (clampGroundLevel(level) >= GROUND_LEVEL_MAX) return null
+  return UPGRADE_COST
 }
 
 /** まとめて整備するときの合計額。上限を超えるぶんは数えない */

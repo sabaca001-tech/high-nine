@@ -346,6 +346,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return visitScoutRegion(state, command.regionId)
     case 'approachProspect':
       return approachProspect(state, command.prospectId)
+    case 'leaveScoutRegion':
+      return leaveScoutRegion(state)
     case 'approachNationalProspect':
       return approachNationalProspect(state, command.prospectId)
     case 'chooseRoute':
@@ -1016,14 +1018,24 @@ function finishTournament(state: GameState): EngineResult {
   // ここでまとめて配っていた頃は、準決勝で伸びた選手が決勝で活きず、
   // 勝ち上がっている実感が最後の画面まで来なかった
 
+  /*
+   * **U18の選考は3年生が居るうちに行う。**
+   * 11月に選んでいた頃は、夏で引退した3年生が名簿から消えたあとだったので、
+   * **自校の3年生は絶対に選ばれなかった**（代表の主力は3年生なのに）。
+   * 夏が終わった時点＝引退の直前に選ぶ。
+   */
+  const called = callU18(state, tournament, events)
+  const afterCall: GameState = { ...state, ...called }
+
   // 夏が終われば3年生は引退する
-  const retired = retireThirdYears(state, tournament, events)
+  const retired = retireThirdYears(afterCall, tournament, events)
 
   const { log: log2, serial: serial2 } = appendLog(state.log, events, state.serial)
 
   return {
     state: {
       ...state,
+      ...called,
       ...retired,
       tournament: null,
       board,
@@ -1038,6 +1050,58 @@ function finishTournament(state: GameState): EngineResult {
     },
     events,
   }
+}
+
+/**
+ * U18日本代表を選ぶ。**夏の大会が終わった時点で、引退する前に。**
+ *
+ * 実際の高校日本代表も夏の甲子園のあとに選ばれ、主力は3年生になる。
+ * 11月に選んでいた頃は、その3年生がもう名簿に居なかった。
+ */
+function callU18(
+  state: GameState,
+  tournament: Tournament,
+  events: GameEvent[],
+): Partial<GameState> {
+  const summerOver =
+    (tournament.kind === 'summerPref' && !tournament.champion) ||
+    tournament.kind === 'nationals'
+  if (!summerOver) return {}
+  // 同じ年に二度選ばない（県大会で負けたあと、翌年まで持ち越す）
+  if (state.u18Squad?.year === state.year) return {}
+
+  const rng = createRng(state.rngState)
+  const squad = selectU18Squad({
+    schools: state.rivals,
+    ourPlayers: state.players,
+    year: state.year,
+    progress: seasonProgressOfCell(state.boardPosition),
+  })
+
+  let players = state.players
+  for (const player of ourU18Players(squad, players)) {
+    const outcome = playU18(rng, player, state.year)
+    players = players.map((p) => (p.id === player.id ? outcome.player : p))
+
+    events.push({
+      type: 'message',
+      text: `${player.name}がU18日本代表に選出された！`,
+      tone: 'good',
+    })
+    events.push({
+      type: 'message',
+      text:
+        outcome.performance >= 70
+          ? `${player.name}は国際大会で活躍し、スカウトの評価を大きく上げた`
+          : outcome.performance >= 35
+            ? `${player.name}は国際大会で経験を積んだ`
+            : `${player.name}は世界の壁を思い知らされた`,
+      tone: outcome.performance >= 35 ? 'good' : 'normal',
+    })
+    if (outcome.changes.length > 0) events.push({ type: 'ability', changes: outcome.changes })
+  }
+
+  return { players, u18Squad: squad, rngState: rng.state }
 }
 
 /**
@@ -2205,41 +2269,6 @@ export function applyOneMonth(
     })
   }
 
-  // 冬前：U18日本代表の召集。
-  // **全国の学校から実際に30人を選ぶ。** 注目選手の総合と比べるだけだった頃は、
-  // 「うちから何人選ばれたか」しか分からず、他の29人が誰なのかが見えなかった
-  if (month === U18_SELECTION_MONTH) {
-    u18Squad = selectU18Squad({
-      schools: state.rivals,
-      ourPlayers: players,
-      year: state.year,
-      progress: seasonProgressOfCell(state.boardPosition),
-    })
-
-    const selected = ourU18Players(u18Squad, players)
-    for (const player of selected) {
-      const outcome = playU18(rng, player, state.year)
-      players = players.map((p) => (p.id === player.id ? outcome.player : p))
-
-      events.push({
-        type: 'message',
-        text: `${player.name}がU18日本代表に選出された！`,
-        tone: 'good',
-      })
-      events.push({
-        type: 'message',
-        text:
-          outcome.performance >= 70
-            ? `${player.name}は国際大会で活躍し、スカウトの評価を大きく上げた`
-            : outcome.performance >= 35
-              ? `${player.name}は国際大会で経験を積んだ`
-              : `${player.name}は世界の壁を思い知らされた`,
-        tone: outcome.performance >= 35 ? 'good' : 'normal',
-      })
-      if (outcome.changes.length > 0) events.push({ type: 'ability', changes: outcome.changes })
-    }
-  }
-
   // 月ごとに能力を記録して、あとから推移を追えるようにする
   players = players.map((player) => ({
     ...player,
@@ -2250,7 +2279,6 @@ export function applyOneMonth(
 }
 
 /** U18日本代表が召集される月。冬の合宿の前 */
-const U18_SELECTION_MONTH = 11
 
 /**
  * 練習効率バフの更新。
@@ -2659,6 +2687,32 @@ function visitScoutRegion(state: GameState, regionId: RegionId): EngineResult {
       serial,
       log,
     },
+    events,
+  }
+}
+
+/**
+ * 誰にも会わずに出張を終える。
+ *
+ * **出張費は戻らない**（行った時点で払っている）。
+ * それでも、めぼしい候補が居ない県で「会わない」を選べないと、
+ * 誰かに会うまで他の県へ行けないまま止まってしまう。
+ */
+function leaveScoutRegion(state: GameState): EngineResult {
+  const visiting = state.scouting.visiting
+  if (visiting === null) return { state, events: [] }
+
+  const events: GameEvent[] = [
+    {
+      type: 'message',
+      text: `${findRegion(visiting).name}では誰にも会わずに引き上げた`,
+      tone: 'normal',
+    },
+  ]
+  const { log, serial } = appendLog(state.log, events, state.serial)
+
+  return {
+    state: { ...state, scouting: { ...state.scouting, visiting: null }, log, serial },
     events,
   }
 }

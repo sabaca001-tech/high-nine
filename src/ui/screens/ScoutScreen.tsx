@@ -285,6 +285,7 @@ function ProspectList({
   visiting: boolean
   onBack: () => void
 }) {
+  const leaveScoutRegion = useGameStore((s) => s.leaveScoutRegion)
   const name = findRegion(region.regionId).name
 
   return (
@@ -302,6 +303,24 @@ function ProspectList({
           ? `いま${name}にいます。会いに行けるのは1人だけです。`
           : `もう一度会いに行くには、${name}へ視察に出てください。`}
       </p>
+
+      {/*
+        **誰にも会わずに終えられるようにする。**
+        めぼしい候補が居ない県でも、誰かに会うまで次の県へ行けなかった。
+        出張費は行った時点で払っているので戻らない。
+      */}
+      {visiting && (
+        <button
+          type="button"
+          className={styles.leave}
+          onClick={() => {
+            leaveScoutRegion()
+            onBack()
+          }}
+        >
+          誰にも会わずに引き上げる（出張費は戻りません）
+        </button>
+      )}
 
       {region.prospects.map((prospect) => (
         <RegionProspectCard

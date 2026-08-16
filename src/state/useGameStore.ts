@@ -83,6 +83,7 @@ type GameStore = {
   buyEquipment: (equipmentId: string) => void
   visitScoutRegion: (regionId: string) => void
   approachProspect: (prospectId: string) => void
+  leaveScoutRegion: () => void
   approachNationalProspect: (prospectId: string) => void
   chooseRoute: (routeId: string) => void
   backToTitle: () => void
@@ -271,6 +272,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { game } = get()
     if (!game) return
     dispatch(set, game, { type: 'approachProspect', prospectId })
+  },
+
+  leaveScoutRegion: () => {
+    const { game } = get()
+    if (!game) return
+    dispatch(set, game, { type: 'leaveScoutRegion' })
   },
 
   approachNationalProspect: (prospectId) => {

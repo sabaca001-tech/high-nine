@@ -34,8 +34,10 @@ describe('グラウンドの段階', () => {
     expect(groundMultiplier(GROUND_LEVEL_MAX)).toBeCloseTo(1.6, 5)
   })
 
-  it('段階が上がるほど整備費が高くなる', () => {
-    expect(groundUpgradeCost(1)).toBeLessThan(groundUpgradeCost(50)!)
+  it('整備費は段階によらず一律', () => {
+    // 段階×3,000円にしていた頃は、後半が高すぎて
+    // 「部費が貯まったらとりあえず整備」しかできなくなっていた
+    expect(groundUpgradeCost(1)).toBe(groundUpgradeCost(50))
     expect(groundUpgradeCost(GROUND_LEVEL_MAX)).toBeNull()
   })
 

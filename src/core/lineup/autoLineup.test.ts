@@ -38,14 +38,20 @@ describe('createAptitudes', () => {
     }
   })
 
-  it('内野手は他の内野も守れることが多い', () => {
+  it('内野手は他の内野も守れることがある（ただし当たり前ではない）', () => {
+    /*
+     * **隣の位置なら誰でも守れる、にはしない。**
+     * ほぼ全員が3段以上だった頃は、誰をどこへ置いても大差なく、
+     * 守備位置を気にする理由もコンバートの意味も薄かった。
+     */
     const rng = createRng(4)
     let playable = 0
-    const trials = 100
+    const trials = 200
     for (let i = 0; i < trials; i++) {
       if (isPlayable(createAptitudes(rng, 'SS')['2B'])) playable++
     }
-    expect(playable / trials).toBeGreaterThan(0.6)
+    expect(playable / trials).toBeGreaterThan(0.15)
+    expect(playable / trials).toBeLessThan(0.5)
   })
 })
 

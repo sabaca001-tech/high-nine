@@ -29,25 +29,32 @@ export function createAptitudes(rng: Rng, main: Position): Record<Position, Apti
 function rollAptitude(rng: Rng, main: Position, target: Position): Aptitude {
   if (main === target) return APTITUDE_MAX
 
+  /*
+   * **本職以外はそう守れない。**
+   * 隣の位置がほぼ全員3段以上だった頃は、誰をどこに置いても大差なく、
+   * コンバートで適性を上げる意味も、守備位置を気にする意味も薄かった。
+   * 「守れる」と言える3段は、**同じ系統の一部と一塁**だけに絞る。
+   */
+
   // 投手は専門職。投手以外が投げるのも、投手が守るのも適性は低い
-  if (target === 'P' || main === 'P') return rng.pick<Aptitude>([1, 0, 0])
+  if (target === 'P' || main === 'P') return rng.pick<Aptitude>([1, 0, 0, 0])
 
   // 捕手も専門職
-  if (target === 'C') return rng.pick<Aptitude>([1, 1, 0])
+  if (target === 'C') return rng.pick<Aptitude>([1, 0, 0])
   if (main === 'C') {
     // 捕手は一塁くらいなら守れる
-    return target === '1B' ? rng.pick<Aptitude>([3, 2]) : rng.pick<Aptitude>([1, 1, 2])
+    return target === '1B' ? rng.pick<Aptitude>([3, 2, 2]) : rng.pick<Aptitude>([1, 1, 0])
   }
 
   // 一塁は誰でもある程度守れる
-  if (target === '1B') return rng.pick<Aptitude>([4, 3, 3, 2])
+  if (target === '1B') return rng.pick<Aptitude>([3, 3, 2, 2])
 
   const sameGroup =
     (INFIELD.includes(main) && INFIELD.includes(target)) ||
     (OUTFIELD.includes(main) && OUTFIELD.includes(target))
 
-  if (sameGroup) return rng.pick<Aptitude>([4, 4, 3, 3])
-  return rng.pick<Aptitude>([2, 2, 1, 1])
+  if (sameGroup) return rng.pick<Aptitude>([4, 3, 2, 2, 1])
+  return rng.pick<Aptitude>([1, 1, 0, 0])
 }
 
 /**

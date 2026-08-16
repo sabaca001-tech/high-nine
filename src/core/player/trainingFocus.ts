@@ -33,8 +33,29 @@ export type TrainingFocus =
    * 到達した時点でポジションが入れ替わる。
    */
   | { type: 'convert'; position: Position; main?: boolean }
+  /**
+   * 打撃フォームを作り直して**弾道を上げる**。
+   *
+   * 弾道は1〜4の4段階しかなく、1段の重みが他の能力とまるで違う。
+   * 日々の練習で1ずつ増える類の値ではないので、
+   * **積み上げた練習量を溜めて、届いたところで1段上がる**形にした。
+   * かかる量はパワーを12上げるのと同じくらい（`TRAJECTORY_COST`）。
+   */
+  | { type: 'trajectory' }
 
 export const DEFAULT_FOCUS: TrainingFocus = { type: 'team' }
+
+/**
+ * 弾道を1段上げるのに必要な練習量（能力値に換算した点数）。
+ *
+ * **パワーを12上げるのと同じ重み**にしてある。
+ * 4段階しかないので、他の能力1点と同じ感覚で上がってしまうと
+ * 全員が弾道4になり、打球の質という個性が消える。
+ */
+export const TRAJECTORY_COST = 12
+
+/** 弾道の練習中、他の能力にかかる倍率 */
+export const TRAJECTORY_PRACTICE_PENALTY = 0.7
 
 /** 重点的に伸ばす能力にかかる倍率 */
 export const FOCUS_BONUS = 1.6
@@ -200,6 +221,7 @@ export function focusMultiplier(player: Player, key: GrowableKey, plan?: GrowthP
   const focus = player.focus ?? DEFAULT_FOCUS
 
   if (focus.type === 'convert') return CONVERT_PRACTICE_PENALTY
+  if (focus.type === 'trajectory') return TRAJECTORY_PRACTICE_PENALTY
   if (focus.type === 'ability') return focus.key === key ? FOCUS_BONUS : FOCUS_PENALTY
   return positionGrowthMultiplier(player.position, key, plan)
 }

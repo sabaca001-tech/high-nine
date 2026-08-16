@@ -546,7 +546,7 @@ function U18Tab() {
     return (
       <Section title="U18日本代表">
         <p className={styles.empty}>
-          まだ選考が行われていません。毎年{U18_SELECTION_MONTH}月に、全国から
+          まだ選考が行われていません。夏の大会が終わった時点で、全国から
           {U18_SQUAD_SIZE}人が選ばれます
         </p>
       </Section>
@@ -571,7 +571,7 @@ function U18Tab() {
         <Row label="在籍中" value={`${activeU18Players(entries).length}人`} />
         {lineup && <Row label="スタメン" value="下の一覧で「打順／守備位置」が付いた9人" />}
         <p className={styles.note}>
-          次の選考（{U18_SELECTION_MONTH}月）まで、この顔ぶれのまま。
+          次の選考（来年の夏）まで、この顔ぶれのまま。
           能力は今の値で表示されます
         </p>
       </Section>
@@ -589,8 +589,6 @@ function U18Tab() {
   )
 }
 
-/** 代表選考が行われる月。gameEngine の U18_SELECTION_MONTH と揃える */
-const U18_SELECTION_MONTH = 11
 
 function U18Row({
   entry,

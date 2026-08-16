@@ -59,6 +59,9 @@ export function talentFromReputation(reputation: number): number {
  */
 const RECRUIT_BASE_TALENT = -10
 
+/** 一般入部の振れ幅（±）。自校の既定（18）より狭い */
+const GENERAL_RECRUIT_SPREAD = 11
+
 /**
  * 新入生の実力補正の上限。
  *
@@ -66,7 +69,7 @@ const RECRUIT_BASE_TALENT = -10
  * 新入生が前の代の3年生と同じ能力で入学し、3年かけて育てる意味が薄れる
  * （実際に起きた）。評判73あたりで上限に届く。
  */
-const RECRUIT_MAX_TALENT = 14
+const RECRUIT_MAX_TALENT = 10
 
 /**
  * 評判1あたりの実力補正。
@@ -140,6 +143,13 @@ export function recruitFreshmen(
         scoutedPitchers,
       ),
       talentBonus: baseTalent + rng.int(-4, 4) + (isRecommended ? 14 : 0),
+      /*
+       * **一般入部は強豪でもDまで。**
+       * 既定の振れ幅（±18）だと、評判が上がったチームには総合68（C）の
+       * 新入生が普通に入ってきて、スカウトで通う意味が薄れていた。
+       * 上振れはスカウト（U15代表）と推薦枠に任せる。
+       */
+      ...(isRecommended ? {} : { talentSpread: GENERAL_RECRUIT_SPREAD }),
       // 在校生と新入生の両方と同姓同名にならないようにする
       takenNames: [...players, ...newcomers].map((player) => player.name),
     })

@@ -2,6 +2,8 @@
 
 import type { BattingAbilities, PitchingAbilities, Player } from '@/core/types/player'
 import { velocityScore } from '@/core/types/player'
+import { findSkill } from '@/core/skill/skillDefs'
+import type { SkillRank } from '@/core/types/skill'
 
 /** F〜S のランク表記 */
 export type Rank = 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
@@ -133,9 +135,42 @@ export function battingRating(b: BattingAbilities): number {
 /**
  * 総合評価(1〜100)。部員一覧の並び替えや、新入生の期待値表示に使う。
  * **投手は投手能力だけ、野手は野手能力だけ**で決まる。
+ *
+ * **特殊能力も少しだけ効く。** 能力値だけで並べていた頃は、
+ * 金特を持った選手と持たない選手が同じ総合で並び、
+ * 特訓や合宿で掴んだものが一覧のどこにも出てこなかった。
+ * ただし主役はあくまで能力値なので、上乗せは小さく取る（最大でも+6）。
  */
 export function overallRating(player: Player): number {
-  if (player.isPitcher && player.pitching) return pitchingRating(player.pitching)
-  return battingRating(player.batting)
+  const base =
+    player.isPitcher && player.pitching
+      ? pitchingRating(player.pitching)
+      : battingRating(player.batting)
+
+  return clampRating(base + skillRatingBonus(player))
+}
+
+/** 特殊能力ぶんの上乗せ。金特が重く、赤特はマイナス */
+export function skillRatingBonus(player: Player): number {
+  let bonus = 0
+  for (const id of player.skills) {
+    const skill = findSkill(id)
+    if (!skill) continue
+    bonus += SKILL_RATING_BONUS[skill.rank]
+  }
+  return Math.max(-SKILL_BONUS_MAX, Math.min(SKILL_BONUS_MAX, bonus))
+}
+
+const SKILL_RATING_BONUS: Record<SkillRank, number> = {
+  gold: 3,
+  blue: 1.5,
+  red: -2,
+}
+
+/** 上乗せの上限。特殊能力を集めただけで総合が跳ね上がらないようにする */
+const SKILL_BONUS_MAX = 6
+
+function clampRating(value: number): number {
+  return Math.min(100, Math.max(1, Math.round(value)))
 }
 

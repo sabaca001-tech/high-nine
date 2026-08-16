@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ALL_POSITIONS, defenseScore, isPlayable } from '@/core/lineup/aptitude'
+import { TRAJECTORY_MAX } from '@/core/player/growth'
 import {
+  TRAJECTORY_COST,
+  TRAJECTORY_PRACTICE_PENALTY,
   canConvert,
   CONVERT_MAIN_MAX,
   CONVERT_MAIN_STEPS,
@@ -494,6 +497,40 @@ function TrainingTab({ player }: { player: Player }) {
           選んだ能力は{FOCUS_BONUS}倍、それ以外は{FOCUS_PENALTY}倍。
           チームの練習に含まれない能力でも、少しずつ伸びます。
         </p>
+
+        {/*
+          **弾道は他の能力と刻みが違う**（1〜4の4段階）ので、
+          能力の一覧には混ぜず、専用の行にする。
+        */}
+        {!player.isPitcher && (
+          <>
+            <button
+              type="button"
+              className={
+                focus.type === 'trajectory'
+                  ? `${styles.focusRow} ${styles.focusActive}`
+                  : styles.focusRow
+              }
+              disabled={player.batting.trajectory >= TRAJECTORY_MAX}
+              onClick={() => choose({ type: 'trajectory' })}
+            >
+              <span className={styles.focusName}>打撃フォームを作り直す（弾道）</span>
+              <span className={styles.focusDesc}>
+                {player.batting.trajectory >= TRAJECTORY_MAX
+                  ? 'すでに弾道は最大'
+                  : `溜まりきると弾道が1段上がる。パワーを${TRAJECTORY_COST}上げるのと同じくらいかかる`}
+              </span>
+            </button>
+
+            {focus.type === 'trajectory' && (
+              <p className={styles.chartNote}>
+                弾道{player.batting.trajectory} → {player.batting.trajectory + 1}（
+                {Math.round(((player.trajectoryProgress ?? 0) / TRAJECTORY_COST) * 100)}%）
+                ／ この間、他の能力の伸びは{TRAJECTORY_PRACTICE_PENALTY}倍になります
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       <section className={styles.section}>

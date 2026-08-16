@@ -26,7 +26,12 @@ import {
 } from '@/core/types/player'
 import { effectOf } from './personality'
 import { improvePitches } from './pitchDefs'
-import { focusMultiplier } from './trainingFocus'
+import {
+  DEFAULT_FOCUS,
+  FOCUS_BONUS,
+  focusMultiplier,
+  TRAJECTORY_COST,
+} from './trainingFocus'
 import type { GrowthPlan } from './trainingFocus'
 
 /** 投手能力に属するキー（球速は尺度が違うので別扱い） */
@@ -222,6 +227,12 @@ const PITCH_IMPROVE_CHANCE_PER_STEP = 0.05
  * チームの練習内容に無い能力でも、方針にしていれば少しずつ伸びる。
  * 通常の練習より小さくして、チームの練習を選ぶ意味を残している。
  */
+/**
+ * 弾道の練習で1手あたりに溜まる量の基準。
+ * 打撃練習1回ぶん（`PRACTICE_DEFS.batting` の4）に合わせてある。
+ */
+const TRAJECTORY_GAIN_AMOUNT = 4
+
 const SELF_TRAINING_AMOUNT = 2.5
 
 export type PracticeOptions = {
@@ -291,6 +302,27 @@ export function applyPractice(
       const result = raiseAbility(current, gain.key, amount)
       current = result.player
       if (result.change) changes.push(result.change)
+    }
+
+    /*
+     * 弾道の練習。
+     *
+     * **パワーが伸びるぶんを弾道に振り替える。**
+     * 弾道は1〜4の4段階しかないので、他の能力と同じ刻みでは扱えない。
+     * パワーを上げるのと同じ練習量を溜めて、届いたところで1段上がる。
+     */
+    if (current.focus?.type === 'trajectory') {
+      const gain: PracticeGain = { key: 'power', amount: TRAJECTORY_GAIN_AMOUNT, target: 'all' }
+      const banked = calcGrowth(rng, current, gain, playerMultiplier * FOCUS_BONUS)
+      const progress = (current.trajectoryProgress ?? 0) + banked
+
+      if (progress >= TRAJECTORY_COST) {
+        const raised = raiseTrajectory(current, 1)
+        current = { ...raised.player, trajectoryProgress: 0, focus: DEFAULT_FOCUS }
+        if (raised.change) changes.push(raised.change)
+      } else {
+        current = { ...current, trajectoryProgress: progress }
+      }
     }
 
     // 自主練。チームの練習内容に含まれない能力でも、方針にしていれば少し伸びる
