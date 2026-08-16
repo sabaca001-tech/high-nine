@@ -69,7 +69,6 @@ function makePitcher(overrides: Partial<Player> = {}): Player {
       velocity: 135,
       control: 40,
       stamina: 40,
-      breaking: 40,
       life: 40,
       sharpness: 40,
       pitches: [],
@@ -437,7 +436,7 @@ describe('createGrowthAptitude', () => {
   it('野手に投手能力の得意・苦手は付かない', () => {
     for (let seed = 1; seed < 40; seed++) {
       const aptitude = createGrowthAptitude(createRng(seed), false)
-      for (const key of ['control', 'stamina', 'breaking']) {
+      for (const key of ['control', 'stamina', 'sharpness']) {
         expect(aptitude[key as keyof typeof aptitude]).toBeUndefined()
       }
     }
@@ -448,7 +447,7 @@ describe('createGrowthAptitude', () => {
     for (let seed = 1; seed < 60; seed++) {
       for (const key of Object.keys(createGrowthAptitude(createRng(seed), true))) keys.add(key)
     }
-    expect([...keys].some((key) => ['control', 'stamina', 'breaking'].includes(key))).toBe(true)
+    expect([...keys].some((key) => ['control', 'stamina', 'sharpness'].includes(key))).toBe(true)
   })
 
   it('平均は1.0前後（チーム全体の成長速度は変わらない）', () => {

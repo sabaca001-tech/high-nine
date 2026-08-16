@@ -51,7 +51,6 @@ const KEYS: GrowableKey[] = [
   'velocity',
   'control',
   'stamina',
-  'breaking',
   'life',
   'sharpness',
 ]
@@ -67,7 +66,6 @@ function currentOf(player: Player, key: GrowableKey): number | undefined {
   if (
     key === 'control' ||
     key === 'stamina' ||
-    key === 'breaking' ||
     key === 'life' ||
     key === 'sharpness'
   ) {
@@ -147,7 +145,6 @@ function rebuild(player: Player, snapshot: AbilitySnapshot): Player {
             velocity: snapshot.velocity ?? player.pitching.velocity,
             control: snapshot.control,
             stamina: snapshot.stamina ?? player.pitching.stamina,
-            breaking: snapshot.breaking ?? player.pitching.breaking,
             life: snapshot.life ?? player.pitching.life,
             sharpness: snapshot.sharpness ?? player.pitching.sharpness,
           }

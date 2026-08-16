@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { overallRating, toRank } from '@/core/player/rating'
+import { overallRating, toRank, velocityRank } from '@/core/player/rating'
 import {
   ABILITY_LABELS,
   MOTIVATION_LABELS,
@@ -137,25 +137,38 @@ export function PlayerCard({
         投手は数値4つと持ち球で判断する。
       */}
       {player.pitching ? (
-        <>
-          {/*
-            **投手は能力を上にまとめる。** 投球能力は4つしかないので、
-            絵の横に縦一列で置くと右側だけ短くなって釣り合わない
-          */}
-          <div className={styles.pitchStats}>
-            <PitcherStats pitching={player.pitching} compact />
-          </div>
-          <div className={styles.charts}>
-            <span className={styles.chartBox}>
-              <AptitudeDiamond player={player} main={player.position} />
-              <span className={styles.chartCaption}>守備適性</span>
+        /*
+          **投手は左に球速と持ち球、右に能力。** 野手の並び（左に絵・右に数値）と揃える。
+          守備適性の図は出さない。投手はマウンドに立つのが仕事で、
+          「どこを守れるか」より**何を投げるのか**が知りたい
+          （守備そのものは右の列に数字で出る）。
+        */
+        <div className={styles.body}>
+          <div className={styles.figures}>
+            <span className={styles.trajectoryRow}>
+              <span className={styles.trajectoryLabel}>球速</span>
+              <span
+                className={styles.velocity}
+                style={{ color: rankColorOf(velocityRank(player.pitching.velocity)) }}
+              >
+                {player.pitching.velocity}
+              </span>
             </span>
             <span className={styles.chartBox}>
               <PitchChart pitches={player.pitching.pitches} labels={false} compact />
               <span className={styles.chartCaption}>持ち球</span>
             </span>
           </div>
-        </>
+          <div className={styles.stats}>
+            <PitcherStats
+              pitching={player.pitching}
+              batting={player.batting}
+              velocity={false}
+              compact
+              columns={1}
+            />
+          </div>
+        </div>
       ) : (
         /*
           **野手は左に弾道と守備適性、右に能力。**

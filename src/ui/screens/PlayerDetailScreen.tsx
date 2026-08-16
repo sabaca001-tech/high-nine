@@ -199,8 +199,7 @@ function AbilityTab({ player }: { player: Player }) {
           />
           <AbilityRow label={ABILITY_LABELS.control} value={player.pitching.control} />
           <AbilityRow label={ABILITY_LABELS.stamina} value={player.pitching.stamina} />
-          <AbilityRow label={ABILITY_LABELS.breaking} value={player.pitching.breaking} />
-          {/* ノビは球速の、キレは変化球の「質」。掛かる相手のすぐ下に置く */}
+          {/* ノビは速球の、キレは変化球の強さ */}
           <AbilityRow label={ABILITY_LABELS.life} value={player.pitching.life} />
           <AbilityRow label={ABILITY_LABELS.sharpness} value={player.pitching.sharpness} />
 
@@ -423,7 +422,6 @@ function GrowthTab({ player, year, month }: { player: Player; year: number; mont
           />
           <AbilityChart title={ABILITY_LABELS.control} points={pointsOf((s) => s.control)} />
           <AbilityChart title={ABILITY_LABELS.stamina} points={pointsOf((s) => s.stamina)} />
-          <AbilityChart title={ABILITY_LABELS.breaking} points={pointsOf((s) => s.breaking)} />
           <AbilityChart title={ABILITY_LABELS.life} points={pointsOf((s) => s.life)} />
           <AbilityChart title={ABILITY_LABELS.sharpness} points={pointsOf((s) => s.sharpness)} />
         </>
@@ -442,7 +440,7 @@ function GrowthTab({ player, year, month }: { player: Player; year: number; mont
 /** その選手が伸ばせる能力の一覧 */
 function growableKeysOf(player: Player): GrowableKey[] {
   const batting: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  const pitching = ['control', 'stamina', 'breaking', 'life', 'sharpness'] as GrowableKey[]
+  const pitching = ['control', 'stamina', 'life', 'sharpness'] as GrowableKey[]
   return player.pitching ? [...pitching, ...batting] : batting
 }
 

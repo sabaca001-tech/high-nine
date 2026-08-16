@@ -36,7 +36,7 @@ import {
 import type { GrowthPlan } from './trainingFocus'
 
 /** 投手能力に属するキー（球速は尺度が違うので別扱い） */
-const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking', 'life', 'sharpness']
+const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'life', 'sharpness']
 
 /**
  * 球速から決まる肩力の**目安**。
@@ -285,7 +285,7 @@ export function applyPractice(
   const pitchNews: string[] = []
   const multiplier = (isRare ? RARE_MULTIPLIER : 1) * cellMultiplier * steps
   // 変化球の練習なら、能力値だけでなく持ち球も動く
-  const isBreakingPractice = def.gains.some((gain) => gain.key === 'breaking')
+  const isBreakingPractice = def.gains.some((gain) => gain.key === 'sharpness')
   // そのカードが投手向けに名指ししている能力。振り替えの二重取りを防ぐ
   const pitcherKeys = new Set(
     def.gains.filter((gain) => gain.target !== 'batter').map((gain) => gain.key),
@@ -347,12 +347,12 @@ export function applyPractice(
      * 溜まりきるたびに1つ覚える（または変化量が1上がる）。
      */
     if (current.focus?.type === 'pitch' && current.pitching) {
-      const gain: PracticeGain = { key: 'breaking', amount: PITCH_GAIN_AMOUNT, target: 'pitcher' }
+      const gain: PracticeGain = { key: 'sharpness', amount: PITCH_GAIN_AMOUNT, target: 'pitcher' }
       const banked = calcGrowth(rng, current, gain, playerMultiplier * FOCUS_BONUS)
       const progress = (current.pitchProgress ?? 0) + banked
 
       if (progress >= PITCH_COST) {
-        const result = improvePitches(rng, current.pitching.pitches, current.pitching.breaking, true)
+        const result = improvePitches(rng, current.pitching.pitches, current.pitching.sharpness, true)
         current = {
           ...current,
           pitching: { ...current.pitching, pitches: result.pitches },
@@ -389,7 +389,7 @@ export function applyPractice(
     // 持ち球の習得・変化量アップ
     const pitchChance = Math.min(0.5, PITCH_IMPROVE_CHANCE_PER_STEP * steps)
     if (isBreakingPractice && current.pitching && rng.chance(pitchChance)) {
-      const result = improvePitches(rng, current.pitching.pitches, current.pitching.breaking)
+      const result = improvePitches(rng, current.pitching.pitches, current.pitching.sharpness)
       current = { ...current, pitching: { ...current.pitching, pitches: result.pitches } }
 
       if (result.learned) {
@@ -587,7 +587,7 @@ export function getAbility(player: Player, key: GrowableKey): number | null {
   if (key === 'velocity') return player.pitching?.velocity ?? null
   if (PITCHING_KEYS.includes(key)) {
     if (!player.pitching) return null
-    return player.pitching[key as 'control' | 'stamina' | 'breaking' | 'life' | 'sharpness']
+    return player.pitching[key as 'control' | 'stamina' | 'life' | 'sharpness']
   }
   return player.batting[key as 'meet' | 'power' | 'speed' | 'arm' | 'fielding' | 'catching']
 }

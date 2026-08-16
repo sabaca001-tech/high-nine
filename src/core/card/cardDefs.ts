@@ -106,12 +106,8 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   breaking: {
     kind: 'breaking',
     label: '変化球練習',
-    description: '投手の変化球とキレが伸びる',
-    gains: [
-      { key: 'breaking', amount: 7, target: 'pitcher' },
-      // 曲げる練習と、その曲がりを打者に効かせる練習は同じ場でやる
-      { key: 'sharpness', amount: 5, target: 'pitcher' },
-    ],
+    description: '投手のキレが伸び、球種を覚えやすくなる',
+    gains: [{ key: 'sharpness', amount: 7, target: 'pitcher' }],
     conditionDelta: -6,
     trustDelta: 0,
     weight: 3,
@@ -310,7 +306,7 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
     label: 'ビデオ分析',
     description: '変化球とミートが伸びる。体を使わないので消耗しない',
     gains: [
-      { key: 'breaking', amount: 5, target: 'pitcher' },
+      { key: 'sharpness', amount: 5, target: 'pitcher' },
       { key: 'meet', amount: 4, target: 'all' },
     ],
     conditionDelta: 0,

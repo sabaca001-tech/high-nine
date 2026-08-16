@@ -46,8 +46,8 @@ export type TrainingFocus =
   /**
    * 球種を練習する。
    *
-   * **変化球の総合力（`breaking`）を上げるのとは別のこと。**
-   * 総合力は「どれだけ曲がるか」で、こちらは「何を投げられるか」。
+   * **キレを上げるのとは別のこと。**
+   * キレは「変化球そのものの強さ」で、こちらは「何を投げられるか」。
    * 積み上げた練習量が届くたびに、球種をひとつ覚えるか変化量が1上がる。
    *
    * 弾道と違って**上限まで続く**（覚えるものが無くなったら自動で終わる）。
@@ -162,9 +162,8 @@ const DEFAULT_GROWTH_PLAN: Record<Position, GrowableKey[]> = {
   P: [
     'velocity',
     'control',
-    'breaking',
-    'life',
     'sharpness',
+    'life',
     'stamina',
     'catching',
     'fielding',
@@ -190,7 +189,7 @@ const DEFAULT_GROWTH_PLAN: Record<Position, GrowableKey[]> = {
  * 変わるのは「誰のどこが伸びるか」だけ。
  */
 const FIELDER_WEIGHTS = [1.3, 1.15, 1.05, 0.95, 0.85, 0.7]
-const PITCHER_WEIGHTS = [1.35, 1.3, 1.25, 1.1, 1.1, 1.05, 0.95, 0.9, 0.85, 0.8, 0.7, 0.65]
+const PITCHER_WEIGHTS = [1.35, 1.3, 1.25, 1.15, 1.05, 0.95, 0.9, 0.85, 0.8, 0.75, 0.65]
 
 /** 優先順の並びから倍率を引く */
 function weightAt(position: Position, rank: number): number {

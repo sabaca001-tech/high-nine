@@ -201,7 +201,7 @@ function FinalAbilities({ alumnus }: { alumnus: Alumnus }) {
   if (!abilities) return null
 
   const keys: (keyof AbilitySnapshot)[] = alumnus.isPitcher
-    ? ['velocity', 'control', 'stamina', 'breaking', 'fielding', 'speed']
+    ? ['velocity', 'control', 'stamina', 'sharpness', 'life', 'fielding']
     : ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
 
   return (

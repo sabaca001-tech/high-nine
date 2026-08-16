@@ -21,7 +21,7 @@ function strong(player: Player, level: number): Player {
       catching: level,
     },
     pitching: player.pitching
-      ? { ...player.pitching, velocity: 150, control: level, stamina: level, breaking: level }
+      ? { ...player.pitching, velocity: 150, control: level, stamina: level, sharpness: level }
       : null,
   }
 }

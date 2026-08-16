@@ -135,6 +135,6 @@ function ceilingFactor(player: Player, key: GrowableKey): number {
 /** その選手が持っている能力のキー */
 function growableKeysOf(player: Player): GrowableKey[] {
   const batting: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  const pitching: GrowableKey[] = ['control', 'stamina', 'breaking', 'life', 'sharpness']
+  const pitching: GrowableKey[] = ['control', 'stamina', 'life', 'sharpness']
   return player.isPitcher ? [...batting, ...pitching] : batting
 }

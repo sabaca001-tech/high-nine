@@ -100,11 +100,10 @@ export function pitchingRating(p: PitchingAbilities): number {
   // 判定（simulateAtBat）と総合で別々の式を持つと、同じ球速が違う意味になる
   const base =
     velocityScore(p.velocity) * VELOCITY_SHARE +
-    p.control * 0.22 +
-    p.stamina * 0.14 +
-    p.breaking * 0.22 +
-    p.life * 0.08 +
-    p.sharpness * 0.08
+    p.control * 0.24 +
+    p.stamina * 0.16 +
+    p.sharpness * 0.20 +
+    p.life * 0.10
 
   return clampRating(base + arsenalRatingBonus(p.pitches))
 }

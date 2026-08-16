@@ -23,7 +23,7 @@ const BATTING: { label: string; get: (player: Player) => number }[] = [
 const PITCHING: { label: string; get: (player: Player) => number }[] = [
   { label: '制', get: (p) => p.pitching?.control ?? 0 },
   { label: 'ス', get: (p) => p.pitching?.stamina ?? 0 },
-  { label: '変', get: (p) => p.pitching?.breaking ?? 0 },
+  { label: 'キ', get: (p) => p.pitching?.sharpness ?? 0 },
 ]
 
 /**

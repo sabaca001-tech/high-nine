@@ -486,7 +486,7 @@ function relativeStrength(players: Player[]): number {
 /** その選手が持っている能力の中から1つ選ぶ */
 function randomGrowableKey(rng: Rng, player: Player): GrowableKey {
   const battingKeys: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  const pitchingKeys: GrowableKey[] = ['control', 'stamina', 'breaking']
+  const pitchingKeys: GrowableKey[] = ['control', 'stamina', 'sharpness']
   return rng.pick(player.isPitcher ? [...battingKeys, ...pitchingKeys] : battingKeys)
 }
 

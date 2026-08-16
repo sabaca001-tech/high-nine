@@ -6,7 +6,6 @@ const base: PitchingAbilities = {
   velocity: 140,
   control: 60,
   stamina: 60,
-  breaking: 60,
   life: 50,
   sharpness: 50,
   pitches: [],
@@ -35,26 +34,24 @@ describe('ノビ（life）', () => {
 })
 
 describe('キレ（sharpness）', () => {
-  it('変化球の効きに乗る', () => {
+  it('変化球の効きそのもの', () => {
+    // 「変化球（曲がる量）」と2つ持っていたのをやめて1つにした。
+    // 曲がる量は持ち球の変化量（`Pitch.level`）が表す
     expect(breakingScore({ ...base, sharpness: 90 })).toBeGreaterThan(breakingScore(base))
+    expect(breakingScore({ ...base, sharpness: 90 })).toBe(90)
   })
 
-  it('曲がりが小さい投手ではキレの効きも小さい', () => {
-    const smallGain =
-      breakingScore({ ...base, breaking: 20, sharpness: 90 }) -
-      breakingScore({ ...base, breaking: 20, sharpness: 10 })
-    const bigGain =
-      breakingScore({ ...base, breaking: 90, sharpness: 90 }) -
-      breakingScore({ ...base, breaking: 90, sharpness: 10 })
-    expect(bigGain).toBeGreaterThan(smallGain)
+  it('球威に効く', () => {
+    expect(stuffScore({ ...base, sharpness: 90 })).toBeGreaterThan(
+      stuffScore({ ...base, sharpness: 10 }),
+    )
   })
 })
 
 describe('球威の基準', () => {
-  it('ノビ・キレが50なら、足す前と同じ球威になる', () => {
-    // **中央を等倍にしてある。** ここがずれると、2つ足しただけで
+  it('ノビが50なら、足す前と同じ球速の重みになる', () => {
+    // **中央を等倍にしてある。** ここがずれると、ノビを足しただけで
     // 投手全体が強く（弱く）なり、打率も一緒に動いてしまう
     expect(straightScore(base)).toBeCloseTo(50, 6)
-    expect(breakingScore(base)).toBeCloseTo(60, 6)
   })
 })

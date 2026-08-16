@@ -147,7 +147,7 @@ function Abilities({ player }: { player: Player }) {
 function summaryOf(player: Player): string {
   if (player.pitching) {
     const p = player.pitching
-    return `${p.velocity}km/h 制${toRank(p.control)} 変${toRank(p.breaking)}`
+    return `${p.velocity}km/h 制${toRank(p.control)} キ${toRank(p.sharpness)}`
   }
   const b = player.batting
   return `ミ${toRank(b.meet)} パ${toRank(b.power)} 走${toRank(b.speed)}`

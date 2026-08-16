@@ -33,7 +33,7 @@ describe('診断: 留学生', () => {
         const label = `${isPitcher ? '投手' : '野手'}${exchange ? '(留学生)' : '　　　　'}`
         console.log(
           isPitcher
-            ? `${label} 総合${avg(overallRating)} 球速${avg((p) => p.pitching!.velocity)} スタミナ${avg((p) => p.pitching!.stamina)} 制球${avg((p) => p.pitching!.control)} 変化${avg((p) => p.pitching!.breaking)}`
+            ? `${label} 総合${avg(overallRating)} 球速${avg((p) => p.pitching!.velocity)} スタミナ${avg((p) => p.pitching!.stamina)} 制球${avg((p) => p.pitching!.control)} キレ${avg((p) => p.pitching!.sharpness)}`
             : `${label} 総合${avg(overallRating)} ミート${avg((p) => p.batting.meet)} パワー${avg((p) => p.batting.power)} 走力${avg((p) => p.batting.speed)} 肩力${avg((p) => p.batting.arm)} 守備${avg((p) => p.batting.fielding)} 捕球${avg((p) => p.batting.catching)}`,
         )
       }

@@ -163,7 +163,7 @@ function keysFor(batting?: BattingLine, pitching?: PitchingLine): GrowableKey[] 
   const keys: GrowableKey[] = []
 
   if (pitching && pitching.outs > 0) {
-    keys.push('control', 'stamina', 'breaking')
+    keys.push('control', 'stamina', 'sharpness')
   }
   if (batting) {
     keys.push('meet', 'power')

@@ -48,7 +48,6 @@ function makePitcher(overrides: Partial<Player> = {}): Player {
       velocity: 140,
       control: 50,
       stamina: 50,
-      breaking: 50,
       life: 50,
       sharpness: 50,
       pitches: [{ direction: 'left', name: 'スライダー', level: 1 }],
@@ -144,7 +143,7 @@ describe('球種の練習', () => {
     // 変化球の低い投手は何を練習しても1球種のままだった
     const raw = makePitcher({
       focus: { type: 'pitch' },
-      pitching: { ...makePitcher().pitching!, breaking: 20 },
+      pitching: { ...makePitcher().pitching!, sharpness: 20 },
     })
     const grown = practice(raw, 120)
     expect(arsenalScore(grown.pitching!.pitches)).toBeGreaterThan(

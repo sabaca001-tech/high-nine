@@ -74,8 +74,6 @@ export type PitchingAbilities = {
   control: number
   /** スタミナ 1〜100 */
   stamina: number
-  /** 変化球の総合力 1〜100。試合の判定にはこの値を使う */
-  breaking: number
   /**
    * ノビ 1〜100。**ストレートの威力**にかかる。
    *
@@ -85,11 +83,12 @@ export type PitchingAbilities = {
    */
   life: number
   /**
-   * キレ 1〜100。**変化球の有効性**にかかる。
+   * キレ 1〜100。**変化球そのものの強さ。**
    *
-   * 変化球の総合力（`breaking`）が「どれだけ曲がるか」なら、
-   * こちらは「その曲がりが打者に効くか」。
-   * 曲がりの小さい投手がキレだけ高くても効果は小さい（掛け算で効く）。
+   * 「変化球（どれだけ曲がるか）」と「キレ（その曲がりが効くか）」を
+   * 別々に持っていたが、**画面で見分けが付かず、意味も重なっていた**。
+   * どれだけ曲がるかは持ち球の変化量（`Pitch.level`）が表しているので、
+   * 能力値のほうは1つに統合してある。試合の判定もこの値を使う。
    */
   sharpness: number
   /** 覚えている球種。どの方向に何を持っているかを見せるために持つ */
@@ -113,7 +112,6 @@ export type GrowableKey =
   | 'velocity'
   | 'control'
   | 'stamina'
-  | 'breaking'
   | 'life'
   | 'sharpness'
 
@@ -128,7 +126,6 @@ export const ABILITY_LABELS: Record<GrowableKey | 'trajectory', string> = {
   velocity: '球速',
   control: 'コントロール',
   stamina: 'スタミナ',
-  breaking: '変化球',
   life: 'ノビ',
   sharpness: 'キレ',
 }
@@ -359,7 +356,6 @@ export type AbilitySnapshot = {
   velocity?: number
   control?: number
   stamina?: number
-  breaking?: number
   life?: number
   sharpness?: number
 }
@@ -387,7 +383,6 @@ export function snapshotOf(player: Player, year: number, month: number): Ability
     velocity: player.pitching.velocity,
     control: player.pitching.control,
     stamina: player.pitching.stamina,
-    breaking: player.pitching.breaking,
     life: player.pitching.life,
     sharpness: player.pitching.sharpness,
   }

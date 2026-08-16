@@ -5,9 +5,9 @@
  * 方向ごとに複数の球種を用意し、**どれを覚えるかは選手ごとに変える**ことで
  * 同じ変化球の値でも投手の個性が出るようにした。
  *
- * 変化量（level）は 1〜7。試合の判定には使わず、
- * 判定は従来どおり `breaking`（総合力）で行う。
- * 球種は「何を投げる投手なのか」を見せるためのもの。
+ * 変化量（level）は 1〜7。**どれだけ曲がるか**を表す。
+ * 打たれにくさの判定に使うのは能力値のキレ（`sharpness`）で、
+ * 球種は「何を投げる投手なのか」と持ち球の充実ぶり（`arsenalScore`）を表す。
  */
 
 import type { Rng } from '@/core/rng/random'
@@ -84,8 +84,8 @@ export function rollPitch(rng: Rng, existing: readonly Pitch[]): Pitch | null {
  * 投手を作るときの持ち球。
  * 変化球の総合力が高いほど球種が多い。
  */
-export function rollInitialPitches(rng: Rng, breaking: number): Pitch[] {
-  const count = breaking >= 70 ? 3 : breaking >= 40 ? 2 : 1
+export function rollInitialPitches(rng: Rng, sharpness: number): Pitch[] {
+  const count = sharpness >= 70 ? 3 : sharpness >= 40 ? 2 : 1
   const pitches: Pitch[] = []
 
   for (let i = 0; i < count; i++) {
@@ -129,7 +129,7 @@ export function arsenalScore(pitches: readonly Pitch[]): number {
 export function improvePitches(
   rng: Rng,
   pitches: readonly Pitch[],
-  breaking: number,
+  sharpness: number,
   /**
    * 球種練習として行う場合。
    *
@@ -140,8 +140,8 @@ export function improvePitches(
    */
   deliberate = false,
 ): { pitches: Pitch[]; learned?: Pitch; improved?: Pitch } {
-  // 持ち球が総合力に見合っていなければ、まず新球種を覚える
-  const deserved = breaking >= 70 ? 3 : breaking >= 40 ? 2 : 1
+  // 持ち球がキレに見合っていなければ、まず新球種を覚える
+  const deserved = sharpness >= 70 ? 3 : sharpness >= 40 ? 2 : 1
   if (pitches.length < deserved) {
     const learned = rollPitch(rng, pitches)
     if (learned) return { pitches: [...pitches, learned], learned }

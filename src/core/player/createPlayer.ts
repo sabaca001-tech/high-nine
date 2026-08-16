@@ -327,17 +327,17 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
    * スカウトの「素質◯◯」と入学後の総合が食い違わない。
    * 揃えずに振っていた頃は、素質45と書いてあった選手が総合40で入ることがあった。
    *
-   * 野手6項目・投手5項目をそれぞれ別に揃える。
+   * 野手6項目・投手4項目をそれぞれ別に揃える。
    */
   const battingSpread = centeredSpread(rng, BATTING_KEYS.length, ABILITY_SPREAD)
-  const pitchingSpread = isPitcher ? centeredSpread(rng, 5, ABILITY_SPREAD) : []
+  const pitchingSpread = isPitcher ? centeredSpread(rng, 4, ABILITY_SPREAD) : []
 
   const taken = options.takenNames ?? []
   const name = exchange ? pickExchangeName(rng, taken) : pickName(rng, taken)
   const position: Position = isPitcher ? 'P' : rng.pick(FIELDER_POSITIONS)
   // 留学生の投手は球速とスタミナに寄る。そのぶん制球と変化球を引く
   const pitchPenalty = exchange ? EXCHANGE_PITCH_PENALTY : 0
-  const breaking = clampAbility(base + (pitchingSpread[2] ?? 0) - pitchPenalty)
+  const sharpness = clampAbility(base + (pitchingSpread[2] ?? 0) - pitchPenalty)
 
   // **投手能力を先に決める。** 野手能力の上限に使うため
   const pitching = isPitcher
@@ -348,11 +348,10 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
         ),
         control: clampAbility(base + pitchingSpread[0] - pitchPenalty),
         stamina: clampAbility(base + pitchingSpread[1] + (exchange ? EXCHANGE_STAMINA : 0)),
-        breaking,
         // ノビは体の使い方、キレは指先の技術。留学生は技術のほうを引く
         life: clampAbility(base + pitchingSpread[3]),
-        sharpness: clampAbility(base + pitchingSpread[4] - pitchPenalty),
-        pitches: rollInitialPitches(rng, breaking),
+        sharpness,
+        pitches: rollInitialPitches(rng, sharpness),
       }
     : null
 
@@ -441,7 +440,7 @@ export function createGrowthAptitude(
   // **球速も対象に入れる。** 入れていなかった頃は、
   // 誰が投げても球速の伸び方が同じで、「伸び代のある投手」が生まれなかった
   const pool: GrowableKey[] = isPitcher
-    ? [...BATTING_KEYS, 'velocity', 'control', 'stamina', 'breaking', 'life', 'sharpness']
+    ? [...BATTING_KEYS, 'velocity', 'control', 'stamina', 'life', 'sharpness']
     : [...BATTING_KEYS]
 
   /*

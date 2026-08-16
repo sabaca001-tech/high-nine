@@ -200,6 +200,18 @@
   min-width: 0;
 }
 
+/*
+ * 球速。投手のカードでは持ち球の図の上に置く。
+ * **単位（km/h）は出さない。** 66pxの列では「球速」が
+ * 「球／速」と2行に折り返して、行の高さが持ち球の図とずれた。
+ */
+.velocity {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* 弾道。守備適性の上に1行だけ置く */
 .trajectoryRow {
   display: flex;
@@ -215,22 +227,11 @@
 .trajectoryLabel {
   font-size: 9px;
   color: var(--text-sub);
+  white-space: nowrap;
 }
 
 .stats {
   min-width: 0;
-}
-
-/* 投手の4能力。守備適性図と持ち球の上に、カード幅いっぱいで置く */
-.pitchStats {
-  margin-top: var(--sp-1);
-}
-
-.charts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-2);
-  margin-top: var(--sp-1);
 }
 
 .chartBox {

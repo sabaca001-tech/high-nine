@@ -51,7 +51,7 @@ const TRAIT_BOOST: Record<ScoutTrait, GrowableKey[]> = {
   contact: ['meet'],
   speed: ['speed'],
   defense: ['fielding', 'catching'],
-  pitching: ['control', 'breaking'],
+  pitching: ['control', 'sharpness'],
   raw: [],
 }
 

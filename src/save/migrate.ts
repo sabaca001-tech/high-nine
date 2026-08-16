@@ -165,6 +165,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 40) {
     data = migrateV39ToV40(data)
   }
+  if (version < 41) {
+    data = migrateV40ToV41(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -1022,7 +1025,8 @@ function fixPitchingDeep(value: unknown): unknown {
   if (isLegacyPitching(value)) {
     const velocity = value.velocity as number
     const control = value.control as number
-    const breaking = value.breaking as number
+    // v41で変化球は廃止された。無ければ制球で代用する
+    const breaking = typeof value.breaking === 'number' ? value.breaking : control
     return {
       ...value,
       // ノビは速球の質なので球速と制球から、キレは変化球の質なので変化球と制球から。
@@ -1038,12 +1042,17 @@ function fixPitchingDeep(value: unknown): unknown {
   return out
 }
 
-/** v39までの投手能力の形か（球速・制球・変化球・持ち球を持ち、ノビかキレが無い） */
+/**
+ * v39までの投手能力の形か（球速・制球・スタミナ・持ち球を持ち、ノビかキレが無い）。
+ *
+ * **変化球（breaking）の有無で判定しない。** v41で変化球そのものを廃止したので、
+ * それを目印にすると新しい形のデータを見落とす。
+ */
 function isLegacyPitching(value: Record<string, unknown>): boolean {
   return (
     typeof value.velocity === 'number' &&
     typeof value.control === 'number' &&
-    typeof value.breaking === 'number' &&
+    typeof value.stamina === 'number' &&
     Array.isArray(value.pitches) &&
     (typeof value.life !== 'number' || typeof value.sharpness !== 'number')
   )
@@ -1052,6 +1061,42 @@ function isLegacyPitching(value: Record<string, unknown>): boolean {
 /** 2つの値の真ん中（1〜100に収める） */
 function mid(a: number, b: number): number {
   return Math.min(100, Math.max(1, Math.round((a + b) / 2)))
+}
+
+/**
+ * v40 → v41
+ *  - 変化球（breaking）を廃止し、キレ（sharpness）に統合
+ *
+ * 2つの能力の意味が重なっていて、画面でも見分けが付かなかった
+ * （どれだけ曲がるかは持ち球の変化量が表している）。
+ *
+ * **どちらか一方を捨てない。** 変化球を消してキレだけ残すと、
+ * 変化球90・キレ40の投手が読み直した瞬間に別人になる。
+ * 主だった変化球のほうを重く見て混ぜる。
+ */
+function migrateV40ToV41(raw: Record<string, unknown>): Record<string, unknown> {
+  const merged = mergeBreakingDeep(raw) as Record<string, unknown>
+  return { ...merged, version: 41 }
+}
+
+/** 保存データを歩いて、変化球を持つもの（投手能力・能力の推移）を統合する */
+function mergeBreakingDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(mergeBreakingDeep)
+  if (!isRecord(value)) return value
+
+  if (typeof value.breaking === 'number') {
+    const breaking = value.breaking
+    const sharpness = typeof value.sharpness === 'number' ? value.sharpness : breaking
+    const { breaking: _dropped, ...rest } = value
+    return {
+      ...rest,
+      sharpness: Math.min(100, Math.max(1, Math.round(breaking * 0.6 + sharpness * 0.4))),
+    }
+  }
+
+  const out: Record<string, unknown> = {}
+  for (const [key, child] of Object.entries(value)) out[key] = mergeBreakingDeep(child)
+  return out
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

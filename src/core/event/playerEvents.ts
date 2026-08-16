@@ -68,14 +68,14 @@ export type PlayerEventDef = {
 /** その選手が持っている能力の中から1つ選ぶ */
 function anyKey(rng: Rng, player: Player): GrowableKey {
   const batting: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  const pitching: GrowableKey[] = ['velocity', 'control', 'stamina', 'breaking']
+  const pitching: GrowableKey[] = ['velocity', 'control', 'stamina', 'sharpness']
   return rng.pick(player.isPitcher ? [...batting, ...pitching] : batting)
 }
 
 /** 投手なら投手の、野手なら野手の「本業」の能力を1つ選ぶ */
 function coreKey(rng: Rng, player: Player): GrowableKey {
   return player.isPitcher
-    ? rng.pick<GrowableKey>(['velocity', 'control', 'breaking', 'stamina'])
+    ? rng.pick<GrowableKey>(['velocity', 'control', 'sharpness', 'stamina'])
     : rng.pick<GrowableKey>(['meet', 'power'])
 }
 

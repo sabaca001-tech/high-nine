@@ -266,10 +266,31 @@ describe('migrate', () => {
       if (!player.pitching) continue
       expect(player.pitching.life).toBeGreaterThan(0)
       expect(player.pitching.sharpness).toBeGreaterThan(0)
-      // 変化球の得意な投手のキレが平均以下に落ちてはいけない
-      expect(player.pitching.sharpness).toBeGreaterThanOrEqual(
-        Math.min(player.pitching.breaking, player.pitching.control) - 1,
-      )
+      // 変化球（v40まで）はキレに統合されて消える
+      expect('breaking' in player.pitching).toBe(false)
+    }
+  })
+
+  it('v40の変化球がキレに統合される（読み直しても別人にならない）', () => {
+    const state = createInitialState({ seed: 777 })
+    const v40 = JSON.parse(JSON.stringify({ ...state, version: 40 })) as Record<string, unknown>
+
+    // v40 の形（変化球とキレを両方持つ）に戻す
+    const players = (v40.players as Record<string, unknown>[]).map((player) => {
+      if (!player.pitching) return player
+      const pitching = player.pitching as Record<string, unknown>
+      return { ...player, pitching: { ...pitching, breaking: 90, sharpness: 30 } }
+    })
+
+    const migrated = migrate({ ...v40, players })
+    expect(migrated).not.toBeNull()
+
+    for (const player of migrated!.players) {
+      if (!player.pitching) continue
+      expect('breaking' in player.pitching).toBe(false)
+      // 主だったほう（変化球90）を重く見て混ぜる。捨てても丸取りしてもいけない
+      expect(player.pitching.sharpness).toBeGreaterThan(30)
+      expect(player.pitching.sharpness).toBeLessThan(90)
     }
   })
 

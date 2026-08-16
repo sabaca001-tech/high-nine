@@ -116,7 +116,6 @@ describe('投手の総合', () => {
     velocity: 140,
     control: 60,
     stamina: 60,
-    breaking: 60,
     life: 60,
     sharpness: 60,
     pitches: [{ direction: 'left', name: 'スライダー', level: 2 }],

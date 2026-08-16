@@ -1,24 +1,30 @@
 import { toRank, velocityRank } from '@/core/player/rating'
 import type { Rank } from '@/core/player/rating'
-import type { PitchingAbilities } from '@/core/types/player'
+import type { BattingAbilities, PitchingAbilities } from '@/core/types/player'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './PitcherStats.module.css'
 
 /**
- * 投手の6能力を数値で並べる。
+ * 投手の能力を数値で並べる。
  *
  * **投手に野手のレーダーを使うのをやめた。**
  * 六角形に「球速・制球・変化・スタミナ・守備・走力」を詰めていたので、
  * 150pxのカードでは軸のラベルが潰れて重なり、
  * そのうえ形が読めても**実際の値が分からない**（球速141km/hなのか135km/hなのか）。
  * 投手は見たい値が数個しかないので、素直に数値で出す。
- *
- * 並びは「球速・変化球」「制球・スタミナ」「ノビ・キレ」の3行。
- * **ノビは球速の、キレは変化球の質**なので、
- * 掛かる相手（球速・変化球）と同じ列に置いてある。
  */
 export function PitcherStats({
   pitching,
+  /**
+   * 添えると**守備と捕球も並べる**。
+   * 投手も守備は使うし、練習でも伸びるのに、一覧のどこにも出ていなかった。
+   */
+  batting,
+  /**
+   * 球速を含めるか。
+   * 一覧のカードでは球速を大きく別に出すので、ここでは省く。
+   */
+  velocity = true,
   /** 一覧のカードに置くとき。字と余白を詰める */
   compact = false,
   /**
@@ -28,6 +34,8 @@ export function PitcherStats({
   columns = 2,
 }: {
   pitching: PitchingAbilities
+  batting?: BattingAbilities
+  velocity?: boolean
   compact?: boolean
   columns?: 1 | 2
 }) {
@@ -43,13 +51,20 @@ export function PitcherStats({
         揃っていなかった頃は、球速だけが常に同じ色で
         「速いのか遅いのか」が一覧では読めなかった
       */}
-      <Cell label="球速" text={`${pitching.velocity}`} rank={velocityRank(pitching.velocity)} />
-      <Cell label="変化" value={pitching.breaking} />
+      {velocity && (
+        <Cell label="球速" text={`${pitching.velocity}`} rank={velocityRank(pitching.velocity)} />
+      )}
       <Cell label="制球" value={pitching.control} />
       <Cell label="スタミナ" value={pitching.stamina} />
-      {/* ノビはストレートの威力、キレは変化球の有効性に掛かる */}
+      {/* ノビは速球の、キレは変化球の強さ */}
       <Cell label="ノビ" value={pitching.life} />
       <Cell label="キレ" value={pitching.sharpness} />
+      {batting && (
+        <>
+          <Cell label="守備" value={batting.fielding} />
+          <Cell label="捕球" value={batting.catching} />
+        </>
+      )}
     </div>
   )
 }

@@ -171,7 +171,7 @@ export function matchExperience(
  */
 function keysFor(player: Player): GrowableKey[] {
   const keys: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  if (player.pitching) keys.push('control', 'stamina', 'breaking')
+  if (player.pitching) keys.push('control', 'stamina', 'sharpness')
   return keys
 }
 

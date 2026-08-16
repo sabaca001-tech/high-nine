@@ -47,7 +47,7 @@ export function playU18(rng: Rng, player: Player, year: number): U18Outcome {
   const steps = performance >= 75 ? 3 : performance >= 50 ? 2 : performance >= 25 ? 1 : 0
 
   const keys: GrowableKey[] = player.pitching
-    ? ['control', 'stamina', 'breaking']
+    ? ['control', 'stamina', 'sharpness']
     : ['meet', 'power', 'speed', 'fielding']
 
   let current = player

@@ -36,7 +36,7 @@ function velocityFromArm(arm: number): number {
  */
 const ROOKIE_VELOCITY_PENALTY = 8
 
-/** 転向したての制球・スタミナ・変化球の水準 */
+/** 転向したての制球・スタミナ・キレの水準 */
 const ROOKIE_MIN = 18
 const ROOKIE_MAX = 42
 
@@ -49,17 +49,16 @@ export function rollPitchingFor(rng: Rng, player: Player): PitchingAbilities {
     VELOCITY_MIN,
     VELOCITY_MAX,
   )
-  const breaking = rng.int(ROOKIE_MIN, ROOKIE_MAX)
+  const sharpness = rng.int(ROOKIE_MIN, ROOKIE_MAX)
 
   return {
     velocity,
     control: rng.int(ROOKIE_MIN, ROOKIE_MAX),
     stamina: rng.int(ROOKIE_MIN, ROOKIE_MAX),
-    breaking,
-    // ノビとキレは投げ込んだ年月で身につくもの。転向したてなら低い
+    // ノビは投げ込んだ年月で身につくもの。転向したてなら低い
     life: rng.int(ROOKIE_MIN, ROOKIE_MAX),
-    sharpness: rng.int(ROOKIE_MIN, ROOKIE_MAX),
-    pitches: rollInitialPitches(rng, breaking),
+    sharpness,
+    pitches: rollInitialPitches(rng, sharpness),
   }
 }
 

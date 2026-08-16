@@ -117,20 +117,20 @@ export function straightScore(pitching: PitchingAbilities): number {
 }
 
 /**
- * 変化球の効き。**変化球の総合力にキレが掛かる。**
+ * 変化球の効き。**キレがそのまま効き。**
  *
- * 曲がりの小さい投手がキレだけ高くても効果は小さい（掛け算なので）。
- * 「曲がるか」と「効くか」を分けて持つことで、
- * 変化球型の投手にも育て方の選択が生まれる。
+ * 「変化球（曲がる量）」と「キレ（効き）」を別々に持っていた頃は、
+ * 掛け算で合成していたが、2つの能力の意味が重なっていて
+ * 画面でも見分けが付かなかった。曲がる量は持ち球の変化量が表す。
  */
 export function breakingScore(pitching: PitchingAbilities): number {
-  return pitching.breaking * qualityFactor(pitching.sharpness)
+  return pitching.sharpness
 }
 
 /**
- * ノビ・キレの効き方。**50で等倍**（±15%の伸縮）。
+ * ノビの効き方。**50で等倍**（±15%の伸縮）。
  *
- * 中央を等倍にしてあるので、この2つを足しても
+ * 中央を等倍にしてあるので、ノビを足したことで
  * 投手全体が強くなったり弱くなったりしない
  * （動くのは「どの投手が強いか」だけ）。
  */

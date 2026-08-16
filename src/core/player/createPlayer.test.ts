@@ -43,7 +43,7 @@ describe('createPlayer', () => {
       if (player.pitching) {
         expect(player.pitching.control).toBeLessThanOrEqual(ABILITY_MAX)
         expect(player.pitching.stamina).toBeLessThanOrEqual(ABILITY_MAX)
-        expect(player.pitching.breaking).toBeLessThanOrEqual(ABILITY_MAX)
+        expect(player.pitching.sharpness).toBeLessThanOrEqual(ABILITY_MAX)
       }
       expect(player.trust).toBeLessThanOrEqual(100)
       expect(player.condition).toBeLessThanOrEqual(100)
@@ -116,9 +116,11 @@ describe('createInitialRoster', () => {
       total += roster.length
     }
 
+    // 素の確率は PITCHER_RATE(0.18) だが、学年ごとに1人は必ず投手にするので
+    // 少人数の代ではそのぶん上振れする
     const rate = pitchers / total
     expect(rate).toBeGreaterThan(0.12)
-    expect(rate).toBeLessThan(0.3)
+    expect(rate).toBeLessThan(0.33)
   })
 })
 

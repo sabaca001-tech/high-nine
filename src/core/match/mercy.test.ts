@@ -27,10 +27,15 @@ function lopsided(seed: number, strength: number) {
 describe('コールドゲーム', () => {
   it('規定の点差を大きく超えたまま終わらない', () => {
     /*
-     * 後攻（自校）が攻撃中に規定へ届いたら、その打席で終わる。
-     * 一打で複数点入るので**ぴったり**にはならないが、
-     * 満塁本塁打（4点）を超える上振れは起きない。
+     * 攻撃中に規定へ届いたら、その打席で終わる。
+     * 一打で複数点入るので**ぴったり**にはならない。
+     *
+     * **前の回から持ち越した点差もある。** 規定は回によって違うので
+     * （5回10点差・7回7点差）、6回終了時に8点差でも試合は続く。
+     * そこから7回表に満塁本塁打が出れば12点差で終わる。
+     * つまり上限は「いちばん緩い規定（10点差）＋一打（4点）」。
      */
+    const MAX_LEAD = 10 + 4
     let checked = 0
 
     for (let seed = 1; seed <= 200; seed++) {
@@ -43,7 +48,7 @@ describe('コールドゲーム', () => {
 
       const diff = Math.abs(result.finalScore.player - result.finalScore.opponent)
       expect(diff).toBeGreaterThanOrEqual(lead)
-      expect(diff).toBeLessThan(lead + 4)
+      expect(diff).toBeLessThan(MAX_LEAD)
       checked += 1
     }
 
