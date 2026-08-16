@@ -76,6 +76,22 @@ export type PitchingAbilities = {
   stamina: number
   /** 変化球の総合力 1〜100。試合の判定にはこの値を使う */
   breaking: number
+  /**
+   * ノビ 1〜100。**ストレートの威力**にかかる。
+   *
+   * 同じ140km/hでも、打者の手元で伸びる球とそうでない球では詰まり方が違う。
+   * 球速そのものは伸ばしにくい（`velocity` は km/h で、上限も現実に縛られる）ので、
+   * 「速くはないが打たれない投手」を作れる軸として置いた。
+   */
+  life: number
+  /**
+   * キレ 1〜100。**変化球の有効性**にかかる。
+   *
+   * 変化球の総合力（`breaking`）が「どれだけ曲がるか」なら、
+   * こちらは「その曲がりが打者に効くか」。
+   * 曲がりの小さい投手がキレだけ高くても効果は小さい（掛け算で効く）。
+   */
+  sharpness: number
   /** 覚えている球種。どの方向に何を持っているかを見せるために持つ */
   pitches: Pitch[]
 }
@@ -98,6 +114,8 @@ export type GrowableKey =
   | 'control'
   | 'stamina'
   | 'breaking'
+  | 'life'
+  | 'sharpness'
 
 export const ABILITY_LABELS: Record<GrowableKey | 'trajectory', string> = {
   trajectory: '弾道',
@@ -111,6 +129,8 @@ export const ABILITY_LABELS: Record<GrowableKey | 'trajectory', string> = {
   control: 'コントロール',
   stamina: 'スタミナ',
   breaking: '変化球',
+  life: 'ノビ',
+  sharpness: 'キレ',
 }
 
 /**
@@ -290,6 +310,11 @@ export type Player = {
    * `TRAJECTORY_COST` に届くと弾道が1段上がる。
    */
   trajectoryProgress?: number
+  /**
+   * 球種練習の進み具合（能力値に換算した点数）。
+   * `PITCH_COST` に届くと球種をひとつ覚えるか、変化量が1上がる。
+   */
+  pitchProgress?: number
   /** 入学時からの能力の推移（古い順） */
   history: AbilitySnapshot[]
   /**
@@ -335,6 +360,8 @@ export type AbilitySnapshot = {
   control?: number
   stamina?: number
   breaking?: number
+  life?: number
+  sharpness?: number
 }
 
 /** 記録を残す上限。3年間（36ヶ月）＋余裕 */
@@ -361,6 +388,8 @@ export function snapshotOf(player: Player, year: number, month: number): Ability
     control: player.pitching.control,
     stamina: player.pitching.stamina,
     breaking: player.pitching.breaking,
+    life: player.pitching.life,
+    sharpness: player.pitching.sharpness,
   }
 }
 

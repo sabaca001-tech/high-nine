@@ -3,6 +3,9 @@ import type { CSSProperties } from 'react'
 import { ALL_POSITIONS, defenseScore, isPlayable } from '@/core/lineup/aptitude'
 import { TRAJECTORY_MAX } from '@/core/player/growth'
 import {
+  canPracticePitch,
+  PITCH_COST,
+  PITCH_PRACTICE_PENALTY,
   TRAJECTORY_COST,
   TRAJECTORY_PRACTICE_PENALTY,
   canConvert,
@@ -197,6 +200,9 @@ function AbilityTab({ player }: { player: Player }) {
           <AbilityRow label={ABILITY_LABELS.control} value={player.pitching.control} />
           <AbilityRow label={ABILITY_LABELS.stamina} value={player.pitching.stamina} />
           <AbilityRow label={ABILITY_LABELS.breaking} value={player.pitching.breaking} />
+          {/* ノビは球速の、キレは変化球の「質」。掛かる相手のすぐ下に置く */}
+          <AbilityRow label={ABILITY_LABELS.life} value={player.pitching.life} />
+          <AbilityRow label={ABILITY_LABELS.sharpness} value={player.pitching.sharpness} />
 
           <h3 className={styles.subTitle}>持ち球</h3>
           <PitchChart pitches={player.pitching.pitches} />
@@ -418,6 +424,8 @@ function GrowthTab({ player, year, month }: { player: Player; year: number; mont
           <AbilityChart title={ABILITY_LABELS.control} points={pointsOf((s) => s.control)} />
           <AbilityChart title={ABILITY_LABELS.stamina} points={pointsOf((s) => s.stamina)} />
           <AbilityChart title={ABILITY_LABELS.breaking} points={pointsOf((s) => s.breaking)} />
+          <AbilityChart title={ABILITY_LABELS.life} points={pointsOf((s) => s.life)} />
+          <AbilityChart title={ABILITY_LABELS.sharpness} points={pointsOf((s) => s.sharpness)} />
         </>
       )}
 
@@ -434,7 +442,8 @@ function GrowthTab({ player, year, month }: { player: Player; year: number; mont
 /** その選手が伸ばせる能力の一覧 */
 function growableKeysOf(player: Player): GrowableKey[] {
   const batting: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  return player.pitching ? [...(['control', 'stamina', 'breaking'] as GrowableKey[]), ...batting] : batting
+  const pitching = ['control', 'stamina', 'breaking', 'life', 'sharpness'] as GrowableKey[]
+  return player.pitching ? [...pitching, ...batting] : batting
 }
 
 /**
@@ -527,6 +536,39 @@ function TrainingTab({ player }: { player: Player }) {
                 弾道{player.batting.trajectory} → {player.batting.trajectory + 1}（
                 {Math.round(((player.trajectoryProgress ?? 0) / TRAJECTORY_COST) * 100)}%）
                 ／ この間、他の能力の伸びは{TRAJECTORY_PRACTICE_PENALTY}倍になります
+              </p>
+            )}
+          </>
+        )}
+
+        {/*
+          **持ち球は能力値ではない**（何を投げるか）ので、
+          弾道と同じく能力の一覧には混ぜず、専用の行に置く。
+        */}
+        {player.pitching && (
+          <>
+            <button
+              type="button"
+              className={
+                focus.type === 'pitch'
+                  ? `${styles.focusRow} ${styles.focusActive}`
+                  : styles.focusRow
+              }
+              disabled={!canPracticePitch(player)}
+              onClick={() => choose({ type: 'pitch' })}
+            >
+              <span className={styles.focusName}>球種を増やす・磨く</span>
+              <span className={styles.focusDesc}>
+                {canPracticePitch(player)
+                  ? '溜まりきるたびに、新しい球種を覚えるか変化量が1上がる'
+                  : 'すべての球種を極めている'}
+              </span>
+            </button>
+
+            {focus.type === 'pitch' && (
+              <p className={styles.chartNote}>
+                次の球種まで{Math.round(((player.pitchProgress ?? 0) / PITCH_COST) * 100)}
+                %／ この間、他の能力の伸びは{PITCH_PRACTICE_PENALTY}倍になります
               </p>
             )}
           </>

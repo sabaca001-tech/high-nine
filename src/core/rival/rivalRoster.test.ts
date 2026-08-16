@@ -58,11 +58,14 @@ describe('rivalRoster', () => {
   })
 
   it('3年生は翌年に卒業して名簿から消える', () => {
+    // **名前ではなく id で見る。** 名前は代ごとに引き直すので、
+    // 別の代の部員がたまたま同じ姓名になることがある
+    // （名前の重複を避けるのは1つの代の中だけ）。
     const plain: RivalSchool = { ...school, stars: [] }
     const seniors = rivalRoster(plain, 5).filter((p) => p.grade === 3)
-    const nextYear = rivalRoster(plain, 6).map((p) => p.name)
+    const nextYear = rivalRoster(plain, 6).map((p) => p.id)
 
-    for (const senior of seniors) expect(nextYear).not.toContain(senior.name)
+    for (const senior of seniors) expect(nextYear).not.toContain(senior.id)
   })
 
   it('戦力が高い学校ほど部員も強い', () => {

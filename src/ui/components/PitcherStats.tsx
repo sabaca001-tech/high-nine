@@ -5,17 +5,17 @@ import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './PitcherStats.module.css'
 
 /**
- * 投手の4能力を数値で並べる。
+ * 投手の6能力を数値で並べる。
  *
  * **投手に野手のレーダーを使うのをやめた。**
  * 六角形に「球速・制球・変化・スタミナ・守備・走力」を詰めていたので、
  * 150pxのカードでは軸のラベルが潰れて重なり、
  * そのうえ形が読めても**実際の値が分からない**（球速141km/hなのか135km/hなのか）。
- * 投手は見たい値が4つしかないので、素直に数値で出す。
+ * 投手は見たい値が数個しかないので、素直に数値で出す。
  *
- * 並びは「球速・変化球」で1行、「制球・スタミナ」で1行。
- * 打者を差し込む力（球速＋変化球）と、投げ続ける力（制球＋スタミナ）を
- * 行で分けてある。
+ * 並びは「球速・変化球」「制球・スタミナ」「ノビ・キレ」の3行。
+ * **ノビは球速の、キレは変化球の質**なので、
+ * 掛かる相手（球速・変化球）と同じ列に置いてある。
  */
 export function PitcherStats({
   pitching,
@@ -47,6 +47,9 @@ export function PitcherStats({
       <Cell label="変化" value={pitching.breaking} />
       <Cell label="制球" value={pitching.control} />
       <Cell label="スタミナ" value={pitching.stamina} />
+      {/* ノビはストレートの威力、キレは変化球の有効性に掛かる */}
+      <Cell label="ノビ" value={pitching.life} />
+      <Cell label="キレ" value={pitching.sharpness} />
     </div>
   )
 }

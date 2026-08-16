@@ -65,7 +65,15 @@ function makePitcher(overrides: Partial<Player> = {}): Player {
     id: 'pitcher',
     position: 'P',
     isPitcher: true,
-    pitching: { velocity: 135, control: 40, stamina: 40, breaking: 40, pitches: [] },
+    pitching: {
+      velocity: 135,
+      control: 40,
+      stamina: 40,
+      breaking: 40,
+      life: 40,
+      sharpness: 40,
+      pitches: [],
+    },
     ...overrides,
   })
 }

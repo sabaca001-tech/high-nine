@@ -17,6 +17,7 @@ import { APTITUDE_MAX } from '@/core/types/player'
 import type { Rng } from '@/core/rng/random'
 import type { Aptitude, GrowableKey, Player, Position } from '@/core/types/player'
 import { rollPitchingFor } from './convertPitching'
+import { isArsenalComplete } from './pitchDefs'
 
 /** 練習方針 */
 export type TrainingFocus =
@@ -42,6 +43,16 @@ export type TrainingFocus =
    * かかる量はパワーを12上げるのと同じくらい（`TRAJECTORY_COST`）。
    */
   | { type: 'trajectory' }
+  /**
+   * 球種を練習する。
+   *
+   * **変化球の総合力（`breaking`）を上げるのとは別のこと。**
+   * 総合力は「どれだけ曲がるか」で、こちらは「何を投げられるか」。
+   * 積み上げた練習量が届くたびに、球種をひとつ覚えるか変化量が1上がる。
+   *
+   * 弾道と違って**上限まで続く**（覚えるものが無くなったら自動で終わる）。
+   */
+  | { type: 'pitch' }
 
 export const DEFAULT_FOCUS: TrainingFocus = { type: 'team' }
 
@@ -56,6 +67,17 @@ export const TRAJECTORY_COST = 12
 
 /** 弾道の練習中、他の能力にかかる倍率 */
 export const TRAJECTORY_PRACTICE_PENALTY = 0.7
+
+/**
+ * 球種をひとつ覚える（変化量を1上げる）のに必要な練習量。
+ *
+ * **変化球を8上げるのと同じ重み。** 弾道（12）より軽くしてあるのは、
+ * 1段の重みが小さく、覚えるものが何段もあるため。
+ */
+export const PITCH_COST = 8
+
+/** 球種の練習中、他の能力にかかる倍率 */
+export const PITCH_PRACTICE_PENALTY = 0.75
 
 /** 重点的に伸ばす能力にかかる倍率 */
 export const FOCUS_BONUS = 1.6
@@ -141,6 +163,8 @@ const DEFAULT_GROWTH_PLAN: Record<Position, GrowableKey[]> = {
     'velocity',
     'control',
     'breaking',
+    'life',
+    'sharpness',
     'stamina',
     'catching',
     'fielding',
@@ -166,7 +190,7 @@ const DEFAULT_GROWTH_PLAN: Record<Position, GrowableKey[]> = {
  * 変わるのは「誰のどこが伸びるか」だけ。
  */
 const FIELDER_WEIGHTS = [1.3, 1.15, 1.05, 0.95, 0.85, 0.7]
-const PITCHER_WEIGHTS = [1.35, 1.3, 1.25, 1.15, 1.0, 0.9, 0.85, 0.8, 0.75, 0.65]
+const PITCHER_WEIGHTS = [1.35, 1.3, 1.25, 1.1, 1.1, 1.05, 0.95, 0.9, 0.85, 0.8, 0.7, 0.65]
 
 /** 優先順の並びから倍率を引く */
 function weightAt(position: Position, rank: number): number {
@@ -222,6 +246,7 @@ export function focusMultiplier(player: Player, key: GrowableKey, plan?: GrowthP
 
   if (focus.type === 'convert') return CONVERT_PRACTICE_PENALTY
   if (focus.type === 'trajectory') return TRAJECTORY_PRACTICE_PENALTY
+  if (focus.type === 'pitch') return PITCH_PRACTICE_PENALTY
   if (focus.type === 'ability') return focus.key === key ? FOCUS_BONUS : FOCUS_PENALTY
   return positionGrowthMultiplier(player.position, key, plan)
 }
@@ -230,6 +255,11 @@ export function focusMultiplier(player: Player, key: GrowableKey, plan?: GrowthP
 export function withFocus(player: Player, focus: TrainingFocus): Player {
   if (isSameFocus(player.focus ?? DEFAULT_FOCUS, focus)) return player
   return { ...player, focus, convertProgress: 0 }
+}
+
+/** その選手が球種の練習を指示できるか（投手で、覚える余地があるか） */
+export function canPracticePitch(player: Player): boolean {
+  return player.pitching !== null && !isArsenalComplete(player.pitching.pitches)
 }
 
 /** 同じ方針かどうか */
@@ -334,5 +364,7 @@ export function focusLabel(focus: TrainingFocus | undefined, labels: Record<stri
   if (value.type === 'convert') {
     return value.main ? `${value.position}へ本職転向` : `${value.position}を練習`
   }
+  if (value.type === 'trajectory') return '弾道'
+  if (value.type === 'pitch') return '球種'
   return 'チーム練習'
 }

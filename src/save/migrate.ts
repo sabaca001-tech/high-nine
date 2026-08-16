@@ -12,7 +12,7 @@ import { createAptitudes } from '@/core/lineup/aptitude'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import type { GameState } from '@/core/types/game'
 import { SAVE_VERSION } from '@/core/types/game'
-import { snapshotOf } from '@/core/types/player'
+import { snapshotOf, velocityScore } from '@/core/types/player'
 import type { Player, Position } from '@/core/types/player'
 import { REPUTATION_INITIAL } from '@/core/types/season'
 import { monthlyFunds } from '@/core/shop/funds'
@@ -161,6 +161,9 @@ export function migrate(raw: unknown): GameState | null {
   }
   if (version < 39) {
     data = migrateV38ToV39(data)
+  }
+  if (version < 40) {
+    data = migrateV39ToV40(data)
   }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
@@ -985,6 +988,68 @@ function migrateV38ToV39(raw: Record<string, unknown>): Record<string, unknown> 
   const graduates = Array.isArray(raw.graduates) ? raw.graduates.map(convert) : raw.graduates
 
   return { ...raw, version: 39, players, graduates }
+}
+
+/**
+ * v39 → v40
+ *  - PitchingAbilities に life（ノビ）と sharpness（キレ）を追加
+ *
+ * **既存の投手が急に弱くならないようにする。**
+ * 一律50で入れると、変化球90の投手のキレが平均以下になって
+ * セーブを読み直した瞬間に打ち込まれる。その投手の持っている値から導く。
+ *
+ * **試合中のセーブも直す。** `matchState` の中にも選手の写しがあり、
+ * ここを忘れると再開した試合で球威が NaN になる。
+ */
+function migrateV39ToV40(raw: Record<string, unknown>): Record<string, unknown> {
+  const convert = (value: unknown): unknown => {
+    if (!isRecord(value)) return value
+    const player = value as Record<string, unknown>
+    if (!isRecord(player.pitching)) return player
+
+    const pitching = player.pitching as Record<string, unknown>
+    if (typeof pitching.life === 'number' && typeof pitching.sharpness === 'number') return player
+
+    const velocity = typeof pitching.velocity === 'number' ? pitching.velocity : 130
+    const control = typeof pitching.control === 'number' ? pitching.control : 40
+    const breaking = typeof pitching.breaking === 'number' ? pitching.breaking : 40
+
+    return {
+      ...player,
+      pitching: {
+        ...pitching,
+        // ノビは速球の質なので球速と制球から、キレは変化球の質なので変化球と制球から
+        life: mid(velocityScore(velocity), control),
+        sharpness: mid(breaking, control),
+      },
+    }
+  }
+
+  const players = Array.isArray(raw.players) ? raw.players.map(convert) : raw.players
+  const graduates = Array.isArray(raw.graduates) ? raw.graduates.map(convert) : raw.graduates
+
+  // 試合の途中でセーブしていた場合、両チームの選手にも同じ変換をかける
+  let matchState = raw.matchState
+  if (isRecord(matchState)) {
+    const teams: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(matchState)) {
+      teams[key] =
+        isRecord(value) && Array.isArray((value as Record<string, unknown>).players)
+          ? {
+              ...value,
+              players: ((value as Record<string, unknown>).players as unknown[]).map(convert),
+            }
+          : value
+    }
+    matchState = teams
+  }
+
+  return { ...raw, version: 40, players, graduates, matchState }
+}
+
+/** 2つの値の真ん中（1〜100に収める） */
+function mid(a: number, b: number): number {
+  return Math.min(100, Math.max(1, Math.round((a + b) / 2)))
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

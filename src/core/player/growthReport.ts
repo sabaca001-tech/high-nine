@@ -52,6 +52,8 @@ const KEYS: GrowableKey[] = [
   'control',
   'stamina',
   'breaking',
+  'life',
+  'sharpness',
 ]
 
 /** 記録から能力値を1つ取り出す */
@@ -62,7 +64,13 @@ function valueOf(snapshot: AbilitySnapshot, key: GrowableKey): number | undefine
 /** いまの能力値 */
 function currentOf(player: Player, key: GrowableKey): number | undefined {
   if (key === 'velocity') return player.pitching?.velocity
-  if (key === 'control' || key === 'stamina' || key === 'breaking') {
+  if (
+    key === 'control' ||
+    key === 'stamina' ||
+    key === 'breaking' ||
+    key === 'life' ||
+    key === 'sharpness'
+  ) {
     return player.pitching?.[key]
   }
   return player.batting[key]
@@ -140,6 +148,8 @@ function rebuild(player: Player, snapshot: AbilitySnapshot): Player {
             control: snapshot.control,
             stamina: snapshot.stamina ?? player.pitching.stamina,
             breaking: snapshot.breaking ?? player.pitching.breaking,
+            life: snapshot.life ?? player.pitching.life,
+            sharpness: snapshot.sharpness ?? player.pitching.sharpness,
           }
         : player.pitching,
   }

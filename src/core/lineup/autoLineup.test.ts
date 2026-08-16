@@ -455,14 +455,40 @@ describe('打順の組み方', () => {
 
   it('投手も打力どおりの打順に入る', () => {
     // **8番固定をやめた。** 打てる投手を下位に沈めておく理由は無い。
-    // 打順は打力で決まるので、投手だけを特別扱いしない
-    const pitcherOrder = lineup.slots.findIndex((slot) => slot.position === 'P') + 1
-    const pitcher = at(pitcherOrder)
+    // 打順は打力で決まるので、投手だけを特別扱いしない。
+    //
+    // **1チームで「上位に自分より弱い打者がいない」とは測れない。**
+    // 1番は出塁力と走力、3・4番はミートとパワーで選ぶので、
+    // 打力の数字だけを並べると前後する枠がある（枠ごとに評価軸が違う）。
+    // 打てる投手と打てない投手で、平均の打順が分かれることを見る
+    let strongTotal = 0
+    let strongCount = 0
+    let weakTotal = 0
+    let weakCount = 0
 
-    // 投手より打力が低い選手が上位にいない（＝打力の並びが守られている）
-    for (let order = 1; order < pitcherOrder; order++) {
-      expect(battingScore(at(order))).toBeGreaterThanOrEqual(battingScore(pitcher) - 0.001)
+    for (let seed = 100; seed < 130; seed++) {
+      const team = createInitialRoster(createRng(seed))
+      const order = autoLineup(team)
+      const ids = new Map(team.map((p) => [p.id, p]))
+      const nine = order.slots.map((slot) => ids.get(slot.playerId)!)
+      const index = order.slots.findIndex((slot) => slot.position === 'P')
+      if (index < 0) continue
+
+      const pitcher = nine[index]
+      const rank = nine.filter((other) => battingScore(other) > battingScore(pitcher)).length
+
+      if (rank <= 2) {
+        strongTotal += index + 1
+        strongCount++
+      } else if (rank >= 6) {
+        weakTotal += index + 1
+        weakCount++
+      }
     }
+
+    expect(strongCount).toBeGreaterThan(0)
+    expect(weakCount).toBeGreaterThan(0)
+    expect(strongTotal / strongCount).toBeLessThan(weakTotal / weakCount)
   })
 
   it('打てる投手なら上位打線に入ることもある', () => {

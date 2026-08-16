@@ -99,10 +99,43 @@ const TIRED_FACTOR = 0.85
  * 「試合で強い投手」と「自動編成が選ぶ投手」が食い違ってはいけない。
  */
 export function stuffScore(pitching: PitchingAbilities): number {
-  return (
-    velocityScore(pitching.velocity) * VELOCITY_WEIGHT +
-    pitching.breaking * (1 - VELOCITY_WEIGHT)
-  )
+  return straightScore(pitching) * VELOCITY_WEIGHT + breakingScore(pitching) * (1 - VELOCITY_WEIGHT)
+}
+
+/**
+ * ストレートの威力。**球速にノビが掛かる。**
+ *
+ * 同じ140km/hでも、手元で伸びる球は詰まらせ、垂れる球は弾き返される。
+ * 球速（km/h）は現実の分布に縛られていて上限まで数kmしか動かせないので、
+ * 「速くはないが打たれない投手」を作る余地をここに置いた。
+ *
+ * **足し算ではなく掛け算にしてある。** 足すと、球の遅い投手が
+ * ノビだけで速球投手に並んでしまう。ノビは速球の価値を伸縮させるもの。
+ */
+export function straightScore(pitching: PitchingAbilities): number {
+  return velocityScore(pitching.velocity) * qualityFactor(pitching.life)
+}
+
+/**
+ * 変化球の効き。**変化球の総合力にキレが掛かる。**
+ *
+ * 曲がりの小さい投手がキレだけ高くても効果は小さい（掛け算なので）。
+ * 「曲がるか」と「効くか」を分けて持つことで、
+ * 変化球型の投手にも育て方の選択が生まれる。
+ */
+export function breakingScore(pitching: PitchingAbilities): number {
+  return pitching.breaking * qualityFactor(pitching.sharpness)
+}
+
+/**
+ * ノビ・キレの効き方。**50で等倍**（±15%の伸縮）。
+ *
+ * 中央を等倍にしてあるので、この2つを足しても
+ * 投手全体が強くなったり弱くなったりしない
+ * （動くのは「どの投手が強いか」だけ）。
+ */
+function qualityFactor(value: number): number {
+  return 0.85 + (value / 100) * 0.3
 }
 
 export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
@@ -178,7 +211,8 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
     0.16 +
       (stuff - contact) / 420 +
       strikeoutBonus +
-      (pitching ? velocityScore(pitching.velocity) * VELOCITY_STRIKEOUT_RATE : 0),
+      // 空振りを取るのは速球そのもの。ノビはここにも効く
+      (pitching ? straightScore(pitching) * VELOCITY_STRIKEOUT_RATE : 0),
     0.03,
     0.5,
   )

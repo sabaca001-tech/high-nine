@@ -25,17 +25,18 @@ import {
   velocityScore,
 } from '@/core/types/player'
 import { effectOf } from './personality'
-import { improvePitches } from './pitchDefs'
+import { improvePitches, isArsenalComplete } from './pitchDefs'
 import {
   DEFAULT_FOCUS,
   FOCUS_BONUS,
   focusMultiplier,
+  PITCH_COST,
   TRAJECTORY_COST,
 } from './trainingFocus'
 import type { GrowthPlan } from './trainingFocus'
 
 /** 投手能力に属するキー（球速は尺度が違うので別扱い） */
-const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking']
+const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'breaking', 'life', 'sharpness']
 
 /**
  * 球速から決まる肩力の**目安**。
@@ -233,6 +234,12 @@ const PITCH_IMPROVE_CHANCE_PER_STEP = 0.05
  */
 const TRAJECTORY_GAIN_AMOUNT = 4
 
+/**
+ * 球種の練習で1手あたりに溜まる量の基準。
+ * 変化球練習1回ぶん（`PRACTICE_DEFS.breaking` の7）に合わせてある。
+ */
+const PITCH_GAIN_AMOUNT = 7
+
 const SELF_TRAINING_AMOUNT = 2.5
 
 export type PracticeOptions = {
@@ -322,6 +329,40 @@ export function applyPractice(
         if (raised.change) changes.push(raised.change)
       } else {
         current = { ...current, trajectoryProgress: progress }
+      }
+    }
+
+    /*
+     * 球種の練習。
+     *
+     * **変化球が伸びるぶんを持ち球に振り替える。**
+     * 持ち球は「変化球練習に止まったときに、たまに増える」ものだったので、
+     * 何を投げる投手に育てるかを選べなかった。
+     * 溜まりきるたびに1つ覚える（または変化量が1上がる）。
+     */
+    if (current.focus?.type === 'pitch' && current.pitching) {
+      const gain: PracticeGain = { key: 'breaking', amount: PITCH_GAIN_AMOUNT, target: 'pitcher' }
+      const banked = calcGrowth(rng, current, gain, playerMultiplier * FOCUS_BONUS)
+      const progress = (current.pitchProgress ?? 0) + banked
+
+      if (progress >= PITCH_COST) {
+        const result = improvePitches(rng, current.pitching.pitches, current.pitching.breaking, true)
+        current = {
+          ...current,
+          pitching: { ...current.pitching, pitches: result.pitches },
+          pitchProgress: 0,
+          // 覚えるものが無くなったら、続けても意味が無いのでチーム練習へ戻す
+          ...(isArsenalComplete(result.pitches) ? { focus: DEFAULT_FOCUS } : {}),
+        }
+        if (result.learned) {
+          pitchNews.push(`${current.name}が「${result.learned.name}」を覚えた！`)
+        } else if (result.improved) {
+          pitchNews.push(
+            `${current.name}の「${result.improved.name}」の変化が大きくなった（変化量${result.improved.level}）`,
+          )
+        }
+      } else {
+        current = { ...current, pitchProgress: progress }
       }
     }
 
@@ -482,7 +523,7 @@ export function getAbility(player: Player, key: GrowableKey): number | null {
   if (key === 'velocity') return player.pitching?.velocity ?? null
   if (PITCHING_KEYS.includes(key)) {
     if (!player.pitching) return null
-    return player.pitching[key as 'control' | 'stamina' | 'breaking']
+    return player.pitching[key as 'control' | 'stamina' | 'breaking' | 'life' | 'sharpness']
   }
   return player.batting[key as 'meet' | 'power' | 'speed' | 'arm' | 'fielding' | 'catching']
 }

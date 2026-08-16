@@ -91,11 +91,13 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   pitching: {
     kind: 'pitching',
     label: '投球練習',
-    description: '投手のコントロールとスタミナが伸びる',
+    description: '投手のコントロールとノビが伸びる',
     gains: [
       { key: 'control', amount: 6, target: 'pitcher' },
       { key: 'stamina', amount: 4, target: 'pitcher' },
       { key: 'velocity', amount: 3, target: 'pitcher' },
+      // ノビは投げ込みで身につく。速球そのものの威力が上がる
+      { key: 'life', amount: 4, target: 'pitcher' },
     ],
     conditionDelta: -7,
     trustDelta: 0,
@@ -104,8 +106,12 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   breaking: {
     kind: 'breaking',
     label: '変化球練習',
-    description: '投手の変化球が伸びる',
-    gains: [{ key: 'breaking', amount: 7, target: 'pitcher' }],
+    description: '投手の変化球とキレが伸びる',
+    gains: [
+      { key: 'breaking', amount: 7, target: 'pitcher' },
+      // 曲げる練習と、その曲がりを打者に効かせる練習は同じ場でやる
+      { key: 'sharpness', amount: 5, target: 'pitcher' },
+    ],
     conditionDelta: -6,
     trustDelta: 0,
     weight: 3,
@@ -292,6 +298,8 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
       { key: 'control', amount: 6, target: 'pitcher' },
       { key: 'stamina', amount: 6, target: 'pitcher' },
       { key: 'velocity', amount: 4, target: 'pitcher' },
+      { key: 'life', amount: 5, target: 'pitcher' },
+      { key: 'sharpness', amount: 4, target: 'pitcher' },
     ],
     conditionDelta: -10,
     trustDelta: 0,

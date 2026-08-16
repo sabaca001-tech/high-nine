@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
-import { overallRating, toRank, trajectoryAngle, velocityRank } from './rating'
+import { overallRating, pitchingRating, toRank, trajectoryAngle, velocityRank } from './rating'
+import { PITCH_DIRECTION_ORDER } from './pitchDefs'
 import { velocityScore, VELOCITY_MAX } from '@/core/types/player'
+import type { PitchingAbilities } from '@/core/types/player'
 
 describe('toRank', () => {
   it('境界値が正しくランク分けされる', () => {
@@ -106,5 +108,55 @@ describe('velocityRank', () => {
   it('上限まで育てればSに届く', () => {
     // 届かない最高ランクは、無いのと同じ
     expect(velocityRank(VELOCITY_MAX)).toBe('S')
+  })
+})
+
+describe('投手の総合', () => {
+  const base: PitchingAbilities = {
+    velocity: 140,
+    control: 60,
+    stamina: 60,
+    breaking: 60,
+    life: 60,
+    sharpness: 60,
+    pitches: [{ direction: 'left', name: 'スライダー', level: 2 }],
+  }
+
+  it('ノビとキレも総合に効く', () => {
+    expect(pitchingRating({ ...base, life: 90 })).toBeGreaterThan(pitchingRating(base))
+    expect(pitchingRating({ ...base, sharpness: 90 })).toBeGreaterThan(pitchingRating(base))
+  })
+
+  it('球種が多いほど総合が高い', () => {
+    // 3球種を持つ投手と、スライダー1本の投手が同じ総合で並んではいけない
+    const rich: PitchingAbilities = {
+      ...base,
+      pitches: [
+        { direction: 'left', name: 'スライダー', level: 2 },
+        { direction: 'down', name: 'フォーク', level: 2 },
+        { direction: 'lowerLeft', name: 'カーブ', level: 2 },
+      ],
+    }
+    expect(pitchingRating(rich)).toBeGreaterThan(pitchingRating(base))
+  })
+
+  it('変化量が大きいほど総合が高い', () => {
+    const sharp: PitchingAbilities = {
+      ...base,
+      pitches: [{ direction: 'left', name: 'スライダー', level: 6 }],
+    }
+    expect(pitchingRating(sharp)).toBeGreaterThan(pitchingRating(base))
+  })
+
+  it('持ち球ぶんの上乗せには上限がある（集めただけで総合は跳ね上がらない）', () => {
+    const everything: PitchingAbilities = {
+      ...base,
+      pitches: PITCH_DIRECTION_ORDER.map((direction) => ({
+        direction,
+        name: direction,
+        level: 7,
+      })),
+    }
+    expect(pitchingRating(everything) - pitchingRating(base)).toBeLessThanOrEqual(6)
   })
 })

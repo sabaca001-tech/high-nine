@@ -56,6 +56,9 @@ export function rollPitchingFor(rng: Rng, player: Player): PitchingAbilities {
     control: rng.int(ROOKIE_MIN, ROOKIE_MAX),
     stamina: rng.int(ROOKIE_MIN, ROOKIE_MAX),
     breaking,
+    // ノビとキレは投げ込んだ年月で身につくもの。転向したてなら低い
+    life: rng.int(ROOKIE_MIN, ROOKIE_MAX),
+    sharpness: rng.int(ROOKIE_MIN, ROOKIE_MAX),
     pitches: rollInitialPitches(rng, breaking),
   }
 }

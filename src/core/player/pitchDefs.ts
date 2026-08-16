@@ -95,6 +95,31 @@ export function rollInitialPitches(rng: Rng, breaking: number): Pitch[] {
   return pitches
 }
 
+/** 持てる球種の数（方向の数だけ持てる） */
+export const PITCH_MAX_COUNT = PITCH_DIRECTION_ORDER.length
+
+/** これ以上、覚えることも磨くことも無いか */
+export function isArsenalComplete(pitches: readonly Pitch[]): boolean {
+  return (
+    pitches.length >= PITCH_MAX_COUNT && pitches.every((pitch) => pitch.level >= PITCH_MAX_LEVEL)
+  )
+}
+
+/**
+ * 持ち球の充実ぶり（0〜）。
+ *
+ * **球種の数と変化量の両方を見る。** 数だけで測ると
+ * 変化量1の球を6つ持った投手が最高になり、
+ * 変化量だけで測ると1球種を磨き上げた投手と3球種の投手が並ぶ。
+ *
+ * 入学時（1〜2球種・変化量1〜2）で2〜3、
+ * 3球種を変化量4まで磨いた投手で8前後になる。
+ */
+export function arsenalScore(pitches: readonly Pitch[]): number {
+  const levels = pitches.reduce((sum, pitch) => sum + pitch.level, 0)
+  return levels * 0.5 + pitches.length * 0.7
+}
+
 /**
  * 変化球練習の成果を持ち球に反映する。
  *
@@ -105,6 +130,15 @@ export function improvePitches(
   rng: Rng,
   pitches: readonly Pitch[],
   breaking: number,
+  /**
+   * 球種練習として行う場合。
+   *
+   * **総合力に見合う数を超えて覚えられる。** 通常の練習では
+   * 「変化球の総合力に見合う持ち球」までしか増えないので、
+   * 変化球が伸びない投手は何を練習しても1球種のままだった。
+   * 本人が球種の練習を選んだのなら、そこは伸ばせるようにする。
+   */
+  deliberate = false,
 ): { pitches: Pitch[]; learned?: Pitch; improved?: Pitch } {
   // 持ち球が総合力に見合っていなければ、まず新球種を覚える
   const deserved = breaking >= 70 ? 3 : breaking >= 40 ? 2 : 1
@@ -115,7 +149,12 @@ export function improvePitches(
 
   // 伸ばせる球種の中から1つ選んで変化量を上げる
   const growable = pitches.filter((pitch) => pitch.level < PITCH_MAX_LEVEL)
-  if (growable.length === 0) return { pitches: [...pitches] }
+  if (growable.length === 0) {
+    // 磨ける球種が無ければ、球種練習に限り新しい球種を覚える
+    const learned = deliberate ? rollPitch(rng, pitches) : null
+    if (learned) return { pitches: [...pitches, learned], learned }
+    return { pitches: [...pitches] }
+  }
 
   const target = rng.pick(growable)
   const improved = { ...target, level: target.level + 1 }

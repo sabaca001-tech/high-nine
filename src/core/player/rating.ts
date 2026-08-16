@@ -1,7 +1,8 @@
 /** 能力値の表示・評価に関する変換 */
 
-import type { BattingAbilities, PitchingAbilities, Player } from '@/core/types/player'
+import type { BattingAbilities, Pitch, PitchingAbilities, Player } from '@/core/types/player'
 import { velocityScore } from '@/core/types/player'
+import { arsenalScore } from './pitchDefs'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { SkillRank } from '@/core/types/skill'
 
@@ -97,13 +98,33 @@ export function trajectoryAngle(trajectory: number): number {
 export function pitchingRating(p: PitchingAbilities): number {
   // 球速の尺度は types/player.ts に一本化してある。
   // 判定（simulateAtBat）と総合で別々の式を持つと、同じ球速が違う意味になる
-  return Math.round(
+  const base =
     velocityScore(p.velocity) * VELOCITY_SHARE +
-      p.control * 0.26 +
-      p.stamina * 0.18 +
-      p.breaking * 0.26,
-  )
+    p.control * 0.22 +
+    p.stamina * 0.14 +
+    p.breaking * 0.22 +
+    p.life * 0.08 +
+    p.sharpness * 0.08
+
+  return clampRating(base + arsenalRatingBonus(p.pitches))
 }
+
+/**
+ * 持ち球ぶんの上乗せ。
+ *
+ * **持ち球が総合にまったく効いていなかった。** 3球種を変化量5まで磨いた投手と、
+ * スライダー1本の投手が同じ総合で並び、球種を覚えても数字がどこも動かない。
+ * ただし主役は能力値なので、特殊能力（`skillRatingBonus`）と同じく上乗せは小さく取る。
+ */
+export function arsenalRatingBonus(pitches: Pitch[]): number {
+  return Math.min(ARSENAL_BONUS_MAX, arsenalScore(pitches) * ARSENAL_BONUS_RATE)
+}
+
+/** 持ち球の充実ぶり1点あたりの上乗せ */
+const ARSENAL_BONUS_RATE = 0.6
+
+/** 持ち球ぶんの上乗せの上限。球種を集めただけで総合が跳ね上がらないようにする */
+const ARSENAL_BONUS_MAX = 5
 
 /**
  * 総合に占める球速の比重。

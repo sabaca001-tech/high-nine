@@ -237,7 +237,10 @@ describe('positionGrowthMultiplier', () => {
 
   it('チーム全体の成長量は変えない（各ポジションで平均1.0前後）', () => {
     for (const position of ALL_POSITIONS) {
-      const keys = position === 'P' ? [...BATTING, 'velocity', 'control', 'stamina', 'breaking'] : BATTING
+      const keys =
+        position === 'P'
+          ? [...BATTING, 'velocity', 'control', 'stamina', 'breaking', 'life', 'sharpness']
+          : BATTING
       const values = (keys as GrowableKey[]).map((key) =>
         positionGrowthMultiplier(position, key),
       )
@@ -358,7 +361,15 @@ describe('本職の転向', () => {
       ...base,
       isPitcher: true,
       position: 'P',
-      pitching: { velocity: 140, control: 60, stamina: 60, breaking: 60, pitches: [] },
+      pitching: {
+        velocity: 140,
+        control: 60,
+        stamina: 60,
+        breaking: 60,
+        life: 60,
+        sharpness: 60,
+        pitches: [],
+      },
       focus: { type: 'convert', position: 'LF', main: true },
       aptitudes: { ...base.aptitudes, LF: 4 },
     }
@@ -428,7 +439,8 @@ describe('成長の優先順を並べ替える', () => {
   it('投手は投球能力も並べ替えられる', () => {
     const order = defaultGrowthOrder('P')
     expect(order).toContain('velocity')
-    expect(order).toHaveLength(10)
+    // 球速・制球・変化球・ノビ・キレ・スタミナ＋野手6項目
+    expect(order).toHaveLength(12)
 
     const plan = { P: [...order].reverse() }
     const values = order.map((key) => positionGrowthMultiplier('P', key, plan))

@@ -236,6 +236,34 @@ describe('migrate', () => {
     expect(record.name).toBe('旧 太郎')
   })
 
+  it('v39の投手にノビとキレが入る（読み直しても弱くならない）', () => {
+    const state = createInitialState({ seed: 4545 })
+    const v39 = JSON.parse(JSON.stringify({ ...state, version: 39 })) as Record<string, unknown>
+
+    // v39 の形（life / sharpness を持たない）に戻す
+    const players = (v39.players as Record<string, unknown>[]).map((player) => {
+      if (!player.pitching) return player
+      const pitching = { ...(player.pitching as Record<string, unknown>) }
+      delete pitching.life
+      delete pitching.sharpness
+      return { ...player, pitching }
+    })
+
+    const migrated = migrate({ ...v39, players })
+    expect(migrated).not.toBeNull()
+    expect(migrated!.version).toBe(SAVE_VERSION)
+
+    for (const player of migrated!.players) {
+      if (!player.pitching) continue
+      expect(player.pitching.life).toBeGreaterThan(0)
+      expect(player.pitching.sharpness).toBeGreaterThan(0)
+      // 変化球の得意な投手のキレが平均以下に落ちてはいけない
+      expect(player.pitching.sharpness).toBeGreaterThanOrEqual(
+        Math.min(player.pitching.breaking, player.pitching.control) - 1,
+      )
+    }
+  })
+
   it('未来のバージョンは読み込まない', () => {
     const state = createInitialState({ seed: 2 })
     expect(migrate({ ...state, version: SAVE_VERSION + 1 })).toBeNull()
