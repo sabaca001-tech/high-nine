@@ -73,6 +73,12 @@ export const U18_MAX_PER_SCHOOL = 2
 export const U18_MIN_GRADE = 2
 
 /**
+ * 代表に必ず入れる投手の数。
+ * 30人のうち3分の1。投手のいない代表は試合にならない。
+ */
+export const U18_MIN_PITCHERS = 10
+
+/**
  * 名簿を作る前に絞り込む学校数。
  *
  * **全校ぶんの名簿を作ると重い。** 県内だけで178校あり、
@@ -113,7 +119,7 @@ export function selectU18Squad(params: {
 }): U18Squad {
   const { schools, ourPlayers, year, progress, size = U18_SQUAD_SIZE } = params
 
-  const pool: { member: U18Member; rating: number }[] = []
+  const pool: { member: U18Member; rating: number; isPitcher: boolean }[] = []
 
   const addFrom = (schoolId: string | null, players: Player[]) => {
     const picked = players
@@ -131,6 +137,7 @@ export function selectU18Squad(params: {
           snapshot: { ...player, history: [], stats: emptyCareerStats() },
         },
         rating: playerPoints(player),
+        isPitcher: player.isPitcher,
       })
     }
   }
@@ -145,8 +152,23 @@ export function selectU18Squad(params: {
     addFrom(school.id, rivalRoster(school, year, progress))
   }
 
-  const members = pool
-    .sort((a, b) => b.rating - a.rating)
+  const ranked = [...pool].sort((a, b) => b.rating - a.rating)
+
+  /*
+   * **投手の枠を先に取る。**
+   * 評価点だけで30人を切ると、代表が野手30人になる年があった。
+   * 野手は6項目すべてがSになりうるのに対し、投手は球速も持ち球も
+   * その帯まで届きにくいので、上位は野手で埋まる。
+   * 実際の代表も投手を投手として選ぶ（`MIN_SQUAD_PITCHERS` と同じ考え方）。
+   */
+  const chosen = new Set(ranked.filter((entry) => entry.isPitcher).slice(0, U18_MIN_PITCHERS))
+  for (const entry of ranked) {
+    if (chosen.size >= size) break
+    chosen.add(entry)
+  }
+
+  const members = ranked
+    .filter((entry) => chosen.has(entry))
     .slice(0, size)
     .map((entry) => entry.member)
 

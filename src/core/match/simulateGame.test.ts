@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { autoLineup } from '@/core/lineup/autoLineup'
-import { createInitialRoster } from '@/core/player/createPlayer'
+import { createInitialRoster, INITIAL_TALENT } from '@/core/player/createPlayer'
+import { ROSTER_TALENT_RATE } from '@/core/rival/rivalRoster'
 import type { Player } from '@/core/types/player'
 import type { MatchResult, MatchSetup } from '@/core/types/match'
 import { isHit, outsOf } from '@/core/types/match'
@@ -217,17 +218,25 @@ describe('simulateGame', () => {
   })
 
   it('互角の相手なら勝率がおおむね五分になる', () => {
+    /*
+     * **初期部員は弱小校の水準**（`INITIAL_TALENT`）なので、
+     * 戦力0の相手では互角にならない。相手の戦力もそのぶん下げて釣り合わせる
+     * （`balanceCheck` と同じ考え方）。
+     *
+     * 80試合では勝率が±0.1ほど揺れるので、試合数も増やしてある。
+     */
+    const strength = Math.round(INITIAL_TALENT / ROSTER_TALENT_RATE)
     let wins = 0
     let losses = 0
-    const trials = 80
+    const trials = 200
     for (let seed = 0; seed < trials; seed++) {
-      const outcome = play(seed).outcome
+      const outcome = play(seed, strength).outcome
       if (outcome === 'win') wins++
       if (outcome === 'lose') losses++
     }
     const winRate = wins / (wins + losses)
-    expect(winRate).toBeGreaterThan(0.3)
-    expect(winRate).toBeLessThan(0.7)
+    expect(winRate).toBeGreaterThan(0.35)
+    expect(winRate).toBeLessThan(0.65)
   })
 
   it('スコアが極端な値にならない', () => {
@@ -272,13 +281,17 @@ describe('決着必須の試合（大会）', () => {
   })
 
   it('9回で決着していれば延長しない', () => {
+    // **コールドで終わった試合は数えない。** 点差が規定に届けば7回で終わるので、
+    // 「決着していれば9回以上」はコールドのある試合には当てはまらない
     let found = false
-    for (let seed = 0; seed < 40 && !found; seed++) {
+    for (let seed = 0; seed < 60 && !found; seed++) {
       const result = decisive(seed)
-      if (result.finalScore.player !== result.finalScore.opponent) {
-        expect(result.innings.length).toBeGreaterThanOrEqual(9)
-        found = true
-      }
+      if (result.finalScore.player === result.finalScore.opponent) continue
+      if (result.innings.length < 9) continue
+
+      expect(result.innings.length).toBeGreaterThanOrEqual(9)
+      expect(result.innings.length).toBeLessThanOrEqual(9)
+      found = true
     }
     expect(found).toBe(true)
   })

@@ -247,11 +247,8 @@ export function abilityPoints(value: number): number {
  */
 const POINT_SCALE = 5
 
-/** 弾道1段ぶんの評価点。高いほうが少しだけ高く出る */
-const TRAJECTORY_POINTS = 12
-
-/** 持ち球の充実ぶり（`arsenalScore`）1点ぶんの評価点 */
-const ARSENAL_POINTS = 9
+/** 弾道1段ぶんの評価点。**いちばん軽い能力（肩力）より軽く**なるように置く */
+const TRAJECTORY_POINTS = 10
 
 /** 特殊能力ぶんの評価点（`skillRatingBonus` を点数に換算する） */
 const SKILL_POINTS = 5
@@ -270,31 +267,94 @@ export function playerPoints(player: Player): number {
   return Math.round(points + skillRatingBonus(player) * SKILL_POINTS)
 }
 
+/**
+ * 野手の評価に占める重み。**上から順に値打ちが大きい。**
+ *
+ *   パワー ＝ ミート ＞ 守備 ＞ 走力 ＞ 捕球 ＞ 肩力 ＞ 弾道
+ *
+ * 打てなければ試合に出られないので打撃を最上位に置き、
+ * 守備は「守れるかどうか」で起用が決まるぶん走力より重い。
+ * 肩は効く場面が限られるので、能力の中ではいちばん軽い。
+ */
+const BATTER_WEIGHTS = {
+  meet: 0.24,
+  power: 0.24,
+  fielding: 0.18,
+  speed: 0.14,
+  catching: 0.11,
+  arm: 0.09,
+}
+
 function batterPoints(b: BattingAbilities): number {
   const weighted =
-    abilityPoints(b.meet) * 0.25 +
-    abilityPoints(b.power) * 0.25 +
-    abilityPoints(b.speed) * 0.15 +
-    abilityPoints(b.arm) * 0.1 +
-    abilityPoints(b.fielding) * 0.15 +
-    abilityPoints(b.catching) * 0.1
+    abilityPoints(b.meet) * BATTER_WEIGHTS.meet +
+    abilityPoints(b.power) * BATTER_WEIGHTS.power +
+    abilityPoints(b.fielding) * BATTER_WEIGHTS.fielding +
+    abilityPoints(b.speed) * BATTER_WEIGHTS.speed +
+    abilityPoints(b.catching) * BATTER_WEIGHTS.catching +
+    abilityPoints(b.arm) * BATTER_WEIGHTS.arm
 
-  // 弾道は4段階しかないので、能力値と同じ扱いにはできない
+  // 弾道は4段階しかないので、能力値と同じ扱いにはできない。
+  // **いちばん軽い能力（肩力）より軽く**なるように点数を置く
   return weighted * POINT_SCALE + (b.trajectory - 1) * TRAJECTORY_POINTS
+}
+
+/**
+ * 投手の評価に占める重み。**上から順に値打ちが大きい。**
+ *
+ *   球速 ＞ 制球 ＞ 変化量 ＞ キレ ＞ ノビ ＞ 球種 ＞ スタミナ
+ *
+ * **「変化量」と「球種」は別のもの。** 変化量は持ち球がどれだけ曲がるか
+ * （`Pitch.level`）で、球種は何種類投げられるか。
+ * 曲がらない球を6種類持っているより、大きく曲がる球が2つあるほうが強い。
+ * スタミナがいちばん軽いのは、継投で補える唯一の項目だから。
+ */
+export const PITCHER_WEIGHTS = {
+  velocity: 0.26,
+  control: 0.21,
+  breakAmount: 0.16,
+  sharpness: 0.13,
+  life: 0.1,
+  variety: 0.08,
+  stamina: 0.06,
 }
 
 function pitcherPoints(p: PitchingAbilities): number {
   const weighted =
     // 球速は**高校生の物差し**で見る（評価点も高校生どうしを比べる値）
-    abilityPoints(velocityGrade(p.velocity)) * VELOCITY_SHARE +
-    abilityPoints(p.control) * 0.24 +
-    abilityPoints(p.stamina) * 0.16 +
-    abilityPoints(p.sharpness) * 0.2 +
-    abilityPoints(p.life) * 0.1
+    abilityPoints(velocityGrade(p.velocity)) * PITCHER_WEIGHTS.velocity +
+    abilityPoints(p.control) * PITCHER_WEIGHTS.control +
+    abilityPoints(breakAmountScore(p.pitches)) * PITCHER_WEIGHTS.breakAmount +
+    abilityPoints(p.sharpness) * PITCHER_WEIGHTS.sharpness +
+    abilityPoints(p.life) * PITCHER_WEIGHTS.life +
+    abilityPoints(varietyScore(p.pitches)) * PITCHER_WEIGHTS.variety +
+    abilityPoints(p.stamina) * PITCHER_WEIGHTS.stamina
 
-  // 球種の数と変化量も評価に入れる（何を投げられるかは戦力そのもの）
-  return weighted * POINT_SCALE + arsenalScore(p.pitches) * ARSENAL_POINTS
+  return weighted * POINT_SCALE
 }
+
+/**
+ * 持ち球の変化量を、能力値と同じ 0〜100 に直す。
+ * **平均の変化量**で見るので、曲がらない球を増やしても上がらない。
+ *
+ * 変化量3で54、4で72、5で90、6以上で100。
+ * **上の帯まで届かせてある。** 64止まりにしていた頃は、
+ * どれだけ良い持ち球でもCの係数しか掛からず、
+ * 投手だけ評価点が構造的に低く出て**U18代表が野手30人**になった。
+ */
+export function breakAmountScore(pitches: Pitch[]): number {
+  if (pitches.length === 0) return 0
+  const average = pitches.reduce((sum, pitch) => sum + pitch.level, 0) / pitches.length
+  return Math.min(100, Math.round(average * BREAK_AMOUNT_SCALE))
+}
+
+/** 球種の数を 0〜100 に直す。2球種で52、3球種で78、4球種で100 */
+export function varietyScore(pitches: Pitch[]): number {
+  return Math.min(100, pitches.length * VARIETY_SCALE)
+}
+
+const BREAK_AMOUNT_SCALE = 18
+const VARIETY_SCALE = 26
 
 /**
  * 評価点からランクを出す。カードに出す大文字はこれで決める。

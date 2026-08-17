@@ -3,6 +3,9 @@ import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
 import {
   abilityPoints,
+  breakAmountScore,
+  PITCHER_WEIGHTS,
+  varietyScore,
   overallRating,
   pitchingRating,
   playerPoints,
@@ -276,5 +279,78 @@ describe('評価点', () => {
     expect(at(40)).toBe('E')
     expect(at(25)).toBe('F')
     expect(at(15)).toBe('G')
+  })
+})
+
+describe('評価の優先順', () => {
+  /**
+   * **重みの並びが仕様そのもの。**
+   * 「パワー＝ミート＞守備＞走力＞捕球＞肩力＞弾道」のような順序は、
+   * 数字を触ったときにいちばん壊れやすいので縛っておく。
+   */
+  function withAbilities(values: Partial<BattingAbilities>): Player {
+    const base = createPlayer(createRng(1), { id: 'x', grade: 3, isPitcher: false })
+    return {
+      ...base,
+      batting: {
+        trajectory: 2,
+        meet: 60,
+        power: 60,
+        speed: 60,
+        arm: 60,
+        fielding: 60,
+        catching: 60,
+        ...values,
+      },
+      skills: [],
+    }
+  }
+
+  it('野手は パワー＝ミート ＞ 守備 ＞ 走力 ＞ 捕球 ＞ 肩力 ＞ 弾道 の順で効く', () => {
+    const flat = withAbilities({})
+    const gain = (key: keyof BattingAbilities) =>
+      playerPoints(withAbilities({ [key]: 75 })) - playerPoints(flat)
+
+    expect(gain('power')).toBe(gain('meet'))
+    expect(gain('meet')).toBeGreaterThan(gain('fielding'))
+    expect(gain('fielding')).toBeGreaterThan(gain('speed'))
+    expect(gain('speed')).toBeGreaterThan(gain('catching'))
+    expect(gain('catching')).toBeGreaterThan(gain('arm'))
+
+    // 弾道はいちばん軽い能力より軽い
+    const trajectoryGain = playerPoints(withAbilities({ trajectory: 3 })) - playerPoints(flat)
+    expect(trajectoryGain).toBeLessThan(gain('arm'))
+    expect(trajectoryGain).toBeGreaterThan(0)
+  })
+
+  it('投手は 球速 ＞ 制球 ＞ 変化量 ＞ キレ ＞ ノビ ＞ 球種 ＞ スタミナ の順に重い', () => {
+    // 重み（同じ値・同じ伸びを与えたときの効き）で見る
+    const weights = PITCHER_WEIGHTS
+    expect(weights.velocity).toBeGreaterThan(weights.control)
+    expect(weights.control).toBeGreaterThan(weights.breakAmount)
+    expect(weights.breakAmount).toBeGreaterThan(weights.sharpness)
+    expect(weights.sharpness).toBeGreaterThan(weights.life)
+    expect(weights.life).toBeGreaterThan(weights.variety)
+    expect(weights.variety).toBeGreaterThan(weights.stamina)
+
+    // 重みの合計は1。野手と同じ土俵で比べるため
+    const total = Object.values(weights).reduce((sum, value) => sum + value, 0)
+    expect(total).toBeCloseTo(1, 6)
+  })
+
+  it('変化量は「平均」で見る（曲がらない球を増やしても上がらない）', () => {
+    expect(breakAmountScore([{ direction: 'left', name: 'ス', level: 5 }])).toBeGreaterThan(
+      breakAmountScore([
+        { direction: 'left', name: 'ス', level: 5 },
+        { direction: 'down', name: 'フ', level: 1 },
+      ]),
+    )
+    // 球種の数は別に数える
+    expect(varietyScore([{ direction: 'left', name: 'ス', level: 5 }])).toBeLessThan(
+      varietyScore([
+        { direction: 'left', name: 'ス', level: 5 },
+        { direction: 'down', name: 'フ', level: 1 },
+      ]),
+    )
   })
 })

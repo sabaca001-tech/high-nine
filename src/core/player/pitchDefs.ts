@@ -82,7 +82,13 @@ export function rollPitch(rng: Rng, existing: readonly Pitch[]): Pitch | null {
 
 /**
  * 投手を作るときの持ち球。
- * 変化球の総合力が高いほど球種が多い。
+ * キレが高いほど球種が多く、**変化量も大きい**。
+ *
+ * **変化量を1〜2で固定していたのをやめた。** 持ち球は練習でしか育たないので、
+ * 生成されるだけの他校の投手は全員が「曲がらない球を2つ」しか持たず、
+ * 3年生のエースでも持ち球の図が新入生と同じに見えていた。
+ * 評価点は変化量を重く見る（`PITCHER_WEIGHTS.breakAmount`）ので、
+ * そこが低いままだと他校の投手が構造的に低く評価される。
  */
 export function rollInitialPitches(rng: Rng, sharpness: number): Pitch[] {
   const count = sharpness >= 70 ? 3 : sharpness >= 40 ? 2 : 1
@@ -90,9 +96,18 @@ export function rollInitialPitches(rng: Rng, sharpness: number): Pitch[] {
 
   for (let i = 0; i < count; i++) {
     const pitch = rollPitch(rng, pitches)
-    if (pitch) pitches.push(pitch)
+    if (pitch) pitches.push({ ...pitch, level: initialPitchLevel(rng, sharpness) })
   }
   return pitches
+}
+
+/**
+ * 生成時の変化量。キレ70で4、キレ90で5あたり。
+ * 上限は6にしてある（7は練習で磨いた投手だけの領域）。
+ */
+function initialPitchLevel(rng: Rng, sharpness: number): number {
+  const base = 1 + Math.round(sharpness / 24)
+  return Math.max(1, Math.min(6, base + rng.int(-1, 1)))
 }
 
 /** 持てる球種の数（方向の数だけ持てる） */
