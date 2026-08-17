@@ -91,23 +91,48 @@ export function rollPitch(rng: Rng, existing: readonly Pitch[]): Pitch | null {
  * そこが低いままだと他校の投手が構造的に低く評価される。
  */
 export function rollInitialPitches(rng: Rng, sharpness: number): Pitch[] {
-  const count = sharpness >= 70 ? 3 : sharpness >= 40 ? 2 : 1
+  const style = rng.weighted(ARSENAL_STYLES)
+  const count = Math.max(1, Math.min(5, baseCount(sharpness) + style.count))
   const pitches: Pitch[] = []
 
   for (let i = 0; i < count; i++) {
     const pitch = rollPitch(rng, pitches)
-    if (pitch) pitches.push({ ...pitch, level: initialPitchLevel(rng, sharpness) })
+    if (pitch) pitches.push({ ...pitch, level: initialPitchLevel(rng, sharpness, style.level) })
   }
   return pitches
+}
+
+/**
+ * 持ち球の型。**同じキレでも投手の顔つきが変わる。**
+ *
+ * どの投手も「キレなりの球種を、キレなりの変化量で」持っていた頃は、
+ * 持ち球の図がどれも同じ形になり、
+ * 「この投手は決め球で来る」「あの投手は多彩」という読みが生まれなかった。
+ */
+const ARSENAL_STYLES: { value: { count: number; level: number }; weight: number }[] = [
+  // 決め球型。球種は少ないが、1つ1つが大きく曲がる
+  { value: { count: -1, level: 1.35 }, weight: 25 },
+  // 多彩型。種類は多いが、変化量は控えめ
+  { value: { count: 1, level: 0.8 }, weight: 25 },
+  // 標準
+  { value: { count: 0, level: 1 }, weight: 50 },
+]
+
+/** キレに見合う球種の数 */
+function baseCount(sharpness: number): number {
+  if (sharpness >= 85) return 4
+  if (sharpness >= 70) return 3
+  if (sharpness >= 40) return 2
+  return 1
 }
 
 /**
  * 生成時の変化量。キレ70で4、キレ90で5あたり。
  * 上限は6にしてある（7は練習で磨いた投手だけの領域）。
  */
-function initialPitchLevel(rng: Rng, sharpness: number): number {
-  const base = 1 + Math.round(sharpness / 24)
-  return Math.max(1, Math.min(6, base + rng.int(-1, 1)))
+function initialPitchLevel(rng: Rng, sharpness: number, styleRate: number): number {
+  const base = (1 + Math.round(sharpness / 24)) * styleRate
+  return Math.max(1, Math.min(6, Math.round(base) + rng.int(-1, 1)))
 }
 
 /** 持てる球種の数（方向の数だけ持てる） */

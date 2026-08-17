@@ -193,8 +193,12 @@ describe('弱小校からの出発', () => {
    * 基準を0にしていた頃は、無名の学校でも中位校と同じ素材が入ってきて、
    * 「弱いチームを強くする」という出発点にならなかった。
    */
-  it('評判20（初期）の新入生は初期部員と同じ水準', () => {
-    expect(talentFromReputation(REPUTATION_INITIAL)).toBe(INITIAL_TALENT)
+  it('評判20（初期）の新入生は、引き継いだ部員より少しだけ良い', () => {
+    // **出発点は新入生より一段低い。** 無名校のはずが140km/hを投げる3年生を
+    // 抱えていては、「ここから強くする」という出発点にならない。
+    // 最初の新入生が引き継いだ部員より良いのは、監督が来たからでもある
+    expect(talentFromReputation(REPUTATION_INITIAL)).toBeGreaterThan(INITIAL_TALENT)
+    expect(talentFromReputation(REPUTATION_INITIAL) - INITIAL_TALENT).toBeLessThanOrEqual(10)
   })
 
   it('評判が上がるほど良い新入生が来る', () => {

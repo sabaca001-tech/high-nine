@@ -248,8 +248,12 @@ const VELOCITY_KNEE_RATE = 0.26
  * **10では凸凹が足りなかった。** 6項目の平均が素質どおりになるよう
  * 合計を0に揃えているので、幅を広げても総合は動かない。
  * 動くのは「何が得意な選手か」の分かりやすさだけ。
+ *
+ * **評価点が一芸を正当に評価するようになったので、さらに広げてある**
+ * （18→24）。平均で測っていた頃は凸凹が大きいほど損だったが、
+ * いまは「守備は下手だが打つ」が戦力として意味を持つ。
  */
-const ABILITY_SPREAD = 18
+const ABILITY_SPREAD = 24
 
 /**
  * 合計が0になるばらつきを `count` 個作る。
@@ -542,9 +546,12 @@ function round2(value: number): number {
  * **弱小校の水準で作る**（`INITIAL_TALENT`）。
  * 素質どおり（0）だと県内のちょうど真ん中に並んでしまい、
  * 「弱いチームを強くする」という出発点にならなかった。
- * 評判20の新入生（`talentFromReputation`）と同じ水準に揃えてある。
+ *
+ * **-10 では強すぎた。** 無名校のはずが 140km/h を投げる3年生が
+ * 40人に1人の割合でいて、「ここから強くする」という出発点にならない。
+ * 最初の新入生（評判20）より一段低いところから始める。
  */
-export const INITIAL_TALENT = -10
+export const INITIAL_TALENT = -18
 
 export function createInitialRoster(
   rng: Rng,

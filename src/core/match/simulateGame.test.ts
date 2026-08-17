@@ -472,7 +472,11 @@ function reachedBlowout(result: MatchResult): boolean {
 
 describe('大差の試合', () => {
   /** こちらが大きく格上。序盤で試合が壊れる組み合わせ */
-  const LOPSIDED = -28
+  /**
+   * 大差がつく相手の戦力。
+   * **初期部員を弱くしたぶん、こちらも下げてある**（-28では7点差がつかない年が増えた）。
+   */
+  const LOPSIDED = -40
 
   it('大差がつくと投手が交代する（先発が完投しない）', () => {
     let blowouts = 0

@@ -2804,9 +2804,19 @@ describe('ライバル校', () => {
     // 夏の地区大会を優勝して全国へ出るまで進める
     let found = false
 
-    // 鳥取（24校＝5回戦）でも全国に届くのは稀なので、何度も試す
+    /*
+     * 鳥取（24校＝5回戦）でも全国に届くのは稀なので、何度も試す。
+     *
+     * **1年目では届かない。** 初期部員は弱小校の水準（`INITIAL_TALENT`）で、
+     * 引き継いだチームのまま県を勝ち抜けることはまず無い。
+     * 何年か育ててから探す。
+     */
     for (let seed = 8000; seed < 8600 && !found; seed++) {
       let state = startedGame({ seed, regionId: 'tottori' })
+      for (let year = 0; year < 4; year++) {
+        state = playUntilYearEnd(state, { chooseCard: (s) => s.hand[0].id })
+        state = applyCommand(state, { type: 'advanceYear' }).state
+      }
 
       for (let guard = 0; guard < 600 && !found; guard++) {
         if (state.phase === 'yearEnd') break
