@@ -23,7 +23,7 @@ import type { TrainingFocus } from '@/core/player/trainingFocus'
 import { effectOf } from '@/core/player/personality'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
-import { overallRating, toRank, TRAJECTORY_LABELS, velocityRank } from '@/core/player/rating'
+import { playerPoints, pointsRank, toRank, TRAJECTORY_LABELS, velocityRank } from '@/core/player/rating'
 import type { Rank } from '@/core/player/rating'
 import { TrajectoryArrow } from '@/ui/components/TrajectoryArrow'
 import { findSkill } from '@/core/skill/skillDefs'
@@ -84,8 +84,8 @@ export function PlayerDetailScreen() {
   const player = game?.players.find((p) => p.id === selectedPlayerId)
   if (!game || !player) return null
 
-  const rating = overallRating(player)
-  const rank = toRank(rating)
+  const points = playerPoints(player)
+  const rank = pointsRank(points)
 
   const profileStyle = {
     // ヘッダーの色はポジション系統から取る（帽子はチーム共通なので区別にならない）
@@ -150,7 +150,12 @@ export function PlayerDetailScreen() {
         </div>
         <div className={styles.overall}>
           <div className={styles.overallRank}>{rank}</div>
-          <div className={styles.overallLabel}>総合{rating}</div>
+          {/*
+            **総合（加重平均）ではなく評価点。**
+            平均で測ると、突き抜けた一芸が平均に薄められて
+            「オールCのほうが上」という並びになっていた
+          */}
+          <div className={styles.overallLabel}>評価{points}</div>
         </div>
       </div>
 

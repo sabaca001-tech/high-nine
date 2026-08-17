@@ -1,6 +1,6 @@
 import { eventText, findPlayerEvent } from '@/core/event/playerEvents'
 import { formatFunds } from '@/core/shop/funds'
-import { overallRating, toRank } from '@/core/player/rating'
+import { playerPoints, pointsRank } from '@/core/player/rating'
 import { POSITION_LABELS } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
@@ -45,7 +45,7 @@ export function PlayerEventScreen() {
             <span className={styles.name}>{player.name}</span>
             <span className={styles.meta}>
               {player.grade}年 / {POSITION_LABELS[player.position]} / 総合{' '}
-              {toRank(overallRating(player))}
+              {pointsRank(playerPoints(player))}
             </span>
           </div>
         </div>

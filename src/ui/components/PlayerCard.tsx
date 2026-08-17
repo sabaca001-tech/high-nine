@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { overallRating, toRank, velocityRank } from '@/core/player/rating'
+import { playerPoints, pointsRank, velocityRank } from '@/core/player/rating'
 import {
   ABILITY_LABELS,
   MOTIVATION_LABELS,
@@ -102,8 +102,8 @@ export function PlayerCard({
   badge?: ReactNode
   footer?: ReactNode
 }) {
-  const rating = overallRating(player)
-  const rank = toRank(rating)
+  const points = playerPoints(player)
+  const rank = pointsRank(points)
 
   const [family, given] = splitName(player.name)
 

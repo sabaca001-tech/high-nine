@@ -10,7 +10,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import type { Player } from '@/core/types/player'
-import { overallRating } from './rating'
+import { playerPoints } from './rating'
 import { raiseAbility } from './growth'
 import type { AbilityChange, GrowableKey } from '@/core/types/player'
 
@@ -35,10 +35,13 @@ export type U18Outcome = {
  * 活躍すれば大きく伸び、通用しなければ経験だけが残る。
  */
 export function playU18(rng: Rng, player: Player, year: number): U18Outcome {
-  const rating = overallRating(player)
-  // 総合78で平均45、総合95で平均80くらい。上振れ下振れが大きい
+  /*
+   * **選考と同じ物差しで測る。** 総合（加重平均）で活躍度を出していた頃は、
+   * 評価点で選ばれた一芸型が、来た途端に「通用しなかった」と判定されていた。
+   * 評価点780（全能力A手前）で平均40、1190（全能力S級）で平均76くらい。
+   */
   const performance = clamp(
-    Math.round((rating - 60) * 2.2 + rng.int(-22, 22)),
+    Math.round((playerPoints(player) - 340) * 0.09 + rng.int(-22, 22)),
     0,
     100,
   )

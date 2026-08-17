@@ -7,7 +7,7 @@ import { formatInnings } from '@/core/player/careerStats'
 import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
 import type { GrowthRange } from '@/core/player/growthReport'
 import { ABILITY_LABELS } from '@/core/types/player'
-import { overallRating, ratingLabel, toRank } from '@/core/player/rating'
+import { overallRating, playerPoints, pointsRank, ratingLabel, toRank } from '@/core/player/rating'
 import { lineupRatingOf, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import type { Player } from '@/core/types/player'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
@@ -621,11 +621,11 @@ function U18Row({
           </span>
           <span
             className={styles.u18Rank}
-            style={{ color: rankColorOf(toRank(overallRating(player))) }}
+            style={{ color: rankColorOf(pointsRank(playerPoints(player))) }}
           >
-            {toRank(overallRating(player))}
+            {pointsRank(playerPoints(player))}
           </span>
-          <span className={styles.u18Rating}>{overallRating(player)}</span>
+          <span className={styles.u18Rating}>{playerPoints(player)}</span>
         </span>
       ) : (
         <span className={styles.u18Stats}>

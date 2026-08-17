@@ -11,7 +11,7 @@
  * 指定が無い・部員が入れ替わったときだけ、総合上位で埋め直す。
  */
 
-import { overallRating } from './rating'
+import { playerPoints } from './rating'
 import type { AutoLineupPlan } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
@@ -56,11 +56,20 @@ const GRADE_BONUS: Record<Grade, number> = {
  * 「若手優先で組んだのにベンチ入りは3年生ばかり」という食い違いが出る。
  */
 export function squadPriority(player: Player, plan: AutoLineupPlan = 'balanced'): number {
-  const rating = overallRating(player)
+  // **評価点で並べる。** 総合（加重平均）だと、一芸のある選手が
+  // 平均的な選手に埋もれてベンチ外に落ちていた
+  const rating = playerPoints(player)
   if (plan === 'ability') return rating
-  if (plan === 'youth') return rating + YOUTH_PLAN_BONUS[player.grade]
-  return rating + GRADE_BONUS[player.grade]
+  if (plan === 'youth') return rating + YOUTH_PLAN_BONUS[player.grade] * POINTS_PER_RATING
+  return rating + GRADE_BONUS[player.grade] * POINTS_PER_RATING
 }
+
+/**
+ * 学年の下駄（`YOUTH_TIEBREAK` など）は**総合（0〜100）の刻み**で置いてある。
+ * 評価点はおおよそその6倍の刻みなので、ここで換算する。
+ * 換算を忘れると、下駄が誤差に埋もれて「若手優先」が効かなくなる。
+ */
+const POINTS_PER_RATING = 6
 
 /** 「若手優先」でベンチ入りに足す下駄。スタメンの `YOUTH_PLAN_BONUS` と揃える */
 const YOUTH_PLAN_BONUS: Record<Grade, number> = {

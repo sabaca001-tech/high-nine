@@ -4,7 +4,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ALL_POSITIONS, defenseScore, isPlayable } from '@/core/lineup/aptitude'
 import { AUTO_LINEUP_PLANS, validateLineup } from '@/core/lineup/autoLineup'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
-import { overallRating, toRank } from '@/core/player/rating'
+import { playerPoints, pointsRank, toRank } from '@/core/player/rating'
 import { TrajectoryArrow } from '@/ui/components/TrajectoryArrow'
 import { PitchChart } from '@/ui/components/PitchChart'
 import { PitcherStats } from '@/ui/components/PitcherStats'
@@ -544,7 +544,7 @@ type AbilityView = 'pitching' | 'batting'
  * 既定はその選手の本職（投手なら投手能力）。
  */
 function AbilityPanel({ player }: { player: Player }) {
-  const rank = toRank(overallRating(player))
+  const rank = pointsRank(playerPoints(player))
   const [view, setView] = useState<AbilityView>(player.pitching ? 'pitching' : 'batting')
 
   return (

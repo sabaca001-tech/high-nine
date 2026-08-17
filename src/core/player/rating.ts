@@ -210,3 +210,110 @@ function clampRating(value: number): number {
   return Math.min(100, Math.max(1, Math.round(value)))
 }
 
+/**
+ * 評価点。**総合（0〜100）の代わりに、一芸を正しく評価するための点数。**
+ *
+ * 総合は能力の加重平均だったので、
+ * **オールCの選手が、ミートとパワーだけSで他がGの選手より上**に出ていた。
+ * 平均で測る限りこうなるが、実際の野球は違う。
+ * 打てる選手はそれだけで使いどころがあるし、
+ * 150km/hを投げる投手は他が並でも一線で通用する。
+ * 代表がどれも同じ顔（万能型）で埋まるのも、平均で選んでいたため。
+ *
+ * **高い能力ほど1点の値打ちを上げる**（`RANK_MULTIPLIER`）。
+ * Sの能力は1点あたり2.5点として数えるので、
+ * 突き抜けた一芸は平均を大きく押し上げる。
+ */
+export const RANK_MULTIPLIER: Record<Rank, number> = {
+  S: 2.5,
+  A: 2,
+  B: 1.7,
+  C: 1.5,
+  D: 1.3,
+  E: 1.2,
+  F: 1.1,
+  G: 1,
+}
+
+/** 能力値1つぶんの値打ち。ランクが上がるほど1点が重くなる */
+export function abilityPoints(value: number): number {
+  return value * RANK_MULTIPLIER[toRank(value)]
+}
+
+/**
+ * 評価点の刻み。
+ * 平凡な高校生（オールD＝50）で325点、
+ * 全国区（オールA＝85）で850点あたりになるように置いた。
+ */
+const POINT_SCALE = 5
+
+/** 弾道1段ぶんの評価点。高いほうが少しだけ高く出る */
+const TRAJECTORY_POINTS = 12
+
+/** 持ち球の充実ぶり（`arsenalScore`）1点ぶんの評価点 */
+const ARSENAL_POINTS = 9
+
+/** 特殊能力ぶんの評価点（`skillRatingBonus` を点数に換算する） */
+const SKILL_POINTS = 5
+
+/**
+ * その選手の評価点。**投手は投げる力だけ、野手は打って守る力だけ**で決まる。
+ *
+ * 重みは総合（`battingRating` / `pitchingRating`）と同じで、
+ * 違うのは**能力値をそのまま足さず、ランクの係数を掛けてから足す**ところ。
+ */
+export function playerPoints(player: Player): number {
+  const points = player.isPitcher && player.pitching
+    ? pitcherPoints(player.pitching)
+    : batterPoints(player.batting)
+
+  return Math.round(points + skillRatingBonus(player) * SKILL_POINTS)
+}
+
+function batterPoints(b: BattingAbilities): number {
+  const weighted =
+    abilityPoints(b.meet) * 0.25 +
+    abilityPoints(b.power) * 0.25 +
+    abilityPoints(b.speed) * 0.15 +
+    abilityPoints(b.arm) * 0.1 +
+    abilityPoints(b.fielding) * 0.15 +
+    abilityPoints(b.catching) * 0.1
+
+  // 弾道は4段階しかないので、能力値と同じ扱いにはできない
+  return weighted * POINT_SCALE + (b.trajectory - 1) * TRAJECTORY_POINTS
+}
+
+function pitcherPoints(p: PitchingAbilities): number {
+  const weighted =
+    // 球速は**高校生の物差し**で見る（評価点も高校生どうしを比べる値）
+    abilityPoints(velocityGrade(p.velocity)) * VELOCITY_SHARE +
+    abilityPoints(p.control) * 0.24 +
+    abilityPoints(p.stamina) * 0.16 +
+    abilityPoints(p.sharpness) * 0.2 +
+    abilityPoints(p.life) * 0.1
+
+  // 球種の数と変化量も評価に入れる（何を投げられるかは戦力そのもの）
+  return weighted * POINT_SCALE + arsenalScore(p.pitches) * ARSENAL_POINTS
+}
+
+/**
+ * 評価点からランクを出す。カードに出す大文字はこれで決める。
+ * 境界は「全能力がそのランクちょうどの選手」の点数に合わせてある。
+ */
+export function pointsRank(points: number): Rank {
+  for (const { rank, min } of POINT_THRESHOLDS) {
+    if (points >= min) return rank
+  }
+  return 'G'
+}
+
+const POINT_THRESHOLDS: { rank: Rank; min: number }[] = [
+  { rank: 'S', min: 1050 }, // 全能力90で1125
+  { rank: 'A', min: 800 }, // 全能力85で850
+  { rank: 'B', min: 580 }, // 全能力70で595
+  { rank: 'C', min: 440 }, // 全能力60で450
+  { rank: 'D', min: 320 }, // 全能力50で325
+  { rank: 'E', min: 230 }, // 全能力40で240
+  { rank: 'F', min: 130 }, // 全能力25で137
+  { rank: 'G', min: 0 },
+]

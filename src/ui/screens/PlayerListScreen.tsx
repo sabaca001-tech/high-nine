@@ -1,4 +1,4 @@
-import { overallRating } from '@/core/player/rating'
+import { playerPoints } from '@/core/player/rating'
 import { firstSquadSet } from '@/core/player/squad'
 import type { Player } from '@/core/types/player'
 import { isInHallOfFame } from '@/core/types/career'
@@ -21,7 +21,7 @@ export function PlayerListScreen() {
 
   // ベンチ入りとベンチ外を分けて見せる
   const firstSquad = firstSquadSet(game.squad)
-  const sorted = [...game.players].sort((a, b) => overallRating(b) - overallRating(a))
+  const sorted = [...game.players].sort((a, b) => playerPoints(b) - playerPoints(a))
   const first = sorted.filter((player) => firstSquad.has(player.id))
   const second = sorted.filter((player) => !firstSquad.has(player.id))
 

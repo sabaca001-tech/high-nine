@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
 import {
+  abilityPoints,
   overallRating,
   pitchingRating,
+  playerPoints,
+  pointsRank,
   proVelocityRank,
   toRank,
   trajectoryAngle,
@@ -14,7 +17,7 @@ import { velocityGrade, velocityScore, VELOCITY_MAX } from '@/core/types/player'
 
 /** 良い順。2つの物差しを比べるのに使う */
 const RANK_ORDER = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
-import type { PitchingAbilities } from '@/core/types/player'
+import type { BattingAbilities, PitchingAbilities, Player } from '@/core/types/player'
 
 describe('toRank', () => {
   it('境界値が正しくランク分けされる', () => {
@@ -185,5 +188,96 @@ describe('投手の総合', () => {
       })),
     }
     expect(pitchingRating(everything) - pitchingRating(base)).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('評価点', () => {
+  const batter = (b: Partial<BattingAbilities>): Player =>
+    createPlayer(createRng(1), { id: 'x', grade: 3, isPitcher: false })
+
+  /** 能力値だけを指定した野手を作る */
+  function withAbilities(values: Partial<BattingAbilities>): Player {
+    const base = batter({})
+    return {
+      ...base,
+      batting: {
+        trajectory: 2,
+        meet: 60,
+        power: 60,
+        speed: 60,
+        arm: 60,
+        fielding: 60,
+        catching: 60,
+        ...values,
+      },
+      skills: [],
+    }
+  }
+
+  it('高い能力ほど1点の値打ちが上がる', () => {
+    // G×1 → S×2.5。同じ「+10」でも、上の帯のほうがずっと大きい
+    expect(abilityPoints(20)).toBe(20)
+    expect(abilityPoints(60)).toBe(90)
+    expect(abilityPoints(90)).toBe(225)
+  })
+
+  it('一芸に突き抜けた選手が、オールCより高く出る', () => {
+    // **これが総合（加重平均）ではできなかったこと。**
+    // ミートとパワーがSで他がGの選手は、平均で測るとオールCより下になる
+    const allC = withAbilities({})
+    const specialist = withAbilities({
+      meet: 90,
+      power: 90,
+      speed: 20,
+      arm: 20,
+      fielding: 20,
+      catching: 20,
+    })
+
+    expect(overallRating(specialist)).toBeLessThan(overallRating(allC))
+    expect(playerPoints(specialist)).toBeGreaterThan(playerPoints(allC))
+  })
+
+  it('弾道が高いほうが少しだけ高く出る', () => {
+    const flat = withAbilities({ trajectory: 1 })
+    const arch = withAbilities({ trajectory: 4 })
+    expect(playerPoints(arch)).toBeGreaterThan(playerPoints(flat))
+    // ただし能力ひとつぶんの差にはならない
+    expect(playerPoints(arch) - playerPoints(flat)).toBeLessThan(50)
+  })
+
+  it('投手は持ち球の数と変化量も評価に入る', () => {
+    const base = createPlayer(createRng(3), { id: 'p', grade: 3, isPitcher: true })
+    const rich: Player = {
+      ...base,
+      pitching: {
+        ...base.pitching!,
+        pitches: [
+          { direction: 'left', name: 'スライダー', level: 5 },
+          { direction: 'down', name: 'フォーク', level: 5 },
+          { direction: 'lowerLeft', name: 'カーブ', level: 4 },
+        ],
+      },
+    }
+    const poor: Player = {
+      ...base,
+      pitching: { ...base.pitching!, pitches: [{ direction: 'left', name: 'スライダー', level: 1 }] },
+    }
+
+    expect(playerPoints(rich)).toBeGreaterThan(playerPoints(poor))
+  })
+
+  it('ランクの境界は「全能力がそのランクちょうど」に合わせてある', () => {
+    const at = (value: number) =>
+      pointsRank(playerPoints(withAbilities({ meet: value, power: value, speed: value, arm: value, fielding: value, catching: value, trajectory: 1 })))
+
+    expect(at(90)).toBe('S')
+    expect(at(85)).toBe('A')
+    expect(at(70)).toBe('B')
+    expect(at(60)).toBe('C')
+    expect(at(50)).toBe('D')
+    expect(at(40)).toBe('E')
+    expect(at(25)).toBe('F')
+    expect(at(15)).toBe('G')
   })
 })

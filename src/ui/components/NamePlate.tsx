@@ -1,5 +1,5 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { toRank, overallRating } from '@/core/player/rating'
+import { playerPoints, pointsRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { plateGradient, rankColorOf } from '@/ui/theme/playerColors'
 import { useLongPress } from './useLongPress'
@@ -45,8 +45,8 @@ export function NamePlate({
   onLongPress?: () => void
   onHandlePointerDown?: (event: ReactPointerEvent) => void
 } & Record<string, unknown>) {
-  const rating = overallRating(player)
-  const rank = toRank(rating)
+  const points = playerPoints(player)
+  const rank = pointsRank(points)
 
   const style = {
     background: plateGradient(player),
@@ -84,11 +84,11 @@ export function NamePlate({
       {lead !== undefined && <span className={styles.lead}>{lead}</span>}
       <span className={styles.name}>{player.name}</span>
       {/*
-        総合力は**名前のすぐ横**に出す。
+        評価点は**名前のすぐ横**に出す。
         誰と誰を入れ替えるかは結局この数字で決めるので、
         1人ずつタップして能力を開かないと比べられないのでは編成にならない
       */}
-      <span className={styles.rating}>{rating}</span>
+      <span className={styles.rating}>{points}</span>
       <span className={styles.grade}>{player.grade}年</span>
       {trailing}
     </div>

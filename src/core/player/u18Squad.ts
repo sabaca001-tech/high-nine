@@ -24,7 +24,7 @@ import { isAvailable } from '@/core/types/player'
 import type { RivalSchool } from '@/core/rival/rivals'
 import { rivalRoster } from '@/core/rival/rivalRoster'
 import { emptyCareerStats } from './careerStats'
-import { overallRating } from './rating'
+import { playerPoints } from './rating'
 
 /**
  * 代表に入った1人。**選手そのものは持たない。**
@@ -97,6 +97,10 @@ function ceilingOf(school: RivalSchool): number {
  *
  * 全国の学校から実力順に、1校2人まで。自校の部員も同じ土俵で並べる。
  * **相対評価なので、周りが育てば基準も上がる。**
+ *
+ * **並べるのは総合ではなく評価点**（`playerPoints`）。
+ * 加重平均で選んでいた頃は、どの能力もそこそこという万能型ばかりが集まり、
+ * 代表名簿が同じ顔で埋まっていた。一芸に突き抜けた選手も選ばれるようにする。
  */
 export function selectU18Squad(params: {
   schools: RivalSchool[]
@@ -114,7 +118,7 @@ export function selectU18Squad(params: {
   const addFrom = (schoolId: string | null, players: Player[]) => {
     const picked = players
       .filter((player) => isAvailable(player) && player.grade >= U18_MIN_GRADE)
-      .sort((a, b) => overallRating(b) - overallRating(a))
+      .sort((a, b) => playerPoints(b) - playerPoints(a))
       .slice(0, U18_MAX_PER_SCHOOL)
 
     for (const player of picked) {
@@ -126,7 +130,7 @@ export function selectU18Squad(params: {
           grade: player.grade,
           snapshot: { ...player, history: [], stats: emptyCareerStats() },
         },
-        rating: overallRating(player),
+        rating: playerPoints(player),
       })
     }
   }

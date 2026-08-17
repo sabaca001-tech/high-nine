@@ -6,7 +6,7 @@ import { PitchChart } from './PitchChart'
 import { TrajectoryArrow } from './TrajectoryArrow'
 import { rivalRoster } from '@/core/rival/rivalRoster'
 import type { RivalSchool } from '@/core/rival/rivals'
-import { overallRating, toRank } from '@/core/player/rating'
+import { playerPoints, toRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './OpponentRoster.module.css'
@@ -66,7 +66,7 @@ export function OpponentRoster({
         {lineup.slots.map((slot, index) => {
           const player = byId.get(slot.playerId)
           if (!player) return null
-          const rating = overallRating(player)
+          const rating = playerPoints(player)
 
           const showing = detailId === player.id
 
