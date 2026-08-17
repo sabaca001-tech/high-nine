@@ -9,6 +9,7 @@ import {
   isInHallOfFame,
 } from '@/core/types/career'
 import { emptyCareerStats } from '@/core/player/careerStats'
+import { proVelocityRank, velocityRank } from '@/core/player/rating'
 import {
   advanceCareer,
   createAlumnus,
@@ -522,19 +523,19 @@ describe('球速とドラフト', () => {
    * 球速を無視していた頃は、制球とスタミナだけが良い138km/hの投手が
    * 毎年のように指名されていた。
    */
-  it('150km/h が分かれ目', () => {
-    expect(velocityDraftBonus(150)).toBe(0)
-    expect(velocityDraftBonus(145)).toBe(-10)
-    expect(velocityDraftBonus(155)).toBe(10)
+  it('143km/h が分かれ目（高校生の球速の帯に合わせてある）', () => {
+    expect(velocityDraftBonus(143)).toBe(0)
+    expect(velocityDraftBonus(138)).toBe(-10)
+    expect(velocityDraftBonus(148)).toBe(10)
     expect(velocityDraftBonus(undefined)).toBe(0)
   })
 
   it('速いほど有利、遅いほど不利（振り切れても止まる）', () => {
     expect(velocityDraftBonus(120)).toBe(-20)
-    expect(velocityDraftBonus(170)).toBe(16)
+    expect(velocityDraftBonus(160)).toBe(16)
   })
 
-  it('145km/h の投手は、150km/h の投手より高い総合が要る', () => {
+  it('遅い投手は、速い投手より高い総合が要る', () => {
     const chance = (rating: number, velocity: number) => {
       let pro = 0
       for (let seed = 1; seed <= 300; seed++) {
@@ -542,10 +543,51 @@ describe('球速とドラフト', () => {
       }
       return pro / 300
     }
-    expect(chance(86, 152)).toBeGreaterThan(chance(86, 145))
-    // 145km/h でも、他が突出していれば届く
-    expect(chance(98, 145)).toBeGreaterThan(0)
-    // 140km/h の平凡な投手はまず指名されない
-    expect(chance(80, 140)).toBe(0)
+    expect(chance(86, 148)).toBeGreaterThan(chance(86, 138))
+    // 球が遅くても、他が突出していれば届く
+    expect(chance(98, 138)).toBeGreaterThan(0)
+    // 平凡な投手はまず指名されない
+    expect(chance(80, 133)).toBe(0)
+  })
+})
+
+describe('プロ入りと球速', () => {
+  /**
+   * **プロに入っても球速そのものは落ちない。**
+   * 落ちるのは高校基準の総合のほう（`toProAbility`）で、
+   * 150km/h は高校生なら一級品でもプロでは普通、という違いは
+   * ランクの物差し（`proVelocityRank`）で表す。
+   */
+  it('卒業時の球速がそのまま残る', () => {
+    const alumnus = createAlumnus(createRng(4), {
+      id: 'p1',
+      name: '速球 太郎',
+      isPitcher: true,
+      position: 'P',
+      year: 3,
+      rating: 88,
+      skills: [],
+      highSchool: emptyCareerStats(),
+      finalAbilities: {
+        year: 3,
+        month: 3,
+        meet: 40,
+        power: 40,
+        speed: 40,
+        arm: 70,
+        fielding: 40,
+        catching: 40,
+        velocity: 149,
+        control: 70,
+        stamina: 70,
+        life: 60,
+        sharpness: 70,
+      },
+    })
+
+    expect(alumnus.finalAbilities?.velocity).toBe(149)
+    // 高校生なら A、プロの物差しなら C
+    expect(velocityRank(149)).toBe('A')
+    expect(proVelocityRank(149)).toBe('C')
   })
 })

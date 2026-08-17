@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createPlayer } from './createPlayer'
-import { overallRating, pitchingRating, toRank, trajectoryAngle, velocityRank } from './rating'
+import {
+  overallRating,
+  pitchingRating,
+  proVelocityRank,
+  toRank,
+  trajectoryAngle,
+  velocityRank,
+} from './rating'
 import { PITCH_DIRECTION_ORDER } from './pitchDefs'
-import { velocityScore, VELOCITY_MAX } from '@/core/types/player'
+import { velocityGrade, velocityScore, VELOCITY_MAX } from '@/core/types/player'
+
+/** 良い順。2つの物差しを比べるのに使う */
+const RANK_ORDER = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
 import type { PitchingAbilities } from '@/core/types/player'
 
 describe('toRank', () => {
@@ -71,29 +81,47 @@ describe('overallRating', () => {
 
 describe('velocityRank', () => {
   /**
-   * **球速のランクは他の能力より遠い。**
-   * 変化球やスタミナは練習で90まで届くが、160km/h（S）は高校生ではまず出ない。
+   * **高校生の物差し。** 物理の尺度（`velocityScore`）でランクを付けていた頃は、
+   * S（160km/h以上）に構造上ほぼ誰も届かず、
+   * 高校生の球速はどれだけ鍛えてもD〜Bの帯に固まっていた。
    */
   it('5km/h ごとに1ランク上がる', () => {
-    expect(velocityRank(129)).toBe('G')
-    expect(velocityRank(130)).toBe('F')
-    expect(velocityRank(135)).toBe('E')
-    expect(velocityRank(140)).toBe('D')
-    expect(velocityRank(145)).toBe('C')
-    expect(velocityRank(150)).toBe('B')
-    expect(velocityRank(155)).toBe('A')
+    expect(velocityRank(119)).toBe('G')
+    expect(velocityRank(120)).toBe('F')
+    expect(velocityRank(125)).toBe('E')
+    expect(velocityRank(130)).toBe('D')
+    expect(velocityRank(135)).toBe('C')
+    expect(velocityRank(140)).toBe('B')
+    expect(velocityRank(145)).toBe('A')
+    expect(velocityRank(150)).toBe('S')
     expect(velocityRank(160)).toBe('S')
   })
 
   it('境界の1km/h手前は下のランクのまま', () => {
-    for (const km of [134, 139, 144, 149, 154, 159]) {
+    for (const km of [124, 129, 134, 139, 144, 149]) {
       expect(velocityRank(km)).not.toBe(velocityRank(km + 1))
     }
   })
 
-  it('表示のランクと尺度が一致する（画面と判定でずれない）', () => {
+  it('プロの物差しでは、同じ球速がひとつ下の帯になる', () => {
+    // 球速そのものは落ちない。変わるのは比べる相手のほう
+    expect(proVelocityRank(150)).toBe('B')
+    expect(proVelocityRank(155)).toBe('A')
+    expect(proVelocityRank(160)).toBe('S')
+    expect(proVelocityRank(140)).toBe('D')
+
+    for (let km = 120; km <= 165; km++) {
+      // 高校生の物差しのほうが必ず甘い（同じか上のランクになる）
+      expect(RANK_ORDER.indexOf(velocityRank(km))).toBeLessThanOrEqual(
+        RANK_ORDER.indexOf(proVelocityRank(km)),
+      )
+    }
+  })
+
+  it('表示のランクと物差しが一致する（画面と判定でずれない）', () => {
     for (let km = 100; km <= 170; km++) {
-      expect(velocityRank(km)).toBe(toRank(velocityScore(km)))
+      expect(velocityRank(km)).toBe(toRank(velocityGrade(km)))
+      expect(proVelocityRank(km)).toBe(toRank(velocityScore(km)))
     }
   })
 

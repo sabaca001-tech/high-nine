@@ -72,7 +72,7 @@ const VELOCITY_WEIGHT = 0.8
  * **`velocityScore` の対応表か `VELOCITY_WEIGHT` を触ったら、ここも測り直す**
  * （`balanceCheck.test.ts` の打率と平均得点を見る）。
  */
-const STUFF_BASELINE = 6
+const STUFF_BASELINE = -11
 
 /**
  * 球速が三振に効く分。球速スコア1点あたりの三振率への加算。
@@ -82,7 +82,7 @@ const STUFF_BASELINE = 6
  * 速球そのものが空振りを取るぶんを別に足す。
  * 球速スコア50（140km/h）で+2.0%、90（160km/h）で+3.6%。
  */
-const VELOCITY_STRIKEOUT_RATE = 0.0004
+const VELOCITY_STRIKEOUT_RATE = 0.00052
 
 /**
  * 「消耗している」とみなすスタミナ係数。

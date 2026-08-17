@@ -141,8 +141,15 @@ export function velocityDraftBonus(velocity?: number): number {
   return clampRange(Math.round((velocity - DRAFT_VELOCITY_LINE) * 2), -20, 16)
 }
 
-/** ここを超えると指名が現実味を帯びる球速(km/h) */
-const DRAFT_VELOCITY_LINE = 150
+/**
+ * ここを超えると指名が現実味を帯びる球速(km/h)。
+ *
+ * **高校生の球速の帯に合わせてある。** 150にしていた頃は、
+ * 生成される投手の帯（3年生の中央値137km/h）から遠すぎて、
+ * ほとんどの投手が下限（-20）に張り付いていた。
+ * いまはAランク（145km/h）の少し手前に置いてある。
+ */
+const DRAFT_VELOCITY_LINE = 143
 
 /**
  * プロ入りしたときに能力をプロの物差しへ置き換える。

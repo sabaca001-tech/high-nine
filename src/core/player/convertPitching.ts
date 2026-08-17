@@ -19,11 +19,13 @@ import { rollInitialPitches } from './pitchDefs'
 /**
  * 肩力から見込める球速。
  *
- * `armFromVelocity`（50 + 球速スコア×0.55）の逆算。
- * 肩力80なら球速スコア55、つまり142km/h あたりが目安になる。
+ * `armFromVelocity`（58 + 球速スコア×0.55）の逆算。
+ * 肩力80なら球速スコア40、つまり135km/h あたりが目安になる。
+ * **切片は `ARM_BASE` と揃える。** ずれると、肩の強い野手が
+ * マウンドに上がった途端にありえない球速になる。
  */
 function velocityFromArm(arm: number): number {
-  const score = Math.max(0, (arm - 50) / 0.55)
+  const score = Math.max(0, (arm - 58) / 0.55)
   // velocityScore の刻み（実際に投げる帯では 10点＝5km/h）で戻す
   return 115 + score * 0.5
 }

@@ -33,7 +33,7 @@ import {
   MOTIVATION_LABELS,
   POSITION_LABELS,
   snapshotOf,
-  velocityScore,
+  velocityGrade,
 } from '@/core/types/player'
 import type { AbilitySnapshot, GrowableKey, Player } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
@@ -189,11 +189,12 @@ function AbilityTab({ player }: { player: Player }) {
             球速も他の能力と同じ並びで出す。**色とランクを揃える。**
             揃っていなかった頃は、球速だけが常に同じ色で
             「速いのか遅いのか」がここでは読めなかった。
-            ゲージは km/h ではなく尺度（velocityScore）で伸ばす
+            ゲージは km/h ではなく高校生の物差し（velocityGrade）で伸ばす。
+            ランクと同じ物差しにしないと、Aなのにゲージは半分、という見え方になる
           */}
           <AbilityRow
             label={ABILITY_LABELS.velocity}
-            value={velocityScore(player.pitching.velocity)}
+            value={velocityGrade(player.pitching.velocity)}
             display={`${player.pitching.velocity} km/h`}
             rank={velocityRank(player.pitching.velocity)}
           />
@@ -417,7 +418,7 @@ function GrowthTab({ player, year, month }: { player: Player; year: number; mont
             title={ABILITY_LABELS.velocity}
             points={pointsOf((s) => s.velocity)}
             min={110}
-            max={165}
+            max={155}
             unit="km/h"
           />
           <AbilityChart title={ABILITY_LABELS.control} points={pointsOf((s) => s.control)} />

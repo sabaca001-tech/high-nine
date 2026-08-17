@@ -1,7 +1,7 @@
 /** 能力値の表示・評価に関する変換 */
 
 import type { BattingAbilities, Pitch, PitchingAbilities, Player } from '@/core/types/player'
-import { velocityScore } from '@/core/types/player'
+import { velocityGrade, velocityScore } from '@/core/types/player'
 import { arsenalScore } from './pitchDefs'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { SkillRank } from '@/core/types/skill'
@@ -45,14 +45,28 @@ export function toRank(value: number): Rank {
 }
 
 /**
- * 球速のランク。
+ * 球速のランク。**高校生の物差しで付ける。**
  *
- * **他の能力と同じ物差しで色を付けるための関数。**
- * 球速だけ km/h の実数値なので、そのままではランクの色が付けられなかった。
- * `velocityScore` の対応表がランクの境界に合わせてあるので、
- * ここは素直に通すだけでよい（130でF、140でD、160でS）。
+ * 物理の尺度（`velocityScore`）をそのままランクにしていた頃は、
+ * S（160km/h以上）に構造上ほぼ誰も届かず、
+ * 高校生の球速はどれだけ鍛えてもD〜Bの帯に固まっていた。
+ *
+ *   120km/h → F ／ 130 → D ／ 140 → B ／ 145 → A ／ 150以上 → S
  */
 export function velocityRank(velocity: number): Rank {
+  return toRank(velocityGrade(velocity))
+}
+
+/**
+ * プロの物差しでの球速のランク。**OB名鑑で使う。**
+ *
+ * プロ入りしても球速そのものは落ちない（落ちるのは高校基準の総合のほう）。
+ * 変わるのは**比べる相手**で、150km/h は高校生なら一級品でも
+ * プロでは普通なので、そこはランクの側で表す。
+ *
+ *   130km/h → F ／ 140 → D ／ 150 → B ／ 155 → A ／ 160以上 → S
+ */
+export function proVelocityRank(velocity: number): Rank {
   return toRank(velocityScore(velocity))
 }
 
@@ -99,7 +113,9 @@ export function pitchingRating(p: PitchingAbilities): number {
   // 球速の尺度は types/player.ts に一本化してある。
   // 判定（simulateAtBat）と総合で別々の式を持つと、同じ球速が違う意味になる
   const base =
-    velocityScore(p.velocity) * VELOCITY_SHARE +
+    // **総合は高校生どうしを比べる値**なので、球速も高校生の物差しで見る
+    // （物理の尺度で見ると、球速の帯が低いぶん投手だけ総合が沈む）
+    velocityGrade(p.velocity) * VELOCITY_SHARE +
     p.control * 0.24 +
     p.stamina * 0.16 +
     p.sharpness * 0.20 +

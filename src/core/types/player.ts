@@ -159,16 +159,17 @@ export const VELOCITY_MAX = 165
 /**
  * 球速と 0〜100 の尺度の対応表。
  *
- * **ランクの境界（`rating.ts` の `RANK_THRESHOLDS`）にぴったり合わせてある。**
- * こうしておくと `toRank(velocityScore(v))` がそのまま球速のランクになり、
- * 画面に出るランクと判定に使う値がずれない。
+ * **これは「球そのものの速さ」の物差し。**
+ * 試合の判定・総合・肩力・成長の頭打ちは、すべてこの尺度で動く。
+ * 尺度がひとつでないと、同じ球速が場所によって違う意味になる。
  *
- *   130km/h → F ／ 135 → E ／ 140 → D ／ 145 → C
- *   150 → B ／ 155 → A ／ 160 → S
+ *   130km/h → 25 ／ 135 → 40 ／ 140 → 50 ／ 145 → 60
+ *   150 → 70 ／ 155 → 80 ／ 160 → 90
  *
- * **他の投手能力より S が遠い。** 変化球やスタミナは練習で90まで届くが、
- * 160km/h は高校生ではまず出ない。そのぶん1ランクの重みを大きくしてある
- * （`simulateAtBat` の `VELOCITY_WEIGHT` と `VELOCITY_STRIKEOUT_RATE`）。
+ * **画面に出すランクは別の物差し**（`velocityGrade`）。
+ * 150km/h は高校生なら文句なしの一級品だが、プロでは普通で、
+ * 同じ球速でも「高校生としてどうか」と「プロとしてどうか」は違う。
+ * ここは物理の値なので動かさない。プロの物差しとしてはそのまま使える。
  *
  * 以前は 115km/h で0・150km/h で100 の直線だった。
  * 140km/h が71（B相当）になり、**平凡な速球が良い球に見えていた**。
@@ -194,20 +195,58 @@ const VELOCITY_ANCHORS: { km: number; score: number }[] = [
  * それぞれ別の式を持っていて、同じ球速が画面と判定で違う意味になっていた。
  */
 export function velocityScore(velocity: number): number {
-  const first = VELOCITY_ANCHORS[0]
-  const last = VELOCITY_ANCHORS[VELOCITY_ANCHORS.length - 1]
+  return interpolate(VELOCITY_ANCHORS, velocity)
+}
+
+/** 対応表の間を直線で埋める。表の外は端の値で止める */
+function interpolate(anchors: { km: number; score: number }[], velocity: number): number {
+  const first = anchors[0]
+  const last = anchors[anchors.length - 1]
   if (velocity <= first.km) return first.score
   if (velocity >= last.km) return last.score
 
-  for (let i = 1; i < VELOCITY_ANCHORS.length; i++) {
-    const to = VELOCITY_ANCHORS[i]
+  for (let i = 1; i < anchors.length; i++) {
+    const to = anchors[i]
     if (velocity > to.km) continue
 
-    const from = VELOCITY_ANCHORS[i - 1]
+    const from = anchors[i - 1]
     const ratio = (velocity - from.km) / (to.km - from.km)
     return from.score + (to.score - from.score) * ratio
   }
   return last.score
+}
+
+/**
+ * 高校生の物差しでの球速（0〜100）。**画面のランクとゲージはこちらを使う。**
+ *
+ * 物理の尺度（`velocityScore`）をそのままランクにしていた頃は、
+ * S（160km/h以上）に構造上ほぼ誰も届かず、
+ * **高校生の球速はどれだけ鍛えてもD〜Bの帯に固まっていた**。
+ * 145km/h を投げる高校生は「C」ではなく、その世代の一級品として読みたい。
+ *
+ * `RANK_THRESHOLDS` の境界にぴったり合わせてあるので、
+ * `toRank(velocityGrade(v))` がそのままランクになる。
+ *
+ *   120km/h → F ／ 125 → E ／ 130 → D ／ 135 → C
+ *   140 → B ／ 145 → A ／ 150 → S
+ *
+ * プロの物差しは `velocityScore` のほう（150でB・155でA・160でS）。
+ */
+const HS_VELOCITY_ANCHORS: { km: number; score: number }[] = [
+  { km: VELOCITY_MIN, score: 0 },
+  { km: 115, score: 10 },
+  { km: 120, score: 25 }, // F
+  { km: 125, score: 40 }, // E
+  { km: 130, score: 50 }, // D
+  { km: 135, score: 60 }, // C
+  { km: 140, score: 70 }, // B
+  { km: 145, score: 80 }, // A
+  { km: 150, score: 90 }, // S
+  { km: VELOCITY_MAX, score: 100 },
+]
+
+export function velocityGrade(velocity: number): number {
+  return interpolate(HS_VELOCITY_ANCHORS, velocity)
 }
 
 /**

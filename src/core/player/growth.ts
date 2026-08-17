@@ -60,7 +60,12 @@ export function armFromVelocity(velocity: number): number {
   )
 }
 
-const ARM_BASE = 50
+/**
+ * **球速の帯を下げたぶん、ここで戻してある。**
+ * 生成の切片（`VELOCITY_INTERCEPT`）を115→108にしたとき、
+ * 同じ投手の球速スコアが14ほど下がり、肩力だけが一律に8下がった。
+ */
+const ARM_BASE = 58
 const ARM_RATE = 0.55
 
 /** 生成時に肩力へ乗せる個体差（±）。「球速の割に肩が強い／弱い」を作る */

@@ -4,7 +4,7 @@ import type { Alumnus, CareerStatus, ProSeason } from '@/core/types/career'
 import { ageAt, CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
 import { ABILITY_LABELS } from '@/core/types/player'
 import type { AbilitySnapshot } from '@/core/types/player'
-import { toRank } from '@/core/player/rating'
+import { proVelocityRank, toRank, velocityRank } from '@/core/player/rating'
 import { AbilityChart } from '@/ui/components/AbilityChart'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -215,7 +215,14 @@ function FinalAbilities({ alumnus }: { alumnus: Alumnus }) {
             <span key={key} className={styles.final}>
               <span className={styles.finalLabel}>{ABILITY_LABELS[key as 'meet']}</span>
               <span className={styles.finalValue}>
-                {key === 'velocity' ? `${value}` : toRank(value)}
+                {/*
+                  **球速はプロに入っても落ちない。** 変わるのは比べる相手のほうで、
+                  150km/h は高校生なら一級品でも、プロでは普通。
+                  プロ入りした選手だけプロの物差しでランクを付ける
+                */}
+                {key === 'velocity'
+                  ? `${value} ${isInHallOfFame(alumnus) ? proVelocityRank(value) : velocityRank(value)}`
+                  : toRank(value)}
               </span>
             </span>
           )
