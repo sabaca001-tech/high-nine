@@ -62,7 +62,10 @@
 }
 
 .rowLabel {
-  flex: 0 0 7em;
+  /* **折り返させない。** 「スタメンの評価／点」のように途中で切れて読めなくなる */
+  flex: 0 0 auto;
+  min-width: 7em;
+  white-space: nowrap;
   font-size: 10px;
   color: var(--text-sub);
 }

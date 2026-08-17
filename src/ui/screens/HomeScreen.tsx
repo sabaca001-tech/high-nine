@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { overallRating } from '@/core/player/rating'
+import { teamPoints } from '@/core/player/rating'
 import { reputationGrade, REPUTATION_GRADE_LABELS } from '@/core/types/season'
 import { findRegion } from '@/core/types/region'
 import { dayOfCell, formatDay } from '@/core/calendar/days'
@@ -105,10 +105,14 @@ function TeamStats({ game }: { game: GameState }) {
     )
 
   const condition = average((p) => p.condition)
+  // チームの強さは**スタメンの評価点の合計**。平均だと一芸が埋もれる
+  const starters = new Set(game.lineup.slots.map((slot) => slot.playerId))
+  const starterPoints = teamPoints(game.players.filter((player) => starters.has(player.id)))
 
   return (
     <div className={styles.teamStats}>
-      <Stat label="能力" value={`${average(overallRating)}`} />
+      {/* チームの強さは**スタメンの評価点の合計**。平均だと一芸が埋もれる */}
+      <Stat label="評価" value={starterPoints.toLocaleString('ja-JP')} />
       <Stat label="体力" value={`${condition}`} low={condition < 40} />
       <Stat label="信頼" value={`${average((p) => p.trust)}`} />
       <Stat

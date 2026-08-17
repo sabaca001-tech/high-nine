@@ -7,9 +7,15 @@ import { formatInnings } from '@/core/player/careerStats'
 import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
 import type { GrowthRange } from '@/core/player/growthReport'
 import { ABILITY_LABELS } from '@/core/types/player'
-import { overallRating, playerPoints, pointsRank, ratingLabel, toRank } from '@/core/player/rating'
-import { lineupRatingOf, seasonProgressOfCell } from '@/core/rival/rivalRoster'
-import type { Player } from '@/core/types/player'
+import {
+  playerPoints,
+  pointsRank,
+  teamPoints,
+  teamPointsLabel,
+  teamPointsRank,
+  toRank,
+} from '@/core/player/rating'
+import { lineupPointsOf, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import { FIRST_SQUAD_SIZE } from '@/core/player/squad'
 import {
   formatRecord,
@@ -131,9 +137,7 @@ function TeamTab() {
   const squad = new Set(game.squad)
   const starters = new Set(game.lineup.slots.map((slot) => slot.playerId))
   const injured = game.players.filter((player) => player.injuryMonths > 0).length
-  const average =
-    game.players.reduce((total, player) => total + overallRating(player), 0) /
-    Math.max(1, game.players.length)
+  const starterPoints = teamPoints(game.players.filter((player) => starters.has(player.id)))
 
   return (
     <>
@@ -160,11 +164,12 @@ function TeamTab() {
         <Row label="ベンチ入り" value={`${squad.size} / ${FIRST_SQUAD_SIZE}人`} />
         <Row label="ベンチ外" value={`${game.players.length - squad.size}人`} />
         <Row label="怪我で離脱中" value={`${injured}人`} />
-        <Row label="平均総合" value={average.toFixed(1)} />
-        <Row
-          label="スタメンの平均"
-          value={averageOf(game.players.filter((p) => starters.has(p.id))).toFixed(1)}
-        />
+        {/*
+          **平均ではなく合計の評価点で出す。** 平均は穴の無さを測る値なので、
+          飛び抜けた選手を抱えたチームが平らなチームに埋もれる。
+          他校の一覧と同じ「スタメン9人ぶん」なので、そのまま見比べられる
+        */}
+        <Row label="スタメン評価" value={teamPointsLabel(starterPoints)} />
       </Section>
 
       <Section title="編成を変える">
@@ -340,7 +345,7 @@ function pickRivals(
   limit: number,
   year: number,
   progress: number,
-): { school: RivalSchool; rating: number }[] {
+): { school: RivalSchool; points: number }[] {
   // **良い代を抱えた学校が埋もれないよう、在校3代を均した力で絞る。**
   // `strength` だけで切ると、台頭してきた学校が一覧に出てこない。
   // 力は**先に1回だけ計算する**（比較のたびに出すと8000校で374msかかった）
@@ -351,14 +356,14 @@ function pickRivals(
   }))
   ranked.sort((a, b) => b.power - a.power)
 
-  // 実測（`lineupRatingOf`）は1校0.2msかかるので、**候補を絞ってから測る**。
+  // 実測（`lineupPointsOf`）は1校0.2msかかるので、**候補を絞ってから測る**。
   // 8000校を全部測ると1.6秒かかって画面が固まる
   return ranked
     .filter((entry, index) => index < limit * 2 || hasMet(recordOf(entry.school)))
-    .map(({ school }) => ({ school, rating: lineupRatingOf(school, year, progress) }))
+    .map(({ school }) => ({ school, points: lineupPointsOf(school, year, progress) }))
     // **勝っている学校を上に出す。** 強豪は戦績で決まる
     .sort(
-      (a, b) => prestigeOf(b.school) - prestigeOf(a.school) || b.rating - a.rating,
+      (a, b) => prestigeOf(b.school) - prestigeOf(a.school) || b.points - a.points,
     )
     .slice(0, limit)
 }
@@ -471,8 +476,8 @@ function RivalsTab() {
         「もっと見る」でも上限（`RIVAL_LIST_MAX`）までしか出さない。
       */}
       <Section title={`${findRegion(game.regionId).name}の学校（${localAll.length}校）`}>
-        {localShown.map(({ school, rating }) => (
-          <RivalRow key={school.id} school={school} rating={rating} />
+        {localShown.map(({ school, points }) => (
+          <RivalRow key={school.id} school={school} points={points} />
         ))}
         {localLimit < RIVAL_LIST_MAX && localAll.length > localShown.length && (
           <button
@@ -490,8 +495,8 @@ function RivalsTab() {
         全部並べると7,900行になるので、県内と同じく強い順に上位だけ出す
       */}
       <Section title={`県外の学校（${nationalAll.length}校）`}>
-        {nationalShown.map(({ school, rating }) => (
-          <RivalRow key={school.id} school={school} rating={rating} showRegion />
+        {nationalShown.map(({ school, points }) => (
+          <RivalRow key={school.id} school={school} points={points} showRegion />
         ))}
         {nationalLimit < RIVAL_LIST_MAX && nationalAll.length > nationalShown.length && (
           <button
@@ -638,12 +643,12 @@ function U18Row({
 
 function RivalRow({
   school,
-  rating,
+  points,
   showRegion,
 }: {
   school: RivalSchool
-  /** スタメン9人の平均総合。親でまとめて実測している */
-  rating: number
+  /** スタメン9人の評価点の合計。親でまとめて実測している */
+  points: number
   showRegion?: boolean
 }) {
   const game = useGameStore((s) => s.game)!
@@ -679,9 +684,9 @@ function RivalRow({
         </span>
         <span
           className={styles.rivalStrength}
-          style={{ color: rankColorOf(toRank(Math.round(rating))) }}
+          style={{ color: rankColorOf(teamPointsRank(points)) }}
         >
-          {ratingLabel(rating)}
+          {teamPointsLabel(points)}
         </span>
         <span className={styles.rivalCaret}>{open ? '▴' : '▾'}</span>
       </button>
@@ -900,11 +905,6 @@ function HelpTab() {
       ))}
     </>
   )
-}
-
-function averageOf(players: Player[]): number {
-  if (players.length === 0) return 0
-  return players.reduce((total, player) => total + overallRating(player), 0) / players.length
 }
 
 /** 「+3」「-2」のように符号を付ける */

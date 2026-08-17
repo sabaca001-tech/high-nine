@@ -18,7 +18,7 @@
 import { createRng } from '@/core/rng/random'
 import { dayOfCell, seasonProgressOfDay } from '@/core/calendar/days'
 import { createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
-import { overallRating } from '@/core/player/rating'
+import { overallRating, teamPoints } from '@/core/player/rating'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
 import type { RivalPlayer, RivalSchool } from './rivals'
@@ -350,15 +350,33 @@ export function lineupRatingOf(
   /** 年度の進み具合（0〜1）。既定は年度の真ん中 */
   progress = 0.5,
 ): number {
+  const starters = lineupOf(school, year, progress)
+  if (starters.length === 0) return 0
+  return starters.reduce((sum, player) => sum + overallRating(player), 0) / starters.length
+}
+
+/**
+ * その学校のスタメン9人の**評価点の合計**。画面に出すのはこちら。
+ *
+ * **平均総合では強豪が読めない。** 平均は穴の無さを測る値なので、
+ * 飛び抜けた選手を抱えた学校が平らな学校に埋もれる。
+ * 強豪は平均が高いとは限らず、点数が高い。
+ */
+export function lineupPointsOf(
+  school: RivalSchool,
+  year: number,
+  progress = 0.5,
+): number {
+  return teamPoints(lineupOf(school, year, progress))
+}
+
+/** その学校のスタメン9人。名簿は種から作り直すので、試合で当たる顔ぶれと一致する */
+function lineupOf(school: RivalSchool, year: number, progress: number): Player[] {
   const roster = rivalRoster(school, year, progress)
   const lineup = autoLineup(roster)
   const byId = new Map(roster.map((player) => [player.id, player]))
 
-  const ratings = lineup.slots
+  return lineup.slots
     .map((slot) => byId.get(slot.playerId))
     .filter((player): player is Player => player !== undefined)
-    .map(overallRating)
-
-  if (ratings.length === 0) return 0
-  return ratings.reduce((sum, value) => sum + value, 0) / ratings.length
 }

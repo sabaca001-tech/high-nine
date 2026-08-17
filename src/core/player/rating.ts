@@ -377,3 +377,39 @@ const POINT_THRESHOLDS: { rank: Rank; min: number }[] = [
   { rank: 'F', min: 130 }, // 全能力25で137
   { rank: 'G', min: 0 },
 ]
+
+/** スタメンの人数。チームの評価点はこの9人ぶんで数える */
+export const LINEUP_SIZE = 9
+
+/**
+ * チームの評価点。**スタメンの合計。**
+ *
+ * **平均で出すのをやめた。** 平均は「穴が無いか」を測るものなので、
+ * 飛び抜けた選手を抱えた学校が平らな学校に埋もれる。
+ * 強豪は平均が高いとは限らず、**点数が高い**。
+ * 選手ひとりの評価点（`playerPoints`）と地続きの数字になるので、
+ * 「この学校はうちのエース何人ぶんか」がそのまま読める。
+ */
+export function teamPoints(players: Player[]): number {
+  return players.reduce((sum, player) => sum + playerPoints(player), 0)
+}
+
+/**
+ * 総合（0〜100）しか分からない相手のチーム評価点。
+ *
+ * その大会限りの相手には名簿が無いので、
+ * **その総合の選手が9人並んだ**と見なして点数に直す。
+ */
+export function teamPointsFromRating(rating: number): number {
+  return Math.round(abilityPoints(rating) * POINT_SCALE * LINEUP_SIZE)
+}
+
+/** チームの評価点のランク。1人あたりに直して見る */
+export function teamPointsRank(points: number, size = LINEUP_SIZE): Rank {
+  return pointsRank(points / Math.max(1, size))
+}
+
+/** 「B 5,412」のような表記 */
+export function teamPointsLabel(points: number, size = LINEUP_SIZE): string {
+  return `${teamPointsRank(points, size)} ${Math.round(points).toLocaleString('ja-JP')}`
+}

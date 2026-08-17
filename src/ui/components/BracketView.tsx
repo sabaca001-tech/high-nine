@@ -3,9 +3,9 @@ import type { Bracket, BracketTeam } from '@/core/tournament/bracket'
 import { blocksOf, matchesAt, survivorsAt } from '@/core/tournament/bracket'
 import type { BracketBlock } from '@/core/tournament/bracket'
 import { roundName } from '@/core/types/tournament'
-import { ratingLabel } from '@/core/player/rating'
+import { teamPointsFromRating, teamPointsLabel } from '@/core/player/rating'
 import { opponentRating } from '@/core/season/matchReputation'
-import { lineupRatingOf } from '@/core/rival/rivalRoster'
+import { lineupPointsOf } from '@/core/rival/rivalRoster'
 import { prestigeLabel } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import styles from './BracketView.module.css'
@@ -51,13 +51,15 @@ export function BracketView({
   const decided = bracket.winners.length >= shown
 
   /**
-   * その相手のスタメン平均総合。
+   * その相手のスタメンの評価点。
    * **実在の学校なら実測する。** 甲子園はその大会限りの代表校も混ざるので、
    * 学校が見つからないときだけ戦力から見込みを立てる。
    */
   const rate = (team: BracketTeam): number => {
     const school = team.schoolId ? schools.find((item) => item.id === team.schoolId) : undefined
-    return school ? lineupRatingOf(school, year, progress) : opponentRating(team.strength)
+    return school
+      ? lineupPointsOf(school, year, progress)
+      : teamPointsFromRating(opponentRating(team.strength))
   }
 
   return (
@@ -176,7 +178,7 @@ function BlockList({
                 >
                   {grade && <span className={styles.grade}>{grade}</span>}
                   {team.name}
-                  <span className={styles.strength}>{ratingLabel(rating)}</span>
+                  <span className={styles.strength}>{teamPointsLabel(rating)}</span>
                 </span>
               ))}
               {rest > 0 && <span className={styles.more}>他{rest}校</span>}
@@ -215,7 +217,7 @@ function Side({
   return (
     <span className={classNames.join(' ')}>
       {team ? team.name : '不戦勝'}
-      {team && <span className={styles.strength}>{ratingLabel(rate(team))}</span>}
+      {team && <span className={styles.strength}>{teamPointsLabel(rate(team))}</span>}
     </span>
   )
 }
@@ -243,7 +245,7 @@ function SurvivorList({
             className={team.ours ? `${styles.chip} ${styles.chipOurs}` : styles.chip}
           >
             {team.name}
-            <span className={styles.strength}>{ratingLabel(rate(team))}</span>
+            <span className={styles.strength}>{teamPointsLabel(rate(team))}</span>
           </span>
         ))}
         {rest > 0 && <span className={styles.more}>他{rest}校</span>}
