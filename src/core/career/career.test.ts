@@ -583,7 +583,7 @@ describe('プロ入りと球速', () => {
         life: 60,
         sharpness: 70,
       },
-    })
+    }, 60)
 
     expect(alumnus.finalAbilities?.velocity).toBe(149)
     // 高校生なら A、プロの物差しなら C
