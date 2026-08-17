@@ -18,6 +18,7 @@ import type { Rng } from '@/core/rng/random'
 import type { Aptitude, GrowableKey, Player, Position } from '@/core/types/player'
 import { rollPitchingFor } from './convertPitching'
 import { isArsenalComplete } from './pitchDefs'
+import type { PitchGoal } from './pitchDefs'
 
 /** 練習方針 */
 export type TrainingFocus =
@@ -48,11 +49,14 @@ export type TrainingFocus =
    *
    * **キレを上げるのとは別のこと。**
    * キレは「変化球そのものの強さ」で、こちらは「何を投げられるか」。
-   * 積み上げた練習量が届くたびに、球種をひとつ覚えるか変化量が1上がる。
+   * 積み上げた練習量が届くたびに、持ち球がひとつ動く。
+   *
+   * **何を狙うかは選べる。** 球種を増やせば的が絞らせず、
+   * 変化量を上げれば1球で仕留められる。どちらの投手にするかは監督が決める。
    *
    * 弾道と違って**上限まで続く**（覚えるものが無くなったら自動で終わる）。
    */
-  | { type: 'pitch' }
+  | { type: 'pitch'; goal: PitchGoal }
 
 export const DEFAULT_FOCUS: TrainingFocus = { type: 'team' }
 
@@ -268,6 +272,7 @@ export function isSameFocus(a: TrainingFocus, b: TrainingFocus): boolean {
   if (a.type === 'convert' && b.type === 'convert') {
     return a.position === b.position && (a.main ?? false) === (b.main ?? false)
   }
+  if (a.type === 'pitch' && b.type === 'pitch') return a.goal === b.goal
   return true
 }
 
@@ -364,6 +369,6 @@ export function focusLabel(focus: TrainingFocus | undefined, labels: Record<stri
     return value.main ? `${value.position}へ本職転向` : `${value.position}を練習`
   }
   if (value.type === 'trajectory') return '弾道'
-  if (value.type === 'pitch') return '球種'
+  if (value.type === 'pitch') return value.goal === 'break' ? '変化量' : '球種'
   return 'チーム練習'
 }

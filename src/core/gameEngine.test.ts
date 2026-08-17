@@ -80,6 +80,19 @@ function stepCard(state: GameState, cardId?: string): GameState {
  * 練習試合の相手選びまで来ていたら、**県内（遠征費0）の相手**を選ぶ。
  * 相手を選ぶまで試合は始まらないので、試合を調べるテストはこれを通す。
  */
+/**
+ * 試合を終えて、成長の報告を閉じたところまで進める。
+ *
+ * **試合のあとは必ず「試合での成長」で足を止める**ようになったので、
+ * `finishMatch` の直後はまだ盤面に戻っていない。
+ */
+function endMatch(state: GameState): GameState {
+  const after = applyCommand(state, { type: 'finishMatch' }).state
+  return after.phase === 'growthReport'
+    ? applyCommand(after, { type: 'closeGrowthReport' }).state
+    : after
+}
+
 function acceptFriendly(state: GameState): GameState {
   if (state.phase !== 'matchOffer' || !state.pendingOffers) return state
   const home = state.pendingOffers.find((offer) => offer.travelCost === 0)
@@ -760,7 +773,7 @@ describe('大会', () => {
     expect(playing.phase).toBe('match')
     expect(playing.pendingMatch).not.toBeNull()
 
-    const after = applyCommand(playing, { type: 'finishMatch' }).state
+    const after = endMatch(playing)
     expect(after.tournament!.results).toHaveLength(1)
 
     const result = after.tournament!.results[0]
@@ -777,10 +790,9 @@ describe('大会', () => {
       const inTournament = untilTournament(startedGame({ seed }))
       const cell = inTournament.boardPosition
 
-      const after = applyCommand(
+      const after = endMatch(
         runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state),
-        { type: 'finishMatch' },
-      ).state
+      )
       if (after.tournament!.eliminated) continue
 
       // その場から動かず、盤面の先に次の回戦のマスがある
@@ -800,10 +812,9 @@ describe('大会', () => {
   it('敗退すると残りの回戦のマスも消える', () => {
     for (let seed = 200; seed < 240; seed++) {
       const inTournament = untilTournament(startedGame({ seed }))
-      const after = applyCommand(
+      const after = endMatch(
         runMatch(applyCommand(inTournament, { type: 'playTournamentMatch' }).state),
-        { type: 'finishMatch' },
-      ).state
+      )
       if (!after.tournament!.eliminated) continue
 
       const finished = applyCommand(after, { type: 'finishTournament' }).state
@@ -855,7 +866,8 @@ describe('大会', () => {
       return
     }
     throw new Error('地区大会に優勝するシードが見つからない')
-  })
+    // **明示的な上限を書く。** 12年ぶんを何シードも回すので、既定の5秒では足りない
+  }, 300_000)
 
   it('1つ勝つたびにチームが伸びる（大会の終わりではなく試合ごと）', () => {
     // 伸びは小さいので、**総合が1上がるまで丸められて見えない**シードもある。
@@ -2058,7 +2070,7 @@ describe('投手の疲労', () => {
       boardPosition: 0,
     }
     const stopped = acceptFriendly(stepCard(state))
-    return applyCommand(runMatch(stopped), { type: 'finishMatch' }).state
+    return endMatch(runMatch(stopped))
   }
 
   it('投げた投手に疲労が溜まる', () => {

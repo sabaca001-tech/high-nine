@@ -38,7 +38,7 @@ export function GrowthReport() {
   return (
     <div className={styles.overlay} onClick={handleClose}>
       <div className={styles.sheet} onClick={(event) => event.stopPropagation()}>
-        <p className={styles.title}>この日の成長</p>
+        <p className={styles.title}>{pending.title ?? 'この日の成長'}</p>
 
         <div className={styles.list}>
           {rows.length > 0 ? (

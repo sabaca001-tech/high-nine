@@ -1433,6 +1433,21 @@ function finishMatch(state: GameState): EngineResult {
 
     const { log, serial } = appendLog(state.log, events, state.serial)
 
+    /*
+     * **試合で誰がどれだけ動いたかを、必ず一度見せる。**
+     * ログに「3人が成長した」と流すだけでは、
+     * 誰がどの能力をいくつ伸ばした（落とした）のかが分からなかった。
+     * 練習と同じ一覧（`GrowthReport`）で足を止める。
+     */
+    const matchGrowth: PendingGrowth | null =
+      growthChanges.length + grown.changes.length > 0
+        ? {
+            changes: [...growthChanges, ...grown.changes],
+            title: '試合での成長',
+            nextPhase: over ? 'tournament' : 'cardSelect',
+          }
+        : null
+
     return {
       state: {
         ...state,
@@ -1447,7 +1462,8 @@ function finishMatch(state: GameState): EngineResult {
         tournament,
         serial,
         // 終わったときだけ大会画面（結果のまとめ）へ。続くなら盤面に戻る
-        phase: over ? 'tournament' : 'cardSelect',
+        pendingGrowth: matchGrowth,
+        phase: matchGrowth ? 'growthReport' : over ? 'tournament' : 'cardSelect',
         log,
       },
       events,
@@ -1457,6 +1473,16 @@ function finishMatch(state: GameState): EngineResult {
   const reachedGoal = state.boardPosition >= GOAL_INDEX
   const { log, serial } = appendLog(state.log, events, state.serial)
 
+  // 練習試合でも、誰がどれだけ動いたかを一覧で見せる
+  const matchGrowth: PendingGrowth | null =
+    growthChanges.length > 0
+      ? {
+          changes: growthChanges,
+          title: '試合での成長',
+          nextPhase: reachedGoal ? 'yearEnd' : 'cardSelect',
+        }
+      : null
+
   return {
     state: {
       ...state,
@@ -1464,9 +1490,10 @@ function finishMatch(state: GameState): EngineResult {
       players,
       rivals,
       pendingMatch: null,
+      pendingGrowth: matchGrowth,
       reputation,
       serial,
-      phase: reachedGoal ? 'yearEnd' : 'cardSelect',
+      phase: matchGrowth ? 'growthReport' : reachedGoal ? 'yearEnd' : 'cardSelect',
       log,
     },
     events,

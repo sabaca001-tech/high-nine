@@ -175,7 +175,15 @@ export function playOutTournament(
   let state = initial
   let steps = 0
 
-  while (state.tournament && !isTournamentOver(state.tournament)) {
+  /*
+   * **最後の試合の成長報告まで片付ける。**
+   * 試合が終わると「試合での成長」で足が止まるので、
+   * 大会が終わった判定だけで抜けると、報告が開いたままの状態が返る。
+   */
+  while (
+    state.tournament &&
+    (!isTournamentOver(state.tournament) || state.phase === 'growthReport')
+  ) {
     state = playStep(state, options)
     if (++steps > maxSteps) throw new Error('大会が終わらない')
   }

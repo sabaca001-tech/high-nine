@@ -13,7 +13,12 @@ import { applyPractice, TRAJECTORY_MAX } from './growth'
 import { pitchingRating } from './rating'
 import { emptyCareerStats } from './careerStats'
 import { canPracticePitch } from './trainingFocus'
-import { arsenalScore, PITCH_MAX_COUNT, PITCH_MAX_LEVEL } from './pitchDefs'
+import {
+  arsenalScore,
+  PITCH_DIRECTION_ORDER,
+  PITCH_MAX_COUNT,
+  PITCH_MAX_LEVEL,
+} from './pitchDefs'
 
 function makeBatter(overrides: Partial<Player> = {}): Player {
   return {
@@ -97,7 +102,7 @@ describe('弾道の練習', () => {
 
 describe('球種の練習', () => {
   it('続ければ持ち球が増える（変化量が上がる）', () => {
-    const before = makePitcher({ focus: { type: 'pitch' } })
+    const before = makePitcher({ focus: { type: 'pitch', goal: 'auto' } })
     const grown = practice(before, 60)
     expect(arsenalScore(grown.pitching!.pitches)).toBeGreaterThan(
       arsenalScore(before.pitching!.pitches),
@@ -105,19 +110,19 @@ describe('球種の練習', () => {
   })
 
   it('溜まりきるまでは持ち球が動かない', () => {
-    const grown = practice(makePitcher({ focus: { type: 'pitch' } }), 1)
+    const grown = practice(makePitcher({ focus: { type: 'pitch', goal: 'auto' } }), 1)
     expect(grown.pitching!.pitches).toHaveLength(1)
     expect(grown.pitchProgress).toBeGreaterThan(0)
   })
 
   it('弾道と違って上限まで続く（1段ごとに方針が外れない）', () => {
-    const grown = practice(makePitcher({ focus: { type: 'pitch' } }), 60)
-    expect(grown.focus).toEqual({ type: 'pitch' })
+    const grown = practice(makePitcher({ focus: { type: 'pitch', goal: 'auto' } }), 60)
+    expect(grown.focus).toEqual({ type: 'pitch', goal: 'auto' })
   })
 
   it('覚えるものが無くなったらチーム練習に戻る', () => {
     const complete = makePitcher({
-      focus: { type: 'pitch' },
+      focus: { type: 'pitch', goal: 'auto' },
       pitching: {
         ...makePitcher().pitching!,
         pitches: [
@@ -142,7 +147,7 @@ describe('球種の練習', () => {
     // 通常の練習では「総合力に見合う数」までしか増えないので、
     // 変化球の低い投手は何を練習しても1球種のままだった
     const raw = makePitcher({
-      focus: { type: 'pitch' },
+      focus: { type: 'pitch', goal: 'auto' },
       pitching: { ...makePitcher().pitching!, sharpness: 20 },
     })
     const grown = practice(raw, 120)
@@ -153,6 +158,40 @@ describe('球種の練習', () => {
 
   it('野手に指示はできない', () => {
     expect(canPracticePitch(makeBatter())).toBe(false)
+  })
+
+  it('「球種を増やす」を選べば、変化量ではなく球種が増える', () => {
+    const before = makePitcher({ focus: { type: 'pitch', goal: 'variety' } })
+    const grown = practice(before, 60)
+
+    expect(grown.pitching!.pitches.length).toBeGreaterThan(before.pitching!.pitches.length)
+  })
+
+  it('「変化量を上げる」を選べば、球種は増えずに変化量が上がる', () => {
+    const before = makePitcher({ focus: { type: 'pitch', goal: 'break' } })
+    const grown = practice(before, 60)
+
+    expect(grown.pitching!.pitches).toHaveLength(before.pitching!.pitches.length)
+    const levels = (player: Player) =>
+      player.pitching!.pitches.reduce((sum, pitch) => sum + pitch.level, 0)
+    expect(levels(grown)).toBeGreaterThan(levels(before))
+  })
+
+  it('狙いが叶わないときは、もう片方で埋める（手が無駄にならない）', () => {
+    // 6球種すべて覚えた投手に「増やす」を指示しても、何も起きないのでは手が無駄になる
+    const full = makePitcher({
+      focus: { type: 'pitch', goal: 'variety' },
+      pitching: {
+        ...makePitcher().pitching!,
+        pitches: PITCH_DIRECTION_ORDER.map((direction) => ({ direction, name: direction, level: 2 })),
+      },
+    })
+    const grown = practice(full, 60)
+    const levels = (player: Player) =>
+      player.pitching!.pitches.reduce((sum, pitch) => sum + pitch.level, 0)
+
+    expect(grown.pitching!.pitches).toHaveLength(PITCH_MAX_COUNT)
+    expect(levels(grown)).toBeGreaterThan(levels(full))
   })
 })
 

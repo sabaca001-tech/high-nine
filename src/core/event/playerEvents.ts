@@ -824,7 +824,7 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
           if (!pitching) {
             return { player, text: `${player.name}は投げられない`, tone: 'normal', changes: [] }
           }
-          const result = improvePitches(rng, pitching.pitches, pitching.sharpness, true)
+          const result = improvePitches(rng, pitching.pitches, pitching.sharpness, 'variety')
           const learned = result.learned
           const down = bump({ ...player, pitching: { ...pitching, pitches: result.pitches } }, 'control', -rng.int(1, 3))
           return {

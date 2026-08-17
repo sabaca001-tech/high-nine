@@ -161,46 +161,71 @@ export function arsenalScore(pitches: readonly Pitch[]): number {
 }
 
 /**
+ * 持ち球の練習で何を狙うか。
+ *
+ * **「球種を増やす」と「変化量を上げる」は別の投手像**になる。
+ * 決め球を磨けば1球で仕留められるし、球種が多ければ的が絞らせない。
+ * どちらに寄せるかは監督が決められるようにしてある。
+ */
+export type PitchGoal =
+  /** 新しい球種を覚える */
+  | 'variety'
+  /** 今ある球種の変化量を上げる */
+  | 'break'
+  /** どちらでも（通常の変化球練習。まず数を揃えてから磨く） */
+  | 'auto'
+
+/**
  * 変化球練習の成果を持ち球に反映する。
  *
  * 「新しい球種を覚える」か「今ある球種の変化量が上がる」かのどちらか。
- * 変化のあった球種を返す（無ければ null）。
+ * 変化のあった球種を返す（無ければ何も入らない）。
+ *
+ * **狙いが叶わないときは、もう片方で埋める。**
+ * 6球種すべて覚えた投手に「増やす」を指示しても何も起きないのでは、
+ * 練習した手が丸ごと無駄になる。
  */
 export function improvePitches(
   rng: Rng,
   pitches: readonly Pitch[],
   sharpness: number,
   /**
-   * 球種練習として行う場合。
+   * 何を狙うか。`auto` は通常の変化球練習
+   * （**キレに見合う数までは自動で増える**）。
    *
-   * **総合力に見合う数を超えて覚えられる。** 通常の練習では
-   * 「変化球の総合力に見合う持ち球」までしか増えないので、
-   * 変化球が伸びない投手は何を練習しても1球種のままだった。
-   * 本人が球種の練習を選んだのなら、そこは伸ばせるようにする。
+   * `variety` を選んだときは**キレに関係なく増やせる**。
+   * 通常の練習では「キレに見合う持ち球」までしか増えないので、
+   * キレの伸びない投手は何を練習しても1球種のままだった。
    */
-  deliberate = false,
+  goal: PitchGoal = 'auto',
 ): { pitches: Pitch[]; learned?: Pitch; improved?: Pitch } {
-  // 持ち球がキレに見合っていなければ、まず新球種を覚える
+  const learn = (): { pitches: Pitch[]; learned: Pitch } | null => {
+    const learned = rollPitch(rng, pitches)
+    return learned ? { pitches: [...pitches, learned], learned } : null
+  }
+
+  const polish = (): { pitches: Pitch[]; improved: Pitch } | null => {
+    const growable = pitches.filter((pitch) => pitch.level < PITCH_MAX_LEVEL)
+    if (growable.length === 0) return null
+
+    const target = rng.pick(growable)
+    const improved = { ...target, level: target.level + 1 }
+    return {
+      pitches: pitches.map((pitch) => (pitch === target ? improved : pitch)),
+      improved,
+    }
+  }
+
+  // 数を増やす狙い。覚えきっていたら、代わりに磨く
+  if (goal === 'variety') return learn() ?? polish() ?? { pitches: [...pitches] }
+  // 磨く狙い。すべて最大なら、代わりに覚える
+  if (goal === 'break') return polish() ?? learn() ?? { pitches: [...pitches] }
+
+  // 通常の変化球練習。持ち球がキレに見合っていなければ、まず新球種を覚える
   const deserved = sharpness >= 70 ? 3 : sharpness >= 40 ? 2 : 1
   if (pitches.length < deserved) {
-    const learned = rollPitch(rng, pitches)
-    if (learned) return { pitches: [...pitches, learned], learned }
+    const learned = learn()
+    if (learned) return learned
   }
-
-  // 伸ばせる球種の中から1つ選んで変化量を上げる
-  const growable = pitches.filter((pitch) => pitch.level < PITCH_MAX_LEVEL)
-  if (growable.length === 0) {
-    // 磨ける球種が無ければ、球種練習に限り新しい球種を覚える
-    const learned = deliberate ? rollPitch(rng, pitches) : null
-    if (learned) return { pitches: [...pitches, learned], learned }
-    return { pitches: [...pitches] }
-  }
-
-  const target = rng.pick(growable)
-  const improved = { ...target, level: target.level + 1 }
-
-  return {
-    pitches: pitches.map((pitch) => (pitch === target ? improved : pitch)),
-    improved,
-  }
+  return polish() ?? { pitches: [...pitches] }
 }

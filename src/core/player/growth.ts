@@ -361,7 +361,12 @@ export function applyPractice(
       const progress = (current.pitchProgress ?? 0) + banked
 
       if (progress >= PITCH_COST) {
-        const result = improvePitches(rng, current.pitching.pitches, current.pitching.sharpness, true)
+        const result = improvePitches(
+          rng,
+          current.pitching.pitches,
+          current.pitching.sharpness,
+          current.focus.goal,
+        )
         current = {
           ...current,
           pitching: { ...current.pitching, pitches: result.pitches },

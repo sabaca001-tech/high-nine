@@ -20,6 +20,7 @@ import {
   FOCUS_PENALTY,
 } from '@/core/player/trainingFocus'
 import type { TrainingFocus } from '@/core/player/trainingFocus'
+import type { PitchGoal } from '@/core/player/pitchDefs'
 import { effectOf } from '@/core/player/personality'
 import { FATIGUE_LABELS, fatigueLevel, fatigueOf } from '@/core/player/fatigue'
 import { APTITUDE_STRONG, APTITUDE_WEAK } from '@/core/types/player'
@@ -450,6 +451,20 @@ function growableKeysOf(player: Player): GrowableKey[] {
   return player.pitching ? [...pitching, ...batting] : batting
 }
 
+/** 持ち球の練習で狙えるもの */
+const PITCH_GOALS: { goal: PitchGoal; label: string; hint: string }[] = [
+  {
+    goal: 'variety',
+    label: '球種を増やす',
+    hint: '溜まりきるたびに新しい球種を覚える。的を絞らせない投手になる',
+  },
+  {
+    goal: 'break',
+    label: '変化量を上げる',
+    hint: '溜まりきるたびに持ち球の変化が1段大きくなる。決め球で仕留める投手になる',
+  },
+]
+
 /**
  * 練習タブ。選手ごとの自主練の内容を決める。
  *
@@ -551,27 +566,32 @@ function TrainingTab({ player }: { player: Player }) {
         */}
         {player.pitching && (
           <>
-            <button
-              type="button"
-              className={
-                focus.type === 'pitch'
-                  ? `${styles.focusRow} ${styles.focusActive}`
-                  : styles.focusRow
-              }
-              disabled={!canPracticePitch(player)}
-              onClick={() => choose({ type: 'pitch' })}
-            >
-              <span className={styles.focusName}>球種を増やす・磨く</span>
-              <span className={styles.focusDesc}>
-                {canPracticePitch(player)
-                  ? '溜まりきるたびに、新しい球種を覚えるか変化量が1上がる'
-                  : 'すべての球種を極めている'}
-              </span>
-            </button>
+            {/*
+              **「増やす」と「磨く」は別の投手像。**
+              球種が多ければ的を絞らせず、変化量が大きければ1球で仕留められる。
+              どちらに寄せるかを監督が選べるようにしてある
+            */}
+            {PITCH_GOALS.map((option) => {
+              const active = focus.type === 'pitch' && focus.goal === option.goal
+              return (
+                <button
+                  key={option.goal}
+                  type="button"
+                  className={active ? `${styles.focusRow} ${styles.focusActive}` : styles.focusRow}
+                  disabled={!canPracticePitch(player)}
+                  onClick={() => choose({ type: 'pitch', goal: option.goal })}
+                >
+                  <span className={styles.focusName}>{option.label}</span>
+                  <span className={styles.focusDesc}>
+                    {canPracticePitch(player) ? option.hint : 'すべての球種を極めている'}
+                  </span>
+                </button>
+              )
+            })}
 
             {focus.type === 'pitch' && (
               <p className={styles.chartNote}>
-                次の球種まで{Math.round(((player.pitchProgress ?? 0) / PITCH_COST) * 100)}
+                次の1つまで{Math.round(((player.pitchProgress ?? 0) / PITCH_COST) * 100)}
                 %／ この間、他の能力の伸びは{PITCH_PRACTICE_PENALTY}倍になります
               </p>
             )}
