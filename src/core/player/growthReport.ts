@@ -9,15 +9,15 @@
  * 新しい状態は持たない。判定には一切使わない。
  */
 
-import { overallRating } from './rating'
+import { playerPoints } from './rating'
 import type { AbilitySnapshot, GrowableKey, Player } from '@/core/types/player'
 
 /** 1人ぶんの伸び */
 export type GrowthEntry = {
   player: Player
-  /** 起点の総合 */
+  /** 起点の評価点 */
   from: number
-  /** 現在の総合 */
+  /** 現在の評価点 */
   to: number
   /** 伸び幅（マイナスもある） */
   delta: number
@@ -109,9 +109,10 @@ export function growthOf(player: Player, range: GrowthRange, year: number): Grow
     if (delta !== 0) gains.push({ key, delta })
   }
 
-  // 起点の能力から総合を組み直す。これで「総合がいくつ伸びたか」が出せる
-  const from = overallRating(rebuild(player, baseline))
-  const to = overallRating(player)
+  // 起点の能力から評価点を組み直す。これで「評価点がいくつ伸びたか」が出せる。
+  // **総合（平均）では、一芸が伸びても数字がほとんど動かなかった**
+  const from = playerPoints(rebuild(player, baseline))
+  const to = playerPoints(player)
 
   return {
     player,

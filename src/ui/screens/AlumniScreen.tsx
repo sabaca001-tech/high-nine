@@ -4,7 +4,12 @@ import type { Alumnus, CareerStatus, ProSeason } from '@/core/types/career'
 import { ageAt, CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
 import { ABILITY_LABELS } from '@/core/types/player'
 import type { AbilitySnapshot } from '@/core/types/player'
-import { proVelocityRank, toRank, velocityRank } from '@/core/player/rating'
+import {
+  pointsFromRating,
+  proVelocityRank,
+  toRank,
+  velocityRank,
+} from '@/core/player/rating'
 import { AbilityChart } from '@/ui/components/AbilityChart'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
@@ -101,8 +106,10 @@ function AlumnusCard({ alumnus }: { alumnus: Alumnus }) {
         <span className={styles.who}>
           <span className={styles.name}>{alumnus.name}</span>
           <span className={styles.sub}>
-            {alumnus.year}年目卒 / {alumnus.position} / 高校{alumnus.rating} → プロ
-            {alumnus.ability}
+            {/* 在校生と同じ単位（評価点）に揃える */}
+            {alumnus.year}年目卒 / {alumnus.position} / 高校
+            {pointsFromRating(alumnus.rating).toLocaleString('ja-JP')} → プロ
+            {pointsFromRating(alumnus.ability).toLocaleString('ja-JP')}
           </span>
           {alumnus.team && <span className={styles.team}>{alumnus.team}</span>}
         </span>
@@ -148,7 +155,7 @@ function AlumnusCard({ alumnus }: { alumnus: Alumnus }) {
                   // **年度ではなく年齢で並べる。** 「3年目に24本」より
                   // 「23歳で24本」のほうが、早咲きか遅咲きかが読める
                   label: `${ageAt(alumnus.year, season.year)}歳`,
-                  value: season.ability,
+                  value: pointsFromRating(season.ability),
                 }))}
                 max={PRO_ABILITY_MAX}
               />
@@ -233,11 +240,12 @@ function FinalAbilities({ alumnus }: { alumnus: Alumnus }) {
 }
 
 /**
- * 能力グラフの縦軸。
- * プロ入りで能力は高校基準からおよそ半分に置き換わるので、
- * 100 のままだと折れ線が下半分に張り付いて読めない。
+ * 能力グラフの縦軸（評価点）。
+ * プロ入りで実力は高校基準からおよそ半分に置き換わるので、
+ * 在校生と同じ上限だと折れ線が下半分に張り付いて読めない。
+ * 総合70相当（＝評価点595）を上限にしてある。
  */
-const PRO_ABILITY_MAX = 70
+const PRO_ABILITY_MAX = 595
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (

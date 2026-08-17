@@ -395,13 +395,22 @@ export function teamPoints(players: Player[]): number {
 }
 
 /**
- * 総合（0〜100）しか分からない相手のチーム評価点。
+ * 総合（0〜100）しか分からない選手の評価点。
  *
- * その大会限りの相手には名簿が無いので、
- * **その総合の選手が9人並んだ**と見なして点数に直す。
+ * 能力の内訳を持たない相手（卒業してプロに行った選手、その大会限りの代表校）は
+ * **全能力がその総合の選手**と見なして点数に直す。
+ * 画面に出る数字の単位を、在校生と揃えるためのもの。
+ */
+export function pointsFromRating(rating: number): number {
+  return Math.round(abilityPoints(rating) * POINT_SCALE)
+}
+
+/**
+ * 総合（0〜100）しか分からない相手のチーム評価点。
+ * **その総合の選手が9人並んだ**と見なす。
  */
 export function teamPointsFromRating(rating: number): number {
-  return Math.round(abilityPoints(rating) * POINT_SCALE * LINEUP_SIZE)
+  return pointsFromRating(rating) * LINEUP_SIZE
 }
 
 /** チームの評価点のランク。1人あたりに直して見る */

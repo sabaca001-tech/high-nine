@@ -9,6 +9,7 @@ import type { GrowthRange } from '@/core/player/growthReport'
 import { ABILITY_LABELS } from '@/core/types/player'
 import {
   playerPoints,
+  pointsFromRating,
   pointsRank,
   teamPoints,
   teamPointsLabel,
@@ -789,8 +790,10 @@ function GraduateRow({ graduate }: { graduate: GraduateRecord }) {
     <div className={styles.rival}>
       <div className={styles.rivalHead}>
         <span className={styles.rivalName}>{graduate.name}</span>
+        {/* 在校生と同じ単位（評価点）で出す。総合と混ぜて読ませない */}
         <span className={styles.rivalStrength}>
-          {toRank(graduate.rating)}（{graduate.rating}）
+          {pointsRank(pointsFromRating(graduate.rating))}{' '}
+          {pointsFromRating(graduate.rating).toLocaleString('ja-JP')}
         </span>
       </div>
       <div className={styles.rivalMeta}>
@@ -867,7 +870,7 @@ function ScoutResultRow({ result }: { result: ScoutResult }) {
       <span className={styles.prospectName}>{result.name}</span>
       <span className={styles.prospectMeta}>
         {result.joined
-          ? `総合${result.rating}${result.skillName ? ` / ${result.skillName}` : ''}`
+          ? `評価${pointsFromRating(result.rating).toLocaleString('ja-JP')}${result.skillName ? ` / ${result.skillName}` : ''}`
           : `${result.schoolName}（${result.regionName}）`}
       </span>
     </div>

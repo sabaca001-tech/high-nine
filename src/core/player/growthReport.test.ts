@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from './createPlayer'
 import { growthOf, growthRanking } from './growthReport'
-import { overallRating } from './rating'
+import { playerPoints } from './rating'
 import { snapshotOf } from '@/core/types/player'
 import type { Player } from '@/core/types/player'
 
@@ -35,7 +35,8 @@ describe('growthOf', () => {
     const player = grown(fielderAt(10), 10)
     const entry = growthOf(player, 'enrollment', 1)!
 
-    expect(entry.to).toBe(overallRating(player))
+    // 伸びは**評価点**で出す（総合の平均では一芸が伸びても数字が動かない）
+    expect(entry.to).toBe(playerPoints(player))
     expect(entry.delta).toBeGreaterThan(0)
     expect(entry.gains.map((g) => g.key)).toContain('meet')
     expect(entry.gains.find((g) => g.key === 'meet')!.delta).toBe(10)
