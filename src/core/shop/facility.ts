@@ -20,8 +20,14 @@
 export const GROUND_LEVEL_MIN = 1
 export const GROUND_LEVEL_MAX = 99
 
-/** 最大まで整備したときの練習効率 */
-const GROUND_MAX_MULTIPLIER = 1.6
+/**
+ * 最大まで整備したときの練習効率。
+ *
+ * **1.6では整備する意味が薄かった。** 日々の練習そのもの（`CARD_GROWTH_SCALE`）で
+ * 伸びていたので、グラウンドは「あれば少し早い」程度の飾りだった。
+ * 練習の伸びを下げたぶん、**どこで練習するか**の差を大きく取る。
+ */
+const GROUND_MAX_MULTIPLIER = 2.1
 
 /**
  * 1段階上げるのにかかる額。**段階によらず一律。**
@@ -42,7 +48,7 @@ export function clampGroundLevel(level: number): number {
  *
  * 平方根にしているので**序盤ほど1段階の効きが大きい**。
  * 直線にすると、低い段階での整備がほとんど体感できなくなる。
- * Lv1=1.00 / Lv25=1.30 / Lv50=1.43 / Lv99=1.60
+ * Lv1=1.00 / Lv10=1.35 / Lv25=1.56 / Lv50=1.79 / Lv99=2.10
  */
 export function groundMultiplier(level: number): number {
   const ratio = (clampGroundLevel(level) - GROUND_LEVEL_MIN) / (GROUND_LEVEL_MAX - GROUND_LEVEL_MIN)
@@ -97,3 +103,20 @@ export function groundDecayChance(level: number): number {
 
 /** 荒れたときに下がる段階数 */
 export const GROUND_DECAY_STEPS = 2
+
+/**
+ * 評判に見合うグラウンドの段階。**ここまでは学校が面倒を見てくれる。**
+ *
+ * 強くなって名前が売れると、学校も部にお金をかける。
+ * 部費を注ぎ込まないと土のグラウンドのままだった頃は、
+ * **評判が上がっても練習環境は何も変わらず**、
+ * 強豪校になった実感が「新入生の質」だけしか無かった。
+ *
+ * 評判20（弱小）でLv5、50でLv12、80でLv20、100でLv25。
+ * プレイヤーが部費で上げるのはこの上なので、整備する意味は消えない。
+ */
+export function groundFloorFor(reputation: number): number {
+  return clampGroundLevel(Math.floor(Math.max(0, reputation) * GROUND_REPUTATION_RATE))
+}
+
+const GROUND_REPUTATION_RATE = 0.25

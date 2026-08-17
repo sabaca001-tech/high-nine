@@ -121,6 +121,7 @@ import {
   GROUND_DECAY_STEPS,
   GROUND_LEVEL_MIN,
   groundDecayChance,
+  groundFloorFor,
   groundName,
   groundUpgradeCostFor,
 } from '@/core/shop/facility'
@@ -2234,12 +2235,35 @@ export function applyOneMonth(
     }
   }
 
-  // グラウンドは放っておくと荒れる。維持費を払えなかった月は荒れやすい。
-  // これが無いと、部費が貯まった時点で最大段階に固定されてしまう
-  const decayChance = groundDecayChance(groundLevel) * (unpaid ? 2 : 1)
-  if (groundLevel > GROUND_LEVEL_MIN && rng.chance(decayChance)) {
+  /*
+   * 学校からの支援。
+   *
+   * **評判が上がると、学校も部にお金をかける。**
+   * 部費を注ぎ込まないと土のグラウンドのままだった頃は、
+   * 強豪と呼ばれるようになっても練習環境が何ひとつ変わらなかった。
+   * 毎月1段階ずつ、評判に見合うところまで整えてくれる（`groundFloorFor`）。
+   */
+  const floor = groundFloorFor(state.reputation)
+  if (groundLevel < floor) {
     const before = groundLevel
-    groundLevel = Math.max(GROUND_LEVEL_MIN, groundLevel - rng.int(1, GROUND_DECAY_STEPS))
+    groundLevel = clampGroundLevel(groundLevel + 1)
+    events.push({
+      type: 'message',
+      text: `学校がグラウンドを手入れしてくれた（Lv${before} → Lv${groundLevel}）`,
+      tone: 'good',
+    })
+  }
+
+  // グラウンドは放っておくと荒れる。維持費を払えなかった月は荒れやすい。
+  // これが無いと、部費が貯まった時点で最大段階に固定されてしまう。
+  // **学校が面倒を見る段階（評判ぶん）より下には落ちない**
+  const decayChance = groundDecayChance(groundLevel) * (unpaid ? 2 : 1)
+  if (groundLevel > Math.max(GROUND_LEVEL_MIN, floor) && rng.chance(decayChance)) {
+    const before = groundLevel
+    groundLevel = Math.max(
+      Math.max(GROUND_LEVEL_MIN, floor),
+      groundLevel - rng.int(1, GROUND_DECAY_STEPS),
+    )
     events.push({
       type: 'message',
       text: `グラウンドが荒れてきた（Lv${before} → Lv${groundLevel}）`,

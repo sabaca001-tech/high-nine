@@ -68,12 +68,12 @@ function practice(player: Player, hands: number, seed = 5): Player {
 
 describe('弾道の練習', () => {
   it('続ければ弾道が1段上がる', () => {
-    const grown = practice(makeBatter({ focus: { type: 'trajectory' } }), 60)
+    const grown = practice(makeBatter({ focus: { type: 'trajectory' } }), 90)
     expect(grown.batting.trajectory).toBe(2)
   })
 
   it('1段上がったらチーム練習に戻る（溜め直しにはならない）', () => {
-    const grown = practice(makeBatter({ focus: { type: 'trajectory' } }), 60)
+    const grown = practice(makeBatter({ focus: { type: 'trajectory' } }), 90)
     expect(grown.focus).toEqual({ type: 'team' })
     expect(grown.trajectoryProgress).toBe(0)
   })
@@ -81,7 +81,7 @@ describe('弾道の練習', () => {
   it('パワーを10〜15上げるのと同じくらいの練習量がかかる', () => {
     // 1手で上がるようでは、全員がすぐ弾道4になって打球の質という個性が消える
     const before = makeBatter({ focus: { type: 'trajectory' } })
-    const power = practice(makeBatter(), 60).batting.power - before.batting.power
+    const power = practice(makeBatter(), 90).batting.power - before.batting.power
     expect(power).toBeGreaterThanOrEqual(8)
     expect(power).toBeLessThanOrEqual(20)
   })
@@ -91,7 +91,7 @@ describe('弾道の練習', () => {
       batting: { ...makeBatter().batting, trajectory: TRAJECTORY_MAX },
       focus: { type: 'trajectory' },
     })
-    expect(practice(maxed, 60).batting.trajectory).toBe(TRAJECTORY_MAX)
+    expect(practice(maxed, 90).batting.trajectory).toBe(TRAJECTORY_MAX)
   })
 })
 

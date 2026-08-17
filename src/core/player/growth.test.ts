@@ -237,7 +237,8 @@ describe('applyPractice', () => {
     let player = makePlayer()
     const keys = new Set<string>()
 
-    for (let i = 0; i < 10; i++) {
+    // 1手あたりの伸びを下げたので、確かめるには手数が要る
+    for (let i = 0; i < 20; i++) {
       const result = applyPractice(rng, [player], PRACTICE_DEFS.batting, { steps: TEST_STEPS })
       player = result.players[0]
       for (const change of result.changes) keys.add(change.key)
