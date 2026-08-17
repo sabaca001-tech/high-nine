@@ -192,12 +192,9 @@ describe('投手の総合', () => {
 })
 
 describe('評価点', () => {
-  const batter = (b: Partial<BattingAbilities>): Player =>
-    createPlayer(createRng(1), { id: 'x', grade: 3, isPitcher: false })
-
   /** 能力値だけを指定した野手を作る */
   function withAbilities(values: Partial<BattingAbilities>): Player {
-    const base = batter({})
+    const base = createPlayer(createRng(1), { id: 'x', grade: 3, isPitcher: false })
     return {
       ...base,
       batting: {
