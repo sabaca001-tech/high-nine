@@ -186,6 +186,43 @@ export function survivorsAt(bracket: Bracket, round: number): BracketTeam[] {
     .filter((team): team is BracketTeam => team !== null)
 }
 
+/**
+ * ブラケットを上下に割った「山」。
+ *
+ * **178校の対戦カードを全部並べても読めない**が、
+ * 「優勝候補がどの山にいるか」は組み合わせが決まった時点でいちばん知りたいことで、
+ * 山ごとにまとめれば一画面に収まる。
+ *
+ * 4つに割ると、それぞれの山を勝ち抜いた学校が準決勝で当たる。
+ * 参加校が少ない大会では、山の数を実際の枠数まで落とす。
+ */
+export function blocksOf(bracket: Bracket, count = 4): BracketBlock[] {
+  const size = bracket.slots.length
+  const blocks = Math.max(1, Math.min(count, size / 2))
+  const per = size / blocks
+
+  return Array.from({ length: blocks }, (_, index) => {
+    const from = index * per
+    const teams = bracket.slots
+      .slice(from, from + per)
+      .filter((team): team is BracketTeam => team !== null)
+
+    return {
+      // A・B・C…と呼ぶ。番号だと回戦や試合番号と紛らわしい
+      name: String.fromCharCode('A'.charCodeAt(0) + index),
+      teams,
+      ours: teams.some((team) => team.ours),
+    }
+  })
+}
+
+export type BracketBlock = {
+  name: string
+  teams: BracketTeam[]
+  /** 自校がこの山にいるか */
+  ours: boolean
+}
+
 /** `round` 回戦の対戦カード。決着済みなら勝者も返す */
 export function matchesAt(
   bracket: Bracket,

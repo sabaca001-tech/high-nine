@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import {
-  championOf,
-  createBracket,
-  matchesAt,
-  occupantAt,
-  opponentAt,
-  ourIndexOf,
-  resolveRound,
-  survivorsAt,
-} from './bracket'
+import { blocksOf, championOf, createBracket, matchesAt, occupantAt, opponentAt, ourIndexOf, resolveRound, survivorsAt } from './bracket'
 import type { Bracket, BracketTeam } from './bracket'
 
 /** 強さを散らした学校を作る */
@@ -163,5 +154,48 @@ describe('occupantAt', () => {
     for (let i = 0; i < bracket.slots.length; i++) {
       expect(occupantAt(bracket, 1, i)).toBe(bracket.slots[i] ? i : -1)
     }
+  })
+})
+
+describe('山（ブロック）', () => {
+  /**
+   * **組み合わせが決まった時点でいちばん知りたいのは「どの山にいるか」。**
+   * 178校の対戦カードは並べても読めないが、山ごとなら一画面に収まる。
+   */
+  const bracket = createBracket(createRng(3), {
+    totalRounds: 5,
+    ours: { name: 'さくら第一', strength: 0 },
+    pool: Array.from({ length: 25 }, (_, i) => ({
+      name: `相手${i}`,
+      strength: i,
+      schoolId: `s${i}`,
+    })),
+  })
+
+  it('参加校がどれかの山に入る（重複も抜けもない）', () => {
+    const blocks = blocksOf(bracket)
+    const total = blocks.reduce((sum, block) => sum + block.teams.length, 0)
+    const entrants = bracket.slots.filter((team) => team !== null).length
+    expect(total).toBe(entrants)
+
+    const names = blocks.flatMap((block) => block.teams.map((team) => team.name))
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('自校の山はひとつだけ', () => {
+    const blocks = blocksOf(bracket)
+    expect(blocks.filter((block) => block.ours)).toHaveLength(1)
+  })
+
+  it('山の数は指定どおり。小さい大会では枠の数まで落ちる', () => {
+    expect(blocksOf(bracket)).toHaveLength(4)
+    expect(blocksOf(bracket, 8)).toHaveLength(8)
+
+    const small = createBracket(createRng(1), {
+      totalRounds: 1,
+      ours: { name: 'さくら第一', strength: 0 },
+      pool: [{ name: '相手', strength: 0 }],
+    })
+    expect(blocksOf(small)).toHaveLength(1)
   })
 })

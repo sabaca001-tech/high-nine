@@ -18,6 +18,7 @@
 import type { Rng } from '@/core/rng/random'
 import { clamp, raiseAbility, raiseTrajectory, TRAJECTORY_MAX } from '@/core/player/growth'
 import { TRAJECTORY_LABELS } from '@/core/player/rating'
+import { improvePitches } from '@/core/player/pitchDefs'
 import { grantSkill } from '@/core/skill/grantSkill'
 import { findSkill } from '@/core/skill/skillDefs'
 import type { EventTone } from '@/core/types/event'
@@ -582,6 +583,318 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
             changes,
           }
         },
+      },
+    ],
+  },
+  {
+    id: 'night-practice',
+    title: '居残り',
+    text: '{name}が日が暮れてもひとりで振り込んでいる。',
+    choices: [
+      {
+        id: 'stay',
+        label: '付き合う',
+        hint: '本業がしっかり伸びる代わりに、体力を削る',
+        resolve: (rng, player) => {
+          const key = coreKey(rng, player)
+          const { player: bumped, changes } = bump(player, key, rng.int(3, 6))
+          return {
+            player: withTrust(withCondition(bumped, -14), 6),
+            text: `${player.name}に付き合って最後まで見た。${ABILITY_LABELS[key]}が伸びた`,
+            tone: 'good',
+            changes,
+          }
+        },
+      },
+      {
+        id: 'send-home',
+        label: '切り上げさせる',
+        hint: '体は休まるが、本人は物足りない',
+        resolve: (_rng, player) => ({
+          player: {
+            ...withCondition(player, 16),
+            motivation: shift(player.motivation, -1),
+          },
+          text: `${player.name}を帰らせた。休ませるのも仕事だが、不満そうだった`,
+          tone: 'normal',
+          changes: [],
+        }),
+      },
+    ],
+  },
+  {
+    id: 'family',
+    title: '家の事情',
+    text: '{name}が家の手伝いで練習に出られない日が続いている。',
+    choices: [
+      {
+        id: 'excuse',
+        label: '休ませる',
+        hint: '本人は救われるが、その間は伸びない',
+        resolve: (_rng, player) => ({
+          player: withTrust(withCondition(player, 10), 10),
+          text: `${player.name}に「家を優先しろ」と伝えた。戻ってきたときの目つきが違った`,
+          tone: 'good',
+          changes: [],
+          teamTrustDelta: 2,
+        }),
+      },
+      {
+        id: 'come',
+        label: '練習に来させる',
+        hint: '伸びはするが、こちらを信じきれなくなる',
+        resolve: (rng, player) => {
+          const key = anyKey(rng, player)
+          const { player: bumped, changes } = bump(player, key, rng.int(3, 5))
+          return {
+            player: withTrust(bumped, -8),
+            text: `${player.name}は無理をして通い続けた。${ABILITY_LABELS[key]}は伸びたが、表情は硬い`,
+            tone: 'normal',
+            changes,
+          }
+        },
+      },
+    ],
+  },
+  {
+    id: 'body-build',
+    title: '体づくり',
+    text: '{name}の体つきを変えたい。どちらに振るか。',
+    applies: (player) => !player.isPitcher,
+    choices: [
+      {
+        id: 'bulk',
+        label: '増量させる',
+        hint: 'パワーは付くが、足は重くなる',
+        resolve: (rng, player) => {
+          const up = bump(player, 'power', rng.int(4, 7))
+          const down = bump(up.player, 'speed', -rng.int(2, 4))
+          return {
+            player: down.player,
+            text: `${player.name}は食べて鍛えた。体は大きくなったが、足は少し重い`,
+            tone: 'good',
+            changes: [...up.changes, ...down.changes],
+          }
+        },
+      },
+      {
+        id: 'cut',
+        label: '絞らせる',
+        hint: '足は速くなるが、飛距離は落ちる',
+        resolve: (rng, player) => {
+          const up = bump(player, 'speed', rng.int(4, 7))
+          const down = bump(up.player, 'power', -rng.int(2, 4))
+          return {
+            player: down.player,
+            text: `${player.name}は体を絞った。動きは軽くなったが、打球は伸びなくなった`,
+            tone: 'good',
+            changes: [...up.changes, ...down.changes],
+          }
+        },
+      },
+    ],
+  },
+  {
+    id: 'liner',
+    title: 'ヒヤリ',
+    text: '打球が{name}を直撃した。本人は「大丈夫です」と言っている。',
+    choices: [
+      {
+        id: 'rest',
+        label: '大事を取る',
+        hint: '休ませれば体は戻るが、悔しがる',
+        resolve: (_rng, player) => ({
+          player: {
+            ...withCondition(player, 20),
+            motivation: shift(player.motivation, -1),
+          },
+          text: `${player.name}を数日外した。大事には至らなかった`,
+          tone: 'normal',
+          changes: [],
+        }),
+      },
+      {
+        id: 'continue',
+        label: '続けさせる',
+        hint: '無事なら根性がつく。ただし賭けになる',
+        resolve: (rng, player) => {
+          if (rng.chance(0.3)) {
+            return {
+              player: { ...withCondition(player, -20), injuryMonths: 1 },
+              text: `${player.name}はその日のうちに動けなくなった。1ヶ月の離脱`,
+              tone: 'bad',
+              changes: [],
+            }
+          }
+          const key = anyKey(rng, player)
+          const { player: bumped, changes } = bump(player, key, rng.int(2, 5))
+          return {
+            player: {
+              ...withCondition(bumped, -8),
+              motivation: shift(player.motivation, 1),
+            },
+            text: `${player.name}は何事もなかったように続けた。${ABILITY_LABELS[key]}が伸びた`,
+            tone: 'good',
+            changes,
+          }
+        },
+      },
+    ],
+  },
+  {
+    id: 'captain',
+    title: '主将',
+    text: '{name}がチームをまとめようとしている。',
+    applies: (player) => player.grade === 3,
+    choices: [
+      {
+        id: 'lead',
+        label: '引っ張らせる',
+        hint: 'チーム全体が締まるが、本人の練習は減る',
+        resolve: (_rng, player) => ({
+          player: withTrust(withCondition(player, -8), 10),
+          text: `${player.name}がチームを引っ張った。全体の空気が変わった`,
+          tone: 'good',
+          changes: [],
+          teamTrustDelta: 8,
+        }),
+      },
+      {
+        id: 'show',
+        label: '背中で見せろと言う',
+        hint: '本人が伸びる。周りは少し置いていかれる',
+        resolve: (rng, player) => {
+          const key = coreKey(rng, player)
+          const { player: bumped, changes } = bump(player, key, rng.int(4, 7))
+          return {
+            player: bumped,
+            text: `${player.name}は黙って打ち込んだ。${ABILITY_LABELS[key]}が伸びた`,
+            tone: 'good',
+            changes,
+            teamTrustDelta: -2,
+          }
+        },
+      },
+    ],
+  },
+  {
+    id: 'late-night',
+    title: '夜更かし',
+    text: '{name}が寝不足のようだ。練習中もあくびをしている。',
+    choices: [
+      {
+        id: 'scold',
+        label: '生活から正させる',
+        hint: '体は戻るが、うるさがられる',
+        resolve: (_rng, player) => ({
+          player: withTrust(withCondition(player, 18), -5),
+          text: `${player.name}の生活を正させた。動きは見違えたが、口数は減った`,
+          tone: 'normal',
+          changes: [],
+        }),
+      },
+      {
+        id: 'ignore',
+        label: '本人に任せる',
+        hint: '信頼はされるが、体はそのまま',
+        resolve: (_rng, player) => ({
+          player: {
+            ...withTrust(withCondition(player, -6), 8),
+            motivation: shift(player.motivation, 1),
+          },
+          text: `${player.name}に任せた。信頼されたことが嬉しかったらしい`,
+          tone: 'normal',
+          changes: [],
+        }),
+      },
+    ],
+  },
+  {
+    id: 'new-pitch',
+    title: '新しい球',
+    text: '{name}が新しい球種を試したいと言っている。',
+    applies: (player) => player.pitching !== null,
+    choices: [
+      {
+        id: 'try',
+        label: '覚えさせる',
+        hint: '持ち球が増えるが、他が疎かになる',
+        resolve: (rng, player) => {
+          const pitching = player.pitching
+          if (!pitching) {
+            return { player, text: `${player.name}は投げられない`, tone: 'normal', changes: [] }
+          }
+          const result = improvePitches(rng, pitching.pitches, pitching.sharpness, true)
+          const learned = result.learned
+          const down = bump({ ...player, pitching: { ...pitching, pitches: result.pitches } }, 'control', -rng.int(1, 3))
+          return {
+            player: withCondition(down.player, -8),
+            text: learned
+              ? `${player.name}は「${learned.name}」を覚えた。そのぶん制球は乱れている`
+              : `${player.name}は持ち球を磨いた。そのぶん制球は乱れている`,
+            tone: 'good',
+            changes: down.changes,
+          }
+        },
+      },
+      {
+        id: 'basics',
+        label: '今ある球を磨かせる',
+        hint: 'キレが上がる',
+        resolve: (rng, player) => {
+          const { player: bumped, changes } = bump(player, 'sharpness', rng.int(3, 6))
+          return {
+            player: bumped,
+            text: `${player.name}は今ある球を投げ込んだ。キレが増した`,
+            tone: 'good',
+            changes,
+          }
+        },
+      },
+    ],
+  },
+  {
+    id: 'scout-visit',
+    title: '視線',
+    text: 'プロのスカウトが{name}を見に来ている。',
+    applies: (player) => player.grade >= 2,
+    choices: [
+      {
+        id: 'show',
+        label: '思い切りやらせる',
+        hint: '見られている緊張で伸びるか、空回りするか',
+        resolve: (rng, player) => {
+          if (rng.chance(0.6)) {
+            const key = coreKey(rng, player)
+            const { player: bumped, changes } = bump(player, key, rng.int(3, 6))
+            return {
+              player: { ...bumped, motivation: shift(player.motivation, 1) },
+              text: `${player.name}は見られている場で結果を出した。${ABILITY_LABELS[key]}が伸びた`,
+              tone: 'good',
+              changes,
+            }
+          }
+          return {
+            player: {
+              ...withCondition(player, -10),
+              motivation: shift(player.motivation, -1),
+            },
+            text: `${player.name}は力み過ぎた。終わったあとも落ち込んでいる`,
+            tone: 'bad',
+            changes: [],
+          }
+        },
+      },
+      {
+        id: 'usual',
+        label: 'いつも通りやらせる',
+        hint: '何も起きないが、崩れもしない',
+        resolve: (_rng, player) => ({
+          player: withTrust(player, 5),
+          text: `${player.name}はいつも通りに動いた。スカウトは黙って帰っていった`,
+          tone: 'normal',
+          changes: [],
+        }),
       },
     ],
   },

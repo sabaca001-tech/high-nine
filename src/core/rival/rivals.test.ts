@@ -2,28 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { findRegion, REGIONS } from '@/core/types/region'
 import { lineupRatingOf } from './rivalRoster'
-import {
-  addStar,
-  bestStarRating,
-  localRivals,
-  addResult,
-  hasMet,
-  recordOf,
-  starsOf,
-  NATIONAL_RIVALS,
-  NATIONAL_SCHOOLS_PER_REGION,
-  nationalRepresentatives,
-  nationalRivals,
-  upperStarRatingAtRank,
-  classBonus,
-  CLASS_SPREAD,
-  rosterPowerOf,
-  advanceRival,
-  createRivals,
-  pickRivalFor,
-  RIVALS_PER_REGION,
-  schoolForProspect,
-} from './rivals'
+import { CLASS_SPREAD, NATIONAL_RIVALS, NATIONAL_SCHOOLS_PER_REGION, RIVALS_PER_REGION, addResult, addStar, advanceRival, bestStarRating, classBonus, createRivals, hasMet, initialTitles, localRivals, nationalRepresentatives, nationalRivals, pickRivalFor, prestigeLabel, recordOf, rosterPowerOf, schoolForProspect, starsOf, titlesOf, upperStarRatingAtRank } from './rivals'
 
 const rivals = createRivals(createRng(11), 'kanagawa')
 
@@ -324,5 +303,47 @@ describe('名門校', () => {
     const school = createRivals(createRng(3), 'kanagawa')[0]
     expect(classBonus(school, 7)).toBe(classBonus(school, 7))
     expect(Math.abs(classBonus(school, 7))).toBeLessThanOrEqual(CLASS_SPREAD)
+  })
+})
+
+describe('学校の格', () => {
+  /**
+   * **始めた年から名門が存在する。** 戦績を0から積み上げる形にしていたので、
+   * 1年目はどの学校も無印で、格という仕組み自体が無いのと同じだった。
+   */
+  it('ゲーム開始時から名門・強豪が存在する', () => {
+    const schools = createRivals(createRng(5), 'kanagawa')
+    const labels = schools.map(prestigeLabel)
+
+    expect(labels.filter((label) => label === '名門').length).toBeGreaterThan(0)
+    expect(labels.filter((label) => label === '強豪').length).toBeGreaterThan(10)
+    // 大半は無印であってほしい（名門だらけでは格にならない）
+    expect(labels.filter((label) => label === null).length).toBeGreaterThan(schools.length / 2)
+  })
+
+  it('地力のある学校ほど格が上がる', () => {
+    const rng = createRng(11)
+    const elite = Array.from({ length: 40 }, () => initialTitles(rng, 60))
+    const weak = Array.from({ length: 40 }, () => initialTitles(rng, 0))
+
+    expect(elite.every((titles) => (titles?.nationals ?? 0) >= 4)).toBe(true)
+    expect(weak.every((titles) => titles === undefined)).toBe(true)
+  })
+
+  it('甲子園の出場より県優勝のほうが多い（勝ち抜いた先に甲子園がある）', () => {
+    const rng = createRng(13)
+    for (let i = 0; i < 200; i++) {
+      const titles = initialTitles(rng, rng.int(-10, 70))
+      if (!titles) continue
+      expect(titles.region).toBeGreaterThanOrEqual(titles.nationals)
+      expect(titles.nationals).toBeGreaterThanOrEqual(titles.championships)
+    }
+  })
+
+  it('戦績が無ければ呼び名も付かない', () => {
+    const schools = createRivals(createRng(5), 'kanagawa')
+    const plain = { ...schools[0], titles: undefined }
+    expect(prestigeLabel(plain)).toBeNull()
+    expect(titlesOf(plain).region).toBe(0)
   })
 })

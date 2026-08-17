@@ -22,7 +22,7 @@ import {
   requiresEquipment,
   unlockedKinds,
 } from '@/core/shop/equipmentDefs'
-import type { PracticeKind } from '@/core/types/card'
+import type { CardNumber, PracticeKind } from '@/core/types/card'
 import { handSizeFor } from '@/core/types/season'
 import type { GameState, Month } from '@/core/types/game'
 import { GRADUATES_LIMIT, LOG_LIMIT, SAVE_VERSION } from '@/core/types/game'
@@ -3043,4 +3043,61 @@ describe('新入部員の一覧', () => {
       expect(report.newcomers.some((newcomer) => newcomer.id === player.id)).toBe(true)
     }
   }, 120000)
+})
+
+describe('飛び越えられないマスで止められたとき', () => {
+  /**
+   * **大会や合宿のマスは飛び越えられない。**
+   * 5のカードを切っても1マスしか進まないことがあり、
+   * 以前はそのぶん成長も体力の回復も5分の1になっていた。
+   * 大会の直前に休養カードを切ると、ほとんど回復しないまま試合に入る形で、
+   * プレイヤーには避けようがないうえ、画面のどこにも理由が出ない。
+   */
+  function stateBeforeTournament(seed: number): GameState {
+    // 初期状態は新年度の画面から始まるので、カードを選べる形にしてから使う
+    const base = startedGame({ seed })
+    const target = base.board.findIndex((cell, index) => index > 5 && cell.kind === 'tournament')
+    expect(target).toBeGreaterThan(0)
+    return { ...base, boardPosition: target - 1 }
+  }
+
+  function play(state: GameState, kind: PracticeKind, number: CardNumber): GameState {
+    const card = { ...state.hand[0], kind, number }
+    return applyCommand(
+      { ...state, hand: [card, ...state.hand.slice(1)] },
+      { type: 'selectCard', cardId: card.id },
+    ).state
+  }
+
+  const averageCondition = (state: GameState): number =>
+    state.players.reduce((sum, player) => sum + player.condition, 0) / state.players.length
+
+  it('休養カードは、止められても日数ぶんまるごと回復する', () => {
+    const before = stateBeforeTournament(11)
+    const stopped = play(before, 'rest', 5)
+
+    // 盤面は1マスしか進んでいない
+    expect(stopped.boardPosition - before.boardPosition).toBe(1)
+
+    // それでも回復量は、遮られずに5マス進んだときと変わらない
+    const free = { ...startedGame({ seed: 11 }), boardPosition: 3 }
+    const freeAfter = play(free, 'rest', 5)
+    const stoppedGain = averageCondition(stopped) - averageCondition(before)
+    const freeGain = averageCondition(freeAfter) - averageCondition(free)
+
+    expect(stoppedGain).toBeGreaterThan(0)
+    expect(stoppedGain).toBeGreaterThan(freeGain * 0.7)
+  })
+
+  it('グラウンド整備は止められても1段階上がる', () => {
+    const before = stateBeforeTournament(12)
+    const after = play(before, 'groundskeeping', 5)
+    expect(after.groundLevel).toBe(before.groundLevel + 1)
+  })
+
+  it('大会マスに止まったら大会が始まる', () => {
+    const before = stateBeforeTournament(13)
+    const after = play(before, 'rest', 5)
+    expect(after.tournament).not.toBeNull()
+  })
 })

@@ -184,6 +184,18 @@
 }
 
 /* 戦績。**強豪はここで決まる**ので、いちばん目立たせる */
+/* 名門・強豪・有力。校名の前に小さく置く */
+.rivalGrade {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
 .rivalTitles {
   padding: 0 6px;
   border-radius: 999px;

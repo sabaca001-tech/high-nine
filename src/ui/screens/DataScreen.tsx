@@ -20,6 +20,7 @@ import {
   starsOf,
   rosterPowerOf,
   titlesOf,
+  prestigeLabel,
   prestigeOf,
 } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
@@ -664,6 +665,13 @@ function RivalRow({
         aria-expanded={open}
       >
         <span className={styles.rivalName}>
+          {/*
+            **格は名前の隣に出す。** 戦力（その年の代の話）だけでは、
+            昔から強い名門なのか今年たまたま良い代なのかが読めなかった
+          */}
+          {prestigeLabel(school) && (
+            <span className={styles.rivalGrade}>{prestigeLabel(school)}</span>
+          )}
           {school.name}
           {showRegion && (
             <span className={styles.rivalRegion}>{findRegion(school.regionId).name}</span>

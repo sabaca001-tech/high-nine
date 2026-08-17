@@ -1808,15 +1808,23 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     })
   }
 
-  // 進んだ日数。成長も消耗もこれに比例する
-  const steps = to - from
+  /*
+   * 効果に使う日数。**飛び越えられずに止められたぶんも、やったことにする。**
+   *
+   * 大会や合宿のマスは飛び越えられないので、5のカードを切っても
+   * 1マスしか進まないことがある。そのとき成長も体力の回復も5分の1になり、
+   * **大会の直前に休養カードを切ると、ほとんど回復しないまま試合に入っていた**。
+   * プレイヤーには避けようがないうえ、画面のどこにも理由が出ない。
+   * 移動だけを止めて、練習・休養そのものはカードどおりに入れる。
+   */
+  const effectSteps = wanted - from
 
   // 止まったマスに関係なく、カードを使った時点で体力を消耗する
   let players = applyCardCost(
     rng,
     state.players,
     PRACTICE_DEFS[card.kind],
-    steps,
+    effectSteps,
     managerConditionCost(state.managers),
   )
 
@@ -1856,7 +1864,7 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   const training = applyCardTraining(state, rng, {
     players,
     card,
-    steps,
+    steps: effectSteps,
     cellKind: cell.kind,
     firstSquad,
   })

@@ -181,3 +181,24 @@ describe('投手の総合は野手能力を含まない', () => {
     expect(overallRating(slugger)).toBe(overallRating(pitcher))
   })
 })
+
+describe('イベントの数', () => {
+  /**
+   * **同じ話が続けて出ると、止まる意味が薄れる。**
+   * イベントマスは1年に何度も踏むので、
+   * 「またこの話か」にならないだけの数を用意しておく。
+   */
+  it('十分な種類がある', () => {
+    expect(PLAYER_EVENTS.length).toBeGreaterThanOrEqual(18)
+  })
+
+  it('投手にも野手にも、それぞれ十分な数が起こりうる', () => {
+    // 3年生で見る（学年で絞るイベントがあるため）
+    const pitcher = { ...roster.find((p) => p.isPitcher)!, grade: 3 as const }
+    const fielder = { ...roster.find((p) => !p.isPitcher)!, grade: 3 as const }
+    const pitcherOnly = PLAYER_EVENTS.filter((event) => event.applies?.(pitcher) ?? true)
+    const fielderOnly = PLAYER_EVENTS.filter((event) => event.applies?.(fielder) ?? true)
+    expect(pitcherOnly.length).toBeGreaterThanOrEqual(12)
+    expect(fielderOnly.length).toBeGreaterThanOrEqual(12)
+  })
+})

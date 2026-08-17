@@ -127,6 +127,67 @@ export function prestigeOf(school: RivalSchool): number {
   return titles.championships * 12 + titles.nationals * 4 + titles.region * 2
 }
 
+/**
+ * 戦績から付ける格の呼び名。**「どこが名門か」を一目で分かるようにする。**
+ *
+ * 戦力（`lineupRatingOf`）はその年の代の話でしかなく、
+ * 一覧に並んだ学校が「昔から強い名門」なのか
+ * 「今年たまたま良い代」なのかが読めなかった。
+ * 呼び名は戦績だけで決まるので、能力を上げなくても格を表せる。
+ *
+ * 何も勝っていない学校には付けない（無印がほとんどであってほしい）。
+ */
+export function prestigeLabel(school: RivalSchool): string | null {
+  const titles = titlesOf(school)
+  const prestige = prestigeOf(school)
+
+  if (titles.championships > 0 || prestige >= ELITE_PRESTIGE) return '名門'
+  if (prestige >= STRONG_PRESTIGE) return '強豪'
+  if (prestige >= NOTABLE_PRESTIGE) return '有力'
+  return null
+}
+
+/** 名門（全国制覇があるか、甲子園の常連） */
+const ELITE_PRESTIGE = 24
+/** 強豪（甲子園に何度か出ている） */
+const STRONG_PRESTIGE = 10
+/** 有力（県で勝ったことがある） */
+const NOTABLE_PRESTIGE = 2
+
+/**
+ * ゲームを始めた時点での戦績。
+ *
+ * **世界に歴史を持たせる。** 戦績を0から積み上げる形にしていたので、
+ * 始めた年はどの学校も無印で、「昔から強い名門」が一校も存在しなかった。
+ * プレイヤーが最初に見る一覧が全部同じ顔なら、格という仕組み自体が無いのと同じ。
+ *
+ * 地力（`tradition`）はその学校が何十年も積んできたものなので、
+ * そこから逆算した回数を最初から持たせる。
+ * **県優勝は甲子園出場より必ず多い**（甲子園は県を勝ち抜いた先にある）。
+ */
+export function initialTitles(rng: Rng, tradition: number): RivalTitles | undefined {
+  if (tradition >= 52) {
+    const nationals = rng.int(4, 12)
+    return {
+      championships: rng.chance(0.45) ? rng.int(1, 2) : 0,
+      nationals,
+      region: nationals + rng.int(2, 6),
+    }
+  }
+  if (tradition >= 28) {
+    const nationals = rng.int(1, 4)
+    return { championships: 0, nationals, region: nationals + rng.int(1, 4) }
+  }
+  if (tradition >= 18) {
+    const nationals = rng.int(0, 1)
+    return { championships: 0, nationals, region: nationals + rng.int(1, 3) }
+  }
+  if (tradition >= 8 && rng.chance(0.35)) {
+    return { championships: 0, nationals: 0, region: 1 }
+  }
+  return undefined
+}
+
 /** 戦績を1年ぶん足す */
 export function addTitles(school: RivalSchool, gained: Partial<RivalTitles>): RivalSchool {
   const titles = titlesOf(school)
@@ -343,6 +404,11 @@ export function createRivals(
       tradition,
       strength: tradition + rng.int(-DRIFT, DRIFT),
       trend: 0,
+      // **始めた時点の戦績。** 無いと、初年度は名門も新設校も同じ顔で並ぶ
+      ...(() => {
+        const titles = initialTitles(rng, tradition)
+        return titles ? { titles } : {}
+      })(),
       ...(notable ? { notable: true, stars: createStars(rng, id, tradition, playerNames, year) } : {}),
       rosterSeed: rng.int(1, 2_000_000_000),
     })

@@ -41,6 +41,9 @@ export function packRivals(schools: RivalSchool[]): PackedSchool[] {
       school.notable ? 1 : null,
       school.stars?.map(packStar) ?? null,
       school.record ? packRecord(school.record) : null,
+      // **戦績も詰める。** 入れ忘れていたので、保存して読み直すと
+      // 甲子園の出場回数が丸ごと消え、名門が無印に戻っていた
+      school.titles ? [school.titles.region, school.titles.nationals, school.titles.championships] : null,
     ]
 
     // 末尾の「無い」ものは切り落とす。
@@ -58,6 +61,7 @@ export function unpackRivals(packed: unknown[]): RivalSchool[] {
 
     const stars = row[8]
     const record = row[9]
+    const titles = row[10]
 
     return [
       {
@@ -71,6 +75,15 @@ export function unpackRivals(packed: unknown[]): RivalSchool[] {
         ...(row[7] === 1 ? { notable: true } : {}),
         ...(Array.isArray(stars) ? { stars: stars.map(unpackStar) } : {}),
         ...(Array.isArray(record) ? { record: unpackRecord(record) } : {}),
+        ...(Array.isArray(titles)
+          ? {
+              titles: {
+                region: Number(titles[0]) || 0,
+                nationals: Number(titles[1]) || 0,
+                championships: Number(titles[2]) || 0,
+              },
+            }
+          : {}),
       },
     ]
   })

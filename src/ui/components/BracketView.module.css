@@ -126,3 +126,58 @@
   font-size: var(--fs-xs);
   color: var(--accent);
 }
+
+/* 山（ブロック）ごとの顔ぶれ */
+.blocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.block {
+  padding: var(--sp-1);
+  border-radius: 8px;
+  background: var(--bg-base);
+}
+
+/* 自校のいる山は枠で示す */
+.blockOurs {
+  outline: 2px solid var(--accent);
+}
+
+.blockHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+}
+
+.blockName {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.blockCount {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.blockHere {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+/* 名門・強豪・有力 */
+.grade {
+  margin-right: 3px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 9px;
+  font-weight: 800;
+}

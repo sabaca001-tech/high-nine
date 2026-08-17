@@ -39,7 +39,7 @@ import styles from './PlayerCard.module.css'
  * 逆に**3文字までしか無い名前は縮めない**ので、
  * 漢字の名前の見え方はこれまでと変わらない。
  */
-export function nameFontSize(name: string): string {
+function nameFontSize(name: string): string {
   const [family, given] = splitName(name)
   const letters = family.length + given.length
   const longest = Math.max(family.length, given.length)

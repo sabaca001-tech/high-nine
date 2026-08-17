@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { Bracket, BracketTeam } from '@/core/tournament/bracket'
-import { matchesAt, survivorsAt } from '@/core/tournament/bracket'
+import { blocksOf, matchesAt, survivorsAt } from '@/core/tournament/bracket'
+import type { BracketBlock } from '@/core/tournament/bracket'
 import { roundName } from '@/core/types/tournament'
 import { ratingLabel } from '@/core/player/rating'
 import { opponentRating } from '@/core/season/matchReputation'
 import { lineupRatingOf } from '@/core/rival/rivalRoster'
+import { prestigeLabel } from '@/core/rival/rivals'
 import type { RivalSchool } from '@/core/rival/rivals'
 import styles from './BracketView.module.css'
 
@@ -36,7 +38,12 @@ export function BracketView({
   /** 年度の進み具合（0〜1）。他校の部員は年度が進むほど伸びている */
   progress?: number
 }) {
-  const [round, setRound] = useState(currentRound)
+  /**
+   * 0は「山（ブロック）」の表示。
+   * **開幕の時点では山から見せる。** 組み合わせが決まった直後にいちばん
+   * 知りたいのは「優勝候補がどの山にいるか」なので、1回戦のカードより先に出す。
+   */
+  const [round, setRound] = useState(currentRound <= 1 ? BLOCK_TAB : currentRound)
   if (bracket.slots.length === 0) return null
 
   const shown = Math.min(round, totalRounds)
@@ -56,6 +63,17 @@ export function BracketView({
   return (
     <section className={styles.wrap}>
       <div className={styles.tabs}>
+        {/*
+          **組み合わせが決まった時点でいちばん知りたいのは「どの山にいるか」。**
+          回戦ごとの対戦カードだけだと、優勝候補がどこに固まっているのかが読めない
+        */}
+        <button
+          type="button"
+          className={round === BLOCK_TAB ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+          onClick={() => setRound(BLOCK_TAB)}
+        >
+          山
+        </button>
         {Array.from({ length: totalRounds }, (_, index) => {
           const value = index + 1
           const reached = bracket.winners.length >= value - 1
@@ -73,7 +91,9 @@ export function BracketView({
         })}
       </div>
 
-      {matches.length <= CARD_LIMIT ? (
+      {round === BLOCK_TAB ? (
+        <BlockList bracket={bracket} schools={schools} rate={rate} />
+      ) : matches.length <= CARD_LIMIT ? (
         <div className={styles.cards}>
           {matches.map((match, index) => (
             <div key={index} className={styles.card}>
@@ -98,8 +118,83 @@ export function BracketView({
   )
 }
 
+/** 「山」のタブを表す値。回戦は1から数える */
+const BLOCK_TAB = 0
+
 /** 対戦カードで並べる上限。これを超える回戦は勝ち残り一覧にする */
 const CARD_LIMIT = 8
+
+/** ひとつの山に名前を出す校数。全部出すと1山40校で読めない */
+const BLOCK_NAME_LIMIT = 5
+
+/**
+ * 山ごとの顔ぶれ。
+ *
+ * **格の高い順に出す。** 戦力（その年の代）だけで並べると、
+ * 「優勝候補が固まっている山」なのか「たまたま今年強い代が多い山」なのかが読めない。
+ * 名門・強豪の呼び名は戦績から決まる（`prestigeLabel`）。
+ */
+function BlockList({
+  bracket,
+  schools,
+  rate,
+}: {
+  bracket: Bracket
+  schools: RivalSchool[]
+  rate: (team: BracketTeam) => number
+}) {
+  const blocks = blocksOf(bracket)
+  const gradeOf = (team: BracketTeam): string | null => {
+    const school = team.schoolId ? schools.find((item) => item.id === team.schoolId) : undefined
+    return school ? prestigeLabel(school) : null
+  }
+
+  return (
+    <div className={styles.blocks}>
+      {blocks.map((block: BracketBlock) => {
+        const ranked = [...block.teams]
+          .map((team) => ({ team, grade: gradeOf(team), rating: rate(team) }))
+          .sort((a, b) => gradeWeight(b.grade) - gradeWeight(a.grade) || b.rating - a.rating)
+        const shown = ranked.slice(0, BLOCK_NAME_LIMIT)
+        const rest = ranked.length - shown.length
+
+        return (
+          <div
+            key={block.name}
+            className={block.ours ? `${styles.block} ${styles.blockOurs}` : styles.block}
+          >
+            <p className={styles.blockHead}>
+              <span className={styles.blockName}>{block.name}山</span>
+              <span className={styles.blockCount}>{block.teams.length}校</span>
+              {block.ours && <span className={styles.blockHere}>自校</span>}
+            </p>
+            <div className={styles.chips}>
+              {shown.map(({ team, grade, rating }, index) => (
+                <span
+                  key={`${team.name}-${index}`}
+                  className={team.ours ? `${styles.chip} ${styles.chipOurs}` : styles.chip}
+                >
+                  {grade && <span className={styles.grade}>{grade}</span>}
+                  {team.name}
+                  <span className={styles.strength}>{ratingLabel(rating)}</span>
+                </span>
+              ))}
+              {rest > 0 && <span className={styles.more}>他{rest}校</span>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** 並べ替えのための格の重み */
+function gradeWeight(grade: string | null): number {
+  if (grade === '名門') return 3
+  if (grade === '強豪') return 2
+  if (grade === '有力') return 1
+  return 0
+}
 
 /** 一覧に名前を出す校数。これを超えたぶんは「他◯校」でまとめる */
 const NAME_LIMIT = 24
