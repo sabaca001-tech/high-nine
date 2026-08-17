@@ -166,7 +166,8 @@ const NOTABLE_PRESTIGE = 2
  * **県優勝は甲子園出場より必ず多い**（甲子園は県を勝ち抜いた先にある）。
  */
 export function initialTitles(rng: Rng, tradition: number): RivalTitles | undefined {
-  if (tradition >= 52) {
+  // 名門（`prestigeLabel` が24以上）に届くのは、この帯だけ
+  if (tradition >= 48) {
     const nationals = rng.int(4, 12)
     return {
       championships: rng.chance(0.45) ? rng.int(1, 2) : 0,
@@ -174,15 +175,15 @@ export function initialTitles(rng: Rng, tradition: number): RivalTitles | undefi
       region: nationals + rng.int(2, 6),
     }
   }
-  if (tradition >= 28) {
-    const nationals = rng.int(1, 4)
+  if (tradition >= 38) {
+    const nationals = rng.int(1, 3)
     return { championships: 0, nationals, region: nationals + rng.int(1, 4) }
   }
-  if (tradition >= 18) {
+  if (tradition >= 26) {
     const nationals = rng.int(0, 1)
     return { championships: 0, nationals, region: nationals + rng.int(1, 3) }
   }
-  if (tradition >= 8 && rng.chance(0.35)) {
+  if (tradition >= 12 && rng.chance(0.35)) {
     return { championships: 0, nationals: 0, region: 1 }
   }
   return undefined
@@ -292,10 +293,13 @@ const TRADITION_TIERS: { weight: number; min: number; max: number }[] = [
  * 県ごとの厚みがそのまま全国の厚みになる）。
  */
 const TOP_SCHOOL_FLOORS: { min: number; max: number }[] = [
-  { min: 38, max: 56 }, // 筆頭校
-  { min: 28, max: 44 }, // 2番手
-  { min: 20, max: 34 }, // 3番手
-  { min: 14, max: 26 }, // 4番手
+  // **筆頭校は名門の帯（52〜）に届かせる。**
+  // 38〜56にしていた頃は、県の筆頭でもスタメン平均が65（C）どまりで、
+  // 「名門」と呼ばれている学校が中堅と見分けられなかった
+  { min: 48, max: 70 }, // 筆頭校
+  { min: 34, max: 50 }, // 2番手
+  { min: 24, max: 38 }, // 3番手
+  { min: 16, max: 28 }, // 4番手
 ]
 
 /**

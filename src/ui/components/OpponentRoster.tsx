@@ -6,7 +6,7 @@ import { PitchChart } from './PitchChart'
 import { TrajectoryArrow } from './TrajectoryArrow'
 import { rivalRoster } from '@/core/rival/rivalRoster'
 import type { RivalSchool } from '@/core/rival/rivals'
-import { playerPoints, toRank } from '@/core/player/rating'
+import { playerPoints, pointsRank, toRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import styles from './OpponentRoster.module.css'
@@ -86,7 +86,7 @@ export function OpponentRoster({
                   {player.origin === 'scout' && <span className={styles.scouted}>スカウト</span>}
                 </span>
                 <span className={styles.grade}>{player.grade}年</span>
-                <span className={styles.rating} style={{ color: rankColorOf(toRank(rating)) }}>
+                <span className={styles.rating} style={{ color: rankColorOf(pointsRank(rating)) }}>
                   {rating}
                 </span>
                 <span className={styles.detail}>

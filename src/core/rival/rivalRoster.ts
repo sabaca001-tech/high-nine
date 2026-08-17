@@ -94,7 +94,7 @@ const TALENT_SLOPE = 0.45
  * 3年生の素質は 50（学年）＋22 に代の当たり外れが乗る程度。
  * 名門との差は**部員の層の厚さ**（`perGradeOf`）で出す。
  */
-const TALENT_CAP = 22
+const TALENT_CAP = 30
 
 /** 各学年の何人目までを投手にするか */
 const PITCHERS_PER_GRADE = 2
