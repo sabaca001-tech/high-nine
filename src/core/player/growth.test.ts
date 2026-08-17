@@ -480,13 +480,14 @@ describe('球速の成長', () => {
   }
 
   it('練習で球速が伸びる', () => {
+    // 1手の伸びを下げたので、1km/h 動かすにも手数が要る
     const before = makePitcher().pitching!.velocity
-    expect(trained('pitching', 40).pitching!.velocity).toBeGreaterThan(before)
+    expect(trained('pitching', 90).pitching!.velocity).toBeGreaterThan(before)
   })
 
   it('走り込みがいちばん伸びる', () => {
-    const running = trained('stamina', 40).pitching!.velocity
-    const throwing = trained('pitching', 40).pitching!.velocity
+    const running = trained('stamina', 90).pitching!.velocity
+    const throwing = trained('pitching', 90).pitching!.velocity
     expect(running).toBeGreaterThan(throwing)
   })
 
