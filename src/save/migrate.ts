@@ -168,6 +168,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 41) {
     data = migrateV40ToV41(data)
   }
+  if (version < 42) {
+    data = migrateV41ToV42(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -1097,6 +1100,29 @@ function mergeBreakingDeep(value: unknown): unknown {
   const out: Record<string, unknown> = {}
   for (const [key, child] of Object.entries(value)) out[key] = mergeBreakingDeep(child)
   return out
+}
+
+/**
+ * v41 → v42
+ *  - Player に academics（学力）を追加
+ *
+ * 定期テストで意味を持つ値なので、**持っていない選手が居ると赤点だらけ**になる。
+ * セーブごとに毎回変わっては困るので、乱数の種は固定して振る。
+ */
+function migrateV41ToV42(raw: Record<string, unknown>): Record<string, unknown> {
+  const rng = createRng(typeof raw.rngState === 'number' ? raw.rngState : 1)
+
+  const convert = (value: unknown): unknown => {
+    if (!isRecord(value)) return value
+    if (typeof value.academics === 'number') return value
+    // 生成時と同じ帯（平均48・±26）で振る
+    return { ...value, academics: Math.min(100, Math.max(1, 48 + rng.int(-26, 26))) }
+  }
+
+  const players = Array.isArray(raw.players) ? raw.players.map(convert) : raw.players
+  const graduates = Array.isArray(raw.graduates) ? raw.graduates.map(convert) : raw.graduates
+
+  return { ...raw, version: 42, players, graduates }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

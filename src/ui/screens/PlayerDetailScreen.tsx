@@ -127,10 +127,27 @@ export function PlayerDetailScreen() {
           */}
           <p className={styles.meta}>
             <span className={styles.personality}>{player.personality}</span>
+            {/*
+              **学力は能力ではない**（スタメンにも評価点にも効かない）ので、
+              性格と同じ「その選手の人となり」の行に置く。
+              効くのは定期テストのときだけ
+            */}
+            <span className={styles.personality} title="定期テストで効く">
+              学力{toRank(player.academics)}
+            </span>
             <span className={styles.personalityNote}>
               {effectOf(player.personality).summary}
             </span>
           </p>
+          {player.studyEffect && player.studyEffect.months > 0 && (
+            <p className={styles.meta}>
+              <span className={player.studyEffect.rate < 1 ? styles.weak : styles.strong}>
+                {player.studyEffect.rate < 1
+                  ? `補習中。練習の伸びが${player.studyEffect.rate}倍（あと${player.studyEffect.months}ヶ月）`
+                  : `テストを乗り切り、練習に集中できている（${player.studyEffect.rate}倍・あと${player.studyEffect.months}ヶ月）`}
+              </span>
+            </p>
+          )}
           {/*
             伸びやすい能力は選手ごとに違う。ここが見えないと
             「なぜこの選手だけ伸びないのか」が分からない。

@@ -2025,6 +2025,9 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   }
 }
 
+/** 自主学習1回ぶんの学力。3〜4回で1段階（ランク）上がる */
+const STUDY_GAIN = 4
+
 /**
  * 練習以外のカードの効果を適用する。
  *
@@ -2046,6 +2049,20 @@ function applyCardSpecial(
       })),
       groundLevel: state.groundLevel,
       events: [{ type: 'message', text: 'チームのやる気が上がった', tone: 'good' }],
+    }
+  }
+
+  if (special === 'study') {
+    // **学力は能力ではない**ので、伸び方の補正（やる気・学年・体力）は掛けない。
+    // 机に向かった時間がそのまま点になる
+    const raised = players.map((player) => ({
+      ...player,
+      academics: clamp(player.academics + STUDY_GAIN, 1, 100),
+    }))
+    return {
+      players: raised,
+      groundLevel: state.groundLevel,
+      events: [{ type: 'message', text: `全員が机に向かった（学力 +${STUDY_GAIN}）`, tone: 'good' }],
     }
   }
 
@@ -2198,13 +2215,22 @@ export function applyOneMonth(
 
   // 月をまたぐと少しだけ体力が戻る。トレーナーが居るとさらに回復する
   const recovery = 10 + managerRecovery(state.managers)
-  players = players.map((player) => ({
-    ...player,
-    condition: Math.min(100, player.condition + recovery),
-    motivation: rollMonthlyMotivation(rng, player.motivation),
-    // 離脱期間は月をまたぐごとに1つ減る
-    injuryMonths: Math.max(0, player.injuryMonths - 1),
-  }))
+  players = players.map((player) => {
+    // テストの結果は次のテストまで。月をまたぐごとに1つ減らして、切れたら消す
+    const study = player.studyEffect
+    const remaining = study ? study.months - 1 : 0
+
+    return {
+      ...player,
+      condition: Math.min(100, player.condition + recovery),
+      motivation: rollMonthlyMotivation(rng, player.motivation),
+      // 離脱期間は月をまたぐごとに1つ減る
+      injuryMonths: Math.max(0, player.injuryMonths - 1),
+      ...(study && remaining > 0
+        ? { studyEffect: { ...study, months: remaining } }
+        : { studyEffect: undefined }),
+    }
+  })
 
   // 怪我から復帰した選手を知らせる
   for (const before of state.players) {

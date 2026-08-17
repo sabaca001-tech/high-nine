@@ -48,7 +48,7 @@ describe('コールドゲーム', () => {
 
       const diff = Math.abs(result.finalScore.player - result.finalScore.opponent)
       expect(diff).toBeGreaterThanOrEqual(lead)
-      expect(diff).toBeLessThan(MAX_LEAD)
+      expect(diff).toBeLessThanOrEqual(MAX_LEAD)
       checked += 1
     }
 

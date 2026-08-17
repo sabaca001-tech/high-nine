@@ -92,14 +92,25 @@ describe('growthOf', () => {
 
 describe('growthRanking', () => {
   it('伸びた順に並ぶ', () => {
-    const players = [grown(fielderAt(0), 2), grown(fielderAt(1), 12), grown(fielderAt(2), 7)]
+    /*
+     * **同じ選手を3人に増やして比べる。**
+     * 別々の選手を並べていた頃は、伸び幅より「どの帯から伸びたか」で
+     * 評価点の差が決まり（高いランクほど1点が重い）、
+     * 選手生成の乱数がずれるたびに順位が入れ替わっていた。
+     */
+    const base = fielderAt(0)
+    const players = [
+      { ...grown(base, 2), id: 'a' },
+      { ...grown(base, 12), id: 'b' },
+      { ...grown(base, 7), id: 'c' },
+    ]
     const ranking = growthRanking(players, 'enrollment', 1)
 
     expect(ranking).toHaveLength(3)
     for (let i = 1; i < ranking.length; i++) {
       expect(ranking[i].delta).toBeLessThanOrEqual(ranking[i - 1].delta)
     }
-    expect(ranking[0].player.id).toBe(fielderAt(1).id)
+    expect(ranking[0].player.id).toBe('b')
   })
 
   it('記録の無い選手は除く', () => {

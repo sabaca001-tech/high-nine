@@ -218,6 +218,18 @@ function diminishingMultiplier(current: number): number {
   return 1.0
 }
 
+/**
+ * 定期テストの結果による練習効率。
+ *
+ * 赤点なら補習に取られて練習がはかどらず、
+ * 余裕で乗り切った選手はかえって集中できる（`fixedEvents` の `takeExam`）。
+ * 効いていない選手は1.0なので、ここは何も変えない。
+ */
+export function studyRateOf(player: Player): number {
+  const effect = player.studyEffect
+  return effect && effect.months > 0 ? effect.rate : 1
+}
+
 export type PracticeOutcome = {
   players: Player[]
   changes: AbilityChange[]
@@ -316,7 +328,9 @@ export function applyPractice(
           rng,
           current,
           actual,
-          playerMultiplier * focusMultiplier(player, actual.key, growthPlan),
+          playerMultiplier *
+            focusMultiplier(player, actual.key, growthPlan) *
+            studyRateOf(player),
         )
         if (amount <= 0) continue
 

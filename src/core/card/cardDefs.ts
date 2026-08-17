@@ -28,6 +28,8 @@ export type PracticeSpecial =
   | 'groundUp'
   /** 離脱中の選手の残り期間が1ヶ月減る */
   | 'heal'
+  /** 全員の学力が上がる（定期テストに効く） */
+  | 'study'
 
 export type PracticeDef = {
   kind: PracticeKind
@@ -128,13 +130,16 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   },
   mental: {
     kind: 'mental',
+    // **信頼度が上がるだけのカードが3枚あった**（ミーティング・自主学習・メンタル強化）。
+    // 同じ効果のカードが並んでいても選ぶ意味が無いので、役割を分けてある。
+    // 集中力を鍛える練習なので、伸びるのは捕球
     label: 'メンタル強化',
-    description: '能力は伸びないが、信頼度が大きく上がる',
-    gains: [],
-    conditionDelta: -3,
-    // **6では動いた実感が無かった。** 1枚で1〜2しか上がらず、
-    // 報告にも出ないので「何も起きていない」と見える
-    trustDelta: 11,
+    description: '集中して球を追う。捕球が伸びる',
+    gains: [{ key: 'catching', amount: 7, target: 'all' }],
+    conditionDelta: -6,
+    trustDelta: 2,
+    // **練習系のカードが増えすぎないように重みは元のまま。**
+    // 信頼度のカードを1枚に絞ったぶん、練習の総量が増えては難易度が戻ってしまう
     weight: 2,
   },
   rest: {
@@ -192,11 +197,12 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   },
   meeting: {
     kind: 'meeting',
+    // **信頼度を上げる役はこのカードだけ**にしてある
     label: 'ミーティング',
-    description: '全員のやる気が上がり、信頼度も上がる',
+    description: '全員のやる気が上がり、信頼度が大きく上がる',
     gains: [],
     conditionDelta: -2,
-    trustDelta: 7,
+    trustDelta: 12,
     weight: 3,
     special: 'motivationUp',
   },
@@ -223,11 +229,12 @@ export const PRACTICE_DEFS: Record<PracticeKind, PracticeDef> = {
   study: {
     kind: 'study',
     label: '自主学習',
-    description: '練習は休むが、信頼度が大きく上がる',
+    description: '練習は休むが、学力が上がる（定期テストで効く）',
     gains: [],
-    conditionDelta: 2,
-    trustDelta: 9,
+    conditionDelta: 4,
+    trustDelta: 2,
     weight: 2,
+    special: 'study',
   },
   outing: {
     kind: 'outing',

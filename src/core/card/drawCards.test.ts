@@ -100,9 +100,11 @@ describe('練習系とそれ以外の割合', () => {
       if (PRACTICE_DEFS[drawCard(rng, i).kind].gains.length > 0) practice += 1
     }
 
+    // **メンタル強化が練習系に移った**ぶん、練習系の割合が上がっている
+    // （信頼度が上がるだけのカードが3枚あったのをミーティング1枚にまとめた）
     const rate = practice / trials
-    expect(rate).toBeGreaterThan(0.64)
-    expect(rate).toBeLessThan(0.76)
+    expect(rate).toBeGreaterThan(0.66)
+    expect(rate).toBeLessThan(0.82)
   })
 
   it('練習器具を買うと練習系の割合が上がる', () => {

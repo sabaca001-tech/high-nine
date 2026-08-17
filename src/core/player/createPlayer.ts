@@ -413,6 +413,7 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     condition: 70 + rng.int(0, 30),
     injuryMonths: 0,
     personality,
+    academics: rollAcademics(rng, personality),
     growthAptitude: createGrowthAptitude(rng, isPitcher, exchange),
     aptitudes: createAptitudes(rng, position),
     skills: [],
@@ -445,6 +446,29 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
  * やる気や学年の補正はあっても、1〜2という小さな値を整数に丸めた時点で
  * 差が消えてしまい、画面には「+1」しか出てこなかった。
  */
+/**
+ * 学力（1〜100）。
+ *
+ * **能力とは関係なく振る。** 野球が上手いから勉強もできる、という相関を入れると
+ * 「良い選手ほど何をやらせても良い」になって、テストで足を掬われる面白さが消える。
+ * 性格だけは少し効かせてある（クールは要領がよく、やんちゃは苦手）。
+ */
+function rollAcademics(rng: Rng, personality: Personality): number {
+  return clampAbility(ACADEMICS_BASE + rng.int(-ACADEMICS_SPREAD, ACADEMICS_SPREAD) + ACADEMICS_BY_PERSONALITY[personality])
+}
+
+const ACADEMICS_BASE = 48
+const ACADEMICS_SPREAD = 26
+
+const ACADEMICS_BY_PERSONALITY: Record<Personality, number> = {
+  クール: 8,
+  したたか: 6,
+  天才肌: 4,
+  ムードメーカー: 0,
+  ど根性: -4,
+  やんちゃ: -10,
+}
+
 export function createGrowthAptitude(
   rng: Rng,
   isPitcher: boolean,

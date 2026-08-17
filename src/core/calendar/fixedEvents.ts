@@ -56,10 +56,7 @@ export const FIXED_EVENTS: Partial<Record<Month, FixedEvent>> = {
   },
   6: {
     name: '中間試験',
-    apply: (_rng, players) => ({
-      players: shiftCondition(players, -8),
-      text: '中間試験。勉強で練習時間が削られた',
-    }),
+    apply: (rng, players) => takeExam(rng, players, '中間試験'),
   },
   8: {
     name: '猛暑',
@@ -77,10 +74,7 @@ export const FIXED_EVENTS: Partial<Record<Month, FixedEvent>> = {
   },
   11: {
     name: '期末試験',
-    apply: (_rng, players) => ({
-      players: shiftCondition(players, -8),
-      text: '期末試験。しばらく練習が手につかない',
-    }),
+    apply: (rng, players) => takeExam(rng, players, '期末試験'),
   },
   1: {
     name: '初詣',
@@ -106,6 +100,84 @@ export const FIXED_EVENTS: Partial<Record<Month, FixedEvent>> = {
     },
   },
 }
+
+
+/**
+ * 定期テスト。
+ *
+ * **学力が意味を持つ唯一の場面。** 全員の体力を削るだけの行事だった頃は、
+ * 避けようのないマイナスが年2回来るだけで、判断の余地がまったく無かった。
+ *
+ * いまは学力（`Player.academics`）で結果が変わる。
+ * 赤点を取れば補習に取られて練習がはかどらず、
+ * 余裕のある選手は要領よく両立して、かえって集中して練習できる。
+ * 効果は**次のテストまで**（`studyEffect`）。
+ *
+ * 自主学習カードで学力を上げておけば避けられるので、
+ * 「いま伸ばすか、後で困らないようにするか」という選択になる。
+ */
+function takeExam(
+  rng: Rng,
+  players: Player[],
+  name: string,
+): { players: Player[]; text: string } {
+  const failed: string[] = []
+  const excelled: string[] = []
+
+  const next = players.map((player) => {
+    const base = { ...player, condition: clamp(player.condition - EXAM_CONDITION, 0, 100) }
+
+    // 学力が低いほど赤点を引きやすい。学力70で0%、20で50%
+    if (rng.chance(failChance(player.academics))) {
+      failed.push(player.name)
+      return { ...base, studyEffect: { rate: EXAM_FAIL_RATE, months: EXAM_EFFECT_MONTHS } }
+    }
+    // 余裕のある選手は、テスト明けに集中して練習できる
+    if (rng.chance(excelChance(player.academics))) {
+      excelled.push(player.name)
+      return { ...base, studyEffect: { rate: EXAM_EXCEL_RATE, months: EXAM_EFFECT_MONTHS } }
+    }
+    return base
+  })
+
+  const parts: string[] = []
+  if (failed.length > 0) parts.push(`${listOf(failed)}が赤点で補習に`)
+  if (excelled.length > 0) parts.push(`${listOf(excelled)}は余裕で乗り切った`)
+
+  return {
+    players: next,
+    text: parts.length > 0 ? `${name}。${parts.join('。')}` : `${name}。全員が無難に乗り切った`,
+  }
+}
+
+/** 名前を並べる。多いときは人数でまとめる */
+function listOf(names: string[]): string {
+  if (names.length <= 2) return names.join('と')
+  return `${names[0]}ほか${names.length - 1}人`
+}
+
+/** 赤点を引く確率。学力70以上なら引かない */
+function failChance(academics: number): number {
+  return Math.max(0, (EXAM_FAIL_LINE - academics) / EXAM_FAIL_LINE) * EXAM_FAIL_MAX
+}
+
+/** 余裕で乗り切る確率。学力55未満なら起きない */
+function excelChance(academics: number): number {
+  return Math.max(0, (academics - EXAM_EXCEL_LINE) / (100 - EXAM_EXCEL_LINE)) * EXAM_EXCEL_MAX
+}
+
+/** テストで削られる体力。学力に関係なく、勉強に時間は取られる */
+const EXAM_CONDITION = 6
+
+const EXAM_FAIL_LINE = 70
+const EXAM_FAIL_MAX = 0.7
+const EXAM_EXCEL_LINE = 55
+const EXAM_EXCEL_MAX = 0.5
+
+/** 赤点・好成績のあとの練習効率と、その効き目が続く月数 */
+export const EXAM_FAIL_RATE = 0.7
+export const EXAM_EXCEL_RATE = 1.2
+const EXAM_EFFECT_MONTHS = 2
 
 export function fixedEventFor(month: Month): FixedEvent | undefined {
   return FIXED_EVENTS[month]

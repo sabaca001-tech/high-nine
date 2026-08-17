@@ -2137,18 +2137,27 @@ describe('投手の疲労', () => {
 })
 
 describe('成長の報告', () => {
-  /** 指定した種類のマスへ、練習カードで止まる */
+  /**
+   * 指定した種類のマスへ、練習カードで止まる。
+   *
+   * **1手では誰も伸びない年もある**（1手あたりの伸びは1未満で、
+   * 端数を確率で切り上げている）ので、報告が出るシードまで探す。
+   */
   function stopOn(kind: 'blank' | 'match' | 'fork', seed: number): GameState {
-    const base = startedGame({ seed })
-    const state: GameState = {
-      ...base,
-      board: base.board.map((_cell, index) =>
-        index === 3 ? { index, kind } : { index, kind: 'blank' as const },
-      ),
-      hand: base.hand.map((card) => ({ ...card, number: 3 as const, kind: 'batting' as const })),
-      boardPosition: 0,
+    for (let offset = 0; offset < 40; offset++) {
+      const base = startedGame({ seed: seed + offset * 101 })
+      const state: GameState = {
+        ...base,
+        board: base.board.map((_cell, index) =>
+          index === 3 ? { index, kind } : { index, kind: 'blank' as const },
+        ),
+        hand: base.hand.map((card) => ({ ...card, number: 3 as const, kind: 'batting' as const })),
+        boardPosition: 0,
+      }
+      const next = applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+      if (next.pendingGrowth && next.pendingGrowth.changes.length > 0) return next
     }
-    return applyCommand(state, { type: 'selectCard', cardId: state.hand[0].id }).state
+    throw new Error('成長の報告が出るシードが見つからない')
   }
 
   it('カードを使うと、まず成長の報告になる', () => {
