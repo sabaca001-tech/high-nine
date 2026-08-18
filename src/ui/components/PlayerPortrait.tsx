@@ -92,7 +92,7 @@ const BRIM_Y = -26
  * かぶらないマネージャーは髪が1本も見えなくなっていた。
  */
 const HAIR_SCALE_MALE = 1.3
-const HAIR_SCALE_MANAGER = 1.22
+const HAIR_SCALE_MANAGER = 1.12
 
 /**
  * 目鼻立ちの縮尺。
@@ -191,6 +191,44 @@ const EAR = 'M 0 -5.5 C -5.8 -6 -6.6 0 -4.8 4.4 C -3.8 7 -1.6 9 0 8 z'
 
 /** 耳の内側のくぼみ。1本の線があるだけで、のっぺりした塊に見えなくなる */
 const EAR_INNER = 'M -1 -2 C -3.4 -1 -3.6 3.4 -1.6 5.6'
+
+/**
+ * マネージャーの顔つき。
+ *
+ * **同じ骨格で髪だけ変えていたので、女子が怖い顔になっていた。**
+ * 頬の位置を上げ（`cheekY`）、あごを細く（`chinIn`）、
+ * 輪郭のふくらみを大きく取る（`jawIn`）と、丸くて優しい顔になる。
+ */
+const FACE_SHAPES_MANAGER = [
+  faceShape(-8, 17, 22),
+  faceShape(-6, 18, 23),
+  faceShape(-9, 16, 21),
+  faceShape(-7, 19, 24),
+  faceShape(-5, 17, 22),
+  faceShape(-8, 18, 23),
+  faceShape(-6, 16, 21),
+  faceShape(-9, 19, 22),
+  faceShape(-7, 17, 24),
+  faceShape(-5, 18, 23),
+]
+
+/**
+ * マネージャーの目・眉・口の描き方。
+ *
+ * 目は大きく（`eye`）、眉は細く（`brow`）、鼻と口は控えめに。
+ * 少年漫画の女子キャラのバランスに寄せてある。
+ */
+const MANAGER_FACE = {
+  /** 目の拡大率 */
+  eye: 1.3,
+  /** 眉の太さの倍率 */
+  brow: 0.55,
+  /** 鼻の線の細さ・薄さ */
+  noseWidth: 1.1,
+  noseOpacity: 0.5,
+  /** 頬の赤み */
+  blush: 'rgba(230, 130, 140, 0.28)',
+}
 
 /** 10種類。丸顔・面長・エラ張り・細面 など */
 const FACE_SHAPES = [
@@ -394,13 +432,17 @@ export function PlayerPortrait({
   const skin = pick(exchange ? SKIN_EXCHANGE : SKIN_JP, h)
   const hair = pick(HAIR_COLORS, h >>> 3)
   const hairstyle = pick(manager ? HAIR_MANAGER : HAIR_MALE, h >>> 7)
-  const face = pick(FACE_SHAPES, h >>> 11)
+  const face = pick(manager ? FACE_SHAPES_MANAGER : FACE_SHAPES, h >>> 11)
   const brow = pick(BROWS, h >>> 14)
   const eye = pick(EYES, h >>> 17)
   const iris = pick(EYE_COLORS, h >>> 20)
   const nose = pick(NOSES, h >>> 22)
   const mouth = pick(MOUTHS, h >>> 25)
   const bang = pick(BANGS, h >>> 28)
+
+  // マネージャーは目を大きく、眉を細くする
+  const eyeScale = manager ? MANAGER_FACE.eye : 1
+  const browScale = manager ? MANAGER_FACE.brow : 1
 
   const crown = capColorOf(design.crown)
   const brim = capColorOf(design.brim)
@@ -414,6 +456,7 @@ export function PlayerPortrait({
   const shadeId = `shade-${playerId}`
   const brimShadeId = `brimshade-${playerId}`
   const faceClip = `face-${playerId}`
+  const hairTopClip = `hairtop-${playerId}`
 
   return (
     <svg
@@ -464,6 +507,20 @@ export function PlayerPortrait({
         <clipPath id={faceClip}>
           <path d={face.d} />
         </clipPath>
+        {/*
+          マネージャーの髪を**眉の上まで**で切る。
+          顔ぜんぶに載せると、残った肌がV字の面になって細面に見える。
+          額から上だけ載せれば、頬もあごも出たまま髪が縁取る形になる。
+        */}
+        <clipPath id={hairTopClip}>
+          {/*
+            裾は**曲線**にする。まっすぐ切ると、定規で引いたような
+            不自然な前髪になって、かえって怖い顔に見えた
+          */}
+          <path
+            d={`M -52 -62 H 52 V ${BROW_Y + 2} q -14 8 -26 1 q -12 -7 -26 2 q -14 8 -26 -1 q -12 -8 -26 -2 z`}
+          />
+        </clipPath>
       </defs>
 
       {/* 首と肩。顔より暗くして、顔を前に出す */}
@@ -497,6 +554,23 @@ export function PlayerPortrait({
         </g>
       ))}
 
+      {/*
+        マネージャーの髪は**顔の裏に敷く**。
+        顔の上に載せると、髪に覆われた残りがV字の面になって
+        「お面をかぶった細面」に見えていた。
+        裏に敷けば輪郭がまるごと出て、髪は顔の外側を縁取る形になる。
+        代わりに前髪（`bang`）を顔の上に置いて、生え際を作る。
+      */}
+      {manager && (
+        <path
+          d={hairstyle}
+          transform={`scale(${HAIR_SCALE_MANAGER})`}
+          fill={`url(#${hairId})`}
+          stroke={OUTLINE}
+          strokeWidth="0.9"
+        />
+      )}
+
       {/* 顔 */}
       <path d={face.d} fill={`url(#${skinId})`} stroke={OUTLINE} strokeWidth="1.2" />
 
@@ -518,6 +592,19 @@ export function PlayerPortrait({
         {cap && (
           <rect x={-CHEEK} y={BRIM_Y} width={CHEEK * 2} height="10" fill={`url(#${brimShadeId})`} />
         )}
+
+        {/* 頬の赤み。これがあるだけで表情がやわらかくなる */}
+        {manager &&
+          [-1, 1].map((side) => (
+            <ellipse
+              key={side}
+              cx={side * (EYE_X + 4)}
+              cy={NOSE_Y + 4}
+              rx="7"
+              ry="4.2"
+              fill={MANAGER_FACE.blush}
+            />
+          ))}
       </g>
 
       {/*
@@ -526,13 +613,28 @@ export function PlayerPortrait({
         帽子をかぶらないマネージャーが坊主頭に見えていた。
         髪型のパスは頭全体を覆う形なので、前に置けば生え際がそのまま出る。
       */}
-      <path
-        d={hairstyle}
-        transform={`scale(${manager ? HAIR_SCALE_MANAGER : HAIR_SCALE_MALE})`}
-        fill={`url(#${hairId})`}
-        stroke={OUTLINE}
-        strokeWidth="0.9"
-      />
+      {!manager && (
+        <path
+          d={hairstyle}
+          transform={`scale(${HAIR_SCALE_MALE})`}
+          fill={`url(#${hairId})`}
+          stroke={OUTLINE}
+          strokeWidth="0.9"
+        />
+      )}
+
+      {/* マネージャーの髪。額から上だけ顔に載せて、生え際を作る */}
+      {manager && (
+        <g clipPath={`url(#${hairTopClip})`}>
+          <path
+            d={hairstyle}
+            transform={`scale(${HAIR_SCALE_MANAGER})`}
+            fill={`url(#${hairId})`}
+            stroke={OUTLINE}
+            strokeWidth="0.9"
+          />
+        </g>
+      )}
 
       {/* 眉 */}
       <path
@@ -540,7 +642,7 @@ export function PlayerPortrait({
         transform={`translate(${-EYE_X + 4} ${BROW_Y}) scale(${FEATURE_SCALE})`}
         fill="none"
         stroke={hair.base}
-        strokeWidth={brow.width}
+        strokeWidth={brow.width * browScale}
         strokeLinecap="round"
         opacity="0.9"
       />
@@ -549,7 +651,7 @@ export function PlayerPortrait({
         transform={`translate(${EYE_X + 5} ${BROW_Y}) scale(${-FEATURE_SCALE} ${FEATURE_SCALE})`}
         fill="none"
         stroke={hair.base}
-        strokeWidth={brow.width}
+        strokeWidth={brow.width * browScale}
         strokeLinecap="round"
         opacity="0.9"
       />
@@ -558,7 +660,7 @@ export function PlayerPortrait({
       {[-1, 1].map((side) => (
         <g
           key={side}
-          transform={`translate(${EYE_X * side} ${EYE_Y}) scale(${side * FEATURE_SCALE} ${FEATURE_SCALE})`}
+          transform={`translate(${EYE_X * side} ${EYE_Y}) scale(${side * FEATURE_SCALE * eyeScale} ${FEATURE_SCALE * eyeScale})`}
         >
           <ellipse cx="0" cy="0" rx={eye.rx} ry={eye.ry} fill="#fdf7f2" />
           <ellipse cx="0.8" cy="0.4" rx={eye.iris * 0.92} ry={eye.iris} fill={`url(#${irisId})`} />
@@ -580,6 +682,16 @@ export function PlayerPortrait({
             stroke={OUTLINE}
             strokeWidth="0.9"
           />
+          {/* まつげ。目尻から外へ跳ねる線を足すと、それだけで女子の顔になる */}
+          {manager && (
+            <path
+              d={`M ${eye.rx * 0.55} ${-eye.ry * 0.75} l 3.4 -2.2 M ${eye.rx * 0.95} ${-eye.ry * 0.2} l 3.6 -0.6`}
+              fill="none"
+              stroke={FEATURE}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          )}
         </g>
       ))}
 
@@ -589,19 +701,20 @@ export function PlayerPortrait({
         transform={`translate(0 ${NOSE_Y}) scale(${FEATURE_SCALE})`}
         fill="none"
         stroke={FEATURE}
-        strokeWidth="1.6"
+        strokeWidth={manager ? MANAGER_FACE.noseWidth : 1.6}
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity="0.8"
+        opacity={manager ? MANAGER_FACE.noseOpacity : 0.8}
       />
 
       {/* 口。マネージャーは唇を塗る */}
       {manager ? (
         <path
-          d={`M -5 ${MOUTH_Y} q 5 -2.5 10 0 q -5 4 -10 0 z`}
-          fill="#c9736f"
+          // 小さく、口角を上げる。大きい唇は年上の顔になる
+          d={`M -3.6 ${MOUTH_Y} q 3.6 -2 7.2 0 q -3.6 3.4 -7.2 0 z`}
+          fill="#e08a8a"
           stroke={FEATURE}
-          strokeWidth="0.8"
+          strokeWidth="0.7"
         />
       ) : (
         <path
