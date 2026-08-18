@@ -37,7 +37,7 @@ import { recruitFreshmen } from '@/core/season/graduation'
 import { applyCardCost, applyPractice, clamp } from '@/core/player/growth'
 import { addBatting, addPitching } from '@/core/player/careerStats'
 import { applyMatchGrowth } from '@/core/player/matchGrowth'
-import { fatigueAfterOuts, fatigueOf, recoveredFatigue } from '@/core/player/fatigue'
+import { fatigueAfterPitching, fatigueOf, recoveredFatigue } from '@/core/player/fatigue'
 import { matchReputationDelta, matchupLabel, teamRating } from '@/core/season/matchReputation'
 import type { MatchStage } from '@/core/player/matchGrowth'
 import {
@@ -1305,7 +1305,7 @@ function finishMatch(state: GameState): EngineResult {
       condition: clamp(player.condition - conditionCost, 0, 100),
       // 投げたぶんだけ疲労が溜まる。抜けるのは日数（selectCard）
       ...(pitching
-        ? { fatigue: fatigueAfterOuts(fatigueOf(player), pitching.outs) }
+        ? { fatigue: fatigueAfterPitching(player, pitching) }
         : {}),
     }
   })

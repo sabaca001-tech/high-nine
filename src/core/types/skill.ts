@@ -38,6 +38,7 @@ export type SkillTarget =
   | 'groundBall' // ゴロを打たせる割合
   | 'stamina' // スタミナの持ち
   | 'longball' // 被本塁打
+  | 'recovery' // 疲労の溜まりにくさ
 
 /**
  * 効く場面。省略時は常時。
@@ -67,6 +68,7 @@ export const SKILL_TARGET_LABELS: Record<SkillTarget, string> = {
   groundBall: 'ゴロ率',
   stamina: 'スタミナ',
   longball: '被本塁打',
+  recovery: '疲労の溜まりにくさ',
 }
 
 export const SKILL_SITUATION_LABELS: Record<SkillSituation, string> = {
@@ -107,6 +109,7 @@ export const SKILL_TARGET_UNIT: Record<SkillTarget, 'ability' | 'percent'> = {
   groundBall: 'percent',
   stamina: 'ability',
   longball: 'percent',
+  recovery: 'percent',
 }
 
 export type Skill = {

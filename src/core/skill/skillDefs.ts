@@ -277,7 +277,29 @@ export const SKILLS: Skill[] = [
     scope: 'pitching',
     forPitcher: true,
     description: 'スタミナが尽きにくく、連投にも耐える',
-    effects: [{ target: 'stamina', amount: 15 }],
+    effects: [
+      { target: 'stamina', amount: 15 },
+      // 「連投にも耐える」を実際に効かせる。疲労が半分しか溜まらない
+      { target: 'recovery', amount: 50 },
+    ],
+  },
+  {
+    id: 'quick-recovery',
+    name: '回復',
+    rank: 'blue',
+    scope: 'pitching',
+    forPitcher: true,
+    description: '登板の疲れが残りにくい。連戦で投げられる',
+    effects: [{ target: 'recovery', amount: 30 }],
+  },
+  {
+    id: 'slow-recovery',
+    name: '疲れやすい',
+    rank: 'red',
+    scope: 'pitching',
+    forPitcher: true,
+    description: '一度投げると疲れが抜けない',
+    effects: [{ target: 'recovery', amount: -30 }],
   },
   {
     id: 'unhittable',

@@ -9,24 +9,32 @@
  * 各試合が独立していて何の代償も無かった。
  * 中1日で回戦が並ぶ盤面にしたのに、**2番手を育てる理由が無い**状態だった。
  *
- * 疲労は「スタミナの目減り」として効く。同じ投手でも、疲れていれば
- * 早く消耗し、球威も少し落ちる。
+ * **溜まり方はイニングではなく「スタミナをどれだけ使ったか」。**
+ * スタミナD（55）の投手が5回投げるのと、S（90）の投手が7回投げるのとでは、
+ * 前者のほうが疲れる。同じ回数を投げても、余力のある投手は疲れない。
+ *
+ * **効き方は「投げられる回が短くなる」のではなく「能力が下がる」。**
+ * 疲れた投手を出せば、イニングは食えるが打たれる。
  */
 
 import type { Player } from '@/core/types/player'
+import { skillBonus } from '@/core/skill/skillEffects'
+import { staminaCapacity } from '@/core/match/halfInning'
 
 /** 疲労の上限 */
 export const FATIGUE_MAX = 100
 
 /**
- * アウト1つあたりの疲労。
- * 完投（27アウト）で 48。
+ * スタミナを使い切る登板1回ぶんの疲労。
  *
- * **60から下げた。** 中1日の回戦が並ぶ大会で、完投すると次の登板まで
- * 疲労が36残り、エースが常に本調子でないまま投げ続ける形になっていた。
- * 連投の代償は残しつつ、48なら中1日で24まで抜ける。
+ * **アウト数に比例させるのをやめた。** イニングで数えると、
+ * スタミナS（90）の投手が7回投げたときのほうが
+ * D（55）の投手が5回投げたときより疲れる、という逆の関係になっていた。
+ * 実際は「自分の持ちに対してどれだけ投げたか」で疲れる。
+ *
+ * 55なら、持ち球いっぱいまで投げて中4〜5日で万全に戻る。
  */
-const FATIGUE_PER_OUT = 48 / 27
+const FATIGUE_PER_FULL_OUTING = 55
 
 /**
  * 1日あたりの回復量。
@@ -38,40 +46,43 @@ const FATIGUE_PER_OUT = 48 / 27
 export const FATIGUE_RECOVERY_PER_DAY = 12
 
 /**
- * 疲労によるスタミナの目減り。
- * 疲労100でスタミナが60%減る（＝持ちが4割になる）。
+ * 疲労による能力の低下。疲労100で35%落ちる。
+ *
+ * **「投げられる回が短くなる」形をやめた。** 疲労でスタミナを目減りさせていた頃は、
+ * 疲れた投手は早く崩れるだけで、1人目の打者に対しては本調子と変わらなかった。
+ * 疲れているなら、**最初の打者から球威も制球も落ちている**ほうが実感に合う。
  */
-const FATIGUE_STAMINA_LOSS = 0.6
-
-/**
- * 疲労そのものによる球威の低下。
- * スタミナの目減りとは別に、**1人目の打者から効く**ぶん。
- * 大きくすると疲れた投手が誰にも打たれる的になるので、控えめに置く。
- */
-const FATIGUE_DIRECT_LOSS = 0.15
+const FATIGUE_DIRECT_LOSS = 0.35
 
 /** その選手の疲労。記録が無ければ0（野手や古いセーブ） */
 export function fatigueOf(player: Player): number {
   return player.fatigue ?? 0
 }
 
-/** 投げたアウト数ぶんの疲労を足した値 */
-export function fatigueAfterOuts(current: number, outs: number): number {
-  return clamp(current + outs * FATIGUE_PER_OUT)
+/**
+ * 1試合投げたぶんの疲労を足した値。
+ *
+ * **相手にした打者数を、その投手の持ち（`staminaCapacity`）で割る。**
+ * 持ちいっぱいまで投げれば `FATIGUE_PER_FULL_OUTING`、
+ * 半分なら半分。スタミナが高い投手ほど、同じ回数でも疲れない。
+ *
+ * 「回復」「鉄腕」を持っていれば、そのぶん溜まりにくい。
+ */
+export function fatigueAfterPitching(
+  player: Player,
+  line: { outs: number; hits: number; walks: number },
+): number {
+  const stamina = player.pitching?.stamina ?? 0
+  const faced = line.outs + line.hits + line.walks
+  const load = faced / Math.max(1, staminaCapacity(stamina + skillBonus(player, 'stamina')))
+  const rate = Math.max(0, 1 - skillBonus(player, 'recovery') / 100)
+
+  return clamp(fatigueOf(player) + load * FATIGUE_PER_FULL_OUTING * rate)
 }
 
 /** 日数ぶん回復させた値 */
 export function recoveredFatigue(current: number, days: number): number {
   return clamp(current - Math.max(0, days) * FATIGUE_RECOVERY_PER_DAY)
-}
-
-/**
- * 疲労を織り込んだスタミナ。
- * `staminaCapacity` はこの値で計算する。
- */
-export function effectiveStamina(player: Player): number {
-  const stamina = player.pitching?.stamina ?? 0
-  return stamina * (1 - (fatigueOf(player) / FATIGUE_MAX) * FATIGUE_STAMINA_LOSS)
 }
 
 /** 疲労そのものによる能力倍率（1人目の打者から効く） */

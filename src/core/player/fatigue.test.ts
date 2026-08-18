@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import { staminaCapacity, staminaFactor } from '@/core/match/halfInning'
+import { staminaFactor } from '@/core/match/halfInning'
 import { createInitialRoster } from './createPlayer'
 import {
-  effectiveStamina,
   FATIGUE_MAX,
   FATIGUE_RECOVERY_PER_DAY,
-  fatigueAfterOuts,
+  fatigueAfterPitching,
   fatigueLevel,
   fatigueOf,
   fatiguePenalty,
@@ -21,6 +20,16 @@ function tired(value: number): Player {
   return { ...pitcher, fatigue: value }
 }
 
+/** スタミナと疲労を指定した投手 */
+function withStamina(stamina: number, fatigue = 0, skills: string[] = []): Player {
+  return { ...pitcher, fatigue, skills, pitching: { ...pitcher.pitching!, stamina } }
+}
+
+/** イニング数ぶんの投球成績（3アウト＝1回、走者は控えめに） */
+function innings(count: number) {
+  return { outs: count * 3, hits: count, walks: Math.round(count / 3) }
+}
+
 describe('fatigueOf', () => {
   it('記録が無ければ0', () => {
     const { fatigue: _ignored, ...rest } = pitcher
@@ -28,23 +37,52 @@ describe('fatigueOf', () => {
   })
 })
 
-describe('fatigueAfterOuts', () => {
-  it('完投（27アウト）で48たまる', () => {
-    expect(fatigueAfterOuts(0, 27)).toBe(48)
+describe('疲労の溜まり方', () => {
+  /**
+   * **イニングではなく「スタミナをどれだけ使ったか」で溜まる。**
+   * 回数で数えていた頃は、スタミナSの投手が長く投げるほど疲れる形になっていて、
+   * 「余力のある投手は同じ回数でも疲れない」が表せなかった。
+   */
+  it('スタミナDが5回投げるほうが、スタミナSが7回投げるより疲れる', () => {
+    const weak = fatigueAfterPitching(withStamina(55), innings(5))
+    const strong = fatigueAfterPitching(withStamina(90), innings(7))
+
+    expect(weak).toBeGreaterThan(strong)
   })
 
-  it('完投しても中1日で半分は抜ける', () => {
-    // 連投の代償は残しつつ、エースが常に本調子でないままにはしない
-    const afterComplete = fatigueAfterOuts(0, 27)
-    expect(recoveredFatigue(afterComplete, 2)).toBeLessThanOrEqual(afterComplete / 2)
+  it('同じ回数なら、スタミナが高いほど疲れない', () => {
+    expect(fatigueAfterPitching(withStamina(90), innings(6))).toBeLessThan(
+      fatigueAfterPitching(withStamina(55), innings(6)),
+    )
   })
 
   it('投げるほど溜まる', () => {
-    expect(fatigueAfterOuts(0, 27)).toBeGreaterThan(fatigueAfterOuts(0, 9))
+    const player = withStamina(70)
+    expect(fatigueAfterPitching(player, innings(7))).toBeGreaterThan(
+      fatigueAfterPitching(player, innings(3)),
+    )
+  })
+
+  it('持ちいっぱいまで投げると、中4日ほど必要な疲労になる', () => {
+    // スタミナDが5回＝ほぼ持ちいっぱい
+    const full = fatigueAfterPitching(withStamina(55), innings(5))
+    expect(full).toBeGreaterThan(40)
+    expect(recoveredFatigue(full, 5)).toBe(0)
   })
 
   it('上限を超えない', () => {
-    expect(fatigueAfterOuts(90, 27)).toBe(FATIGUE_MAX)
+    expect(fatigueAfterPitching(withStamina(30, 90), innings(9))).toBe(FATIGUE_MAX)
+  })
+
+  it('「回復」を持っていると溜まりにくい', () => {
+    const normal = fatigueAfterPitching(withStamina(70), innings(6))
+    const quick = fatigueAfterPitching(withStamina(70, 0, ['quick-recovery']), innings(6))
+    const iron = fatigueAfterPitching(withStamina(70, 0, ['iron-arm']), innings(6))
+    const slow = fatigueAfterPitching(withStamina(70, 0, ['slow-recovery']), innings(6))
+
+    expect(quick).toBeLessThan(normal)
+    expect(iron).toBeLessThan(quick)
+    expect(slow).toBeGreaterThan(normal)
   })
 })
 
@@ -68,29 +106,30 @@ describe('recoveredFatigue', () => {
 })
 
 describe('疲労の効き方', () => {
-  it('疲れているとスタミナが目減りする', () => {
-    expect(effectiveStamina(tired(60))).toBeLessThan(effectiveStamina(tired(0)))
-  })
-
-  it('持ちが短くなる', () => {
-    expect(staminaCapacity(effectiveStamina(tired(60)))).toBeLessThan(
-      staminaCapacity(effectiveStamina(tired(0))),
-    )
-  })
-
-  it('1人目の打者から球威が落ちる', () => {
+  /**
+   * **投げられる回は短くならない。** 疲労でスタミナを目減りさせていた頃は、
+   * 疲れた投手も1人目の打者には本調子と同じで、ただ早く崩れるだけだった。
+   * 疲れているなら最初から球威も制球も落ちているほうが実感に合う。
+   */
+  it('1人目の打者から能力が落ちる', () => {
     expect(fatiguePenalty(tired(60))).toBeLessThan(1)
     expect(staminaFactor(tired(60), 1)).toBeLessThan(staminaFactor(tired(0), 1))
   })
 
-  it('万全なら何も変わらない', () => {
-    expect(fatiguePenalty(tired(0))).toBe(1)
-    expect(effectiveStamina(tired(0))).toBe(pitcher.pitching!.stamina)
+  it('疲労が重いほど落ちる', () => {
+    expect(fatiguePenalty(tired(90))).toBeLessThan(fatiguePenalty(tired(40)))
   })
 
-  it('同じ球数でも、疲れているほうが先に崩れる', () => {
-    const faced = 20
-    expect(staminaFactor(tired(70), faced)).toBeLessThan(staminaFactor(tired(20), faced))
+  it('万全なら何も変わらない', () => {
+    expect(fatiguePenalty(tired(0))).toBe(1)
+  })
+
+  it('投げられる打者数そのものは変わらない', () => {
+    // 疲れていても「イニングを食えない」わけではない。打たれるだけ
+    const faced = 10
+    const ratio = staminaFactor(tired(60), faced) / staminaFactor(tired(60), 1)
+    const freshRatio = staminaFactor(tired(0), faced) / staminaFactor(tired(0), 1)
+    expect(ratio).toBeCloseTo(freshRatio, 6)
   })
 })
 

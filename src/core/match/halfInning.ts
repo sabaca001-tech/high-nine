@@ -15,7 +15,6 @@ import { isHit, outsOf, PLAY_RESULT_LABELS } from '@/core/types/match'
 import { misplacementPenalty } from '@/core/lineup/aptitude'
 import { reassignFieldPositions } from '@/core/lineup/autoLineup'
 import {
-  effectiveStamina,
   FATIGUE_AVOID,
   fatigueOf,
   fatiguePenalty,
@@ -336,8 +335,11 @@ export const BATTERS_PER_INNING = 4.3
  * さらに交代の判定が緩かったので**毎試合ほぼ完投**していた。
  *
  * 実測（staminaCheck.test.ts、120試合の平均投球回／完投率）:
- *  G(20) 1.7回 0% ／ E(40) 4.1回 0% ／ D(55) 5.7回 0%
- *  C(65) 6.7回 0% ／ B(75) 7.8回 13% ／ S(90) 8.9回 66%
+ *  G(20) 2.3回 8% ／ E(40) 4.9回 21% ／ D(55) 6.7回 38%
+ *  C(65) 7.4回 43% ／ B(75) 8.1回 54% ／ S(90) 8.6回 69%
+ *
+ * **疲労で持ちは短くならない**（疲れているぶんは能力が落ちる）ので、
+ * 連戦でも投球回そのものは変わらない。完投率が上がって見えるのはそのため。
  */
 export function staminaCapacity(stamina: number): number {
   return Math.max(4, stamina * 0.47 - 4)
@@ -352,8 +354,10 @@ export function staminaCapacity(stamina: number): number {
  */
 export function staminaFactor(pitcher: Player, faced: number): number {
   // 「鉄腕」「省エネ投法」でスタミナが底上げされ、「スタミナ切れ」で減る
+  // **疲労はここに掛けない。** 疲れているぶんは能力そのものを下げる
+  // （`fatiguePenalty`）ので、投げられる回は変わらない
   const stamina = pitcher.pitching
-    ? effectiveStamina(pitcher) + skillBonus(pitcher, 'stamina')
+    ? pitcher.pitching.stamina + skillBonus(pitcher, 'stamina')
     : 20
   const over = Math.max(0, faced - staminaCapacity(stamina))
   // 鉄腕はバテにくい
