@@ -542,3 +542,33 @@ describe('大差の試合', () => {
     expect(checked).toBeGreaterThan(10)
   })
 })
+
+describe('打ち込まれたら代える', () => {
+  /**
+   * **スタミナが残っていても代える。**
+   * 消耗だけで判断していた頃は、5点取られていても球威が落ちていなければ続投で、
+   * 「今日は合っていないから代える」という当たり前の判断が存在しなかった。
+   */
+  function lopsidedGame(seed: number): MatchResult {
+    const { setup } = makeSetup(seed, 40)
+    return simulateGame(createRng(seed * 29 + 3), setup)
+  }
+
+  it('大量失点した投手は投げ切らない', () => {
+    let complete = 0
+    let blown = 0
+
+    for (let seed = 1; seed < 60; seed++) {
+      const result = lopsidedGame(seed)
+      const first = result.pitchingLines[0]
+      if (first.runs < 6) continue
+
+      blown += 1
+      if (result.pitchingLines.length === 1) complete += 1
+    }
+
+    expect(blown).toBeGreaterThan(0)
+    // 6点以上取られて投げ切るのは例外的（控えが尽きた試合だけ）
+    expect(complete / blown).toBeLessThan(0.3)
+  })
+})

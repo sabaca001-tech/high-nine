@@ -77,10 +77,12 @@ export function playHalf(rng: Rng, ctx: HalfContext): number {
     ? [runnerFor(offense, 1), runnerFor(offense, 2), null]
     : [...EMPTY_BASES]
   let runsThisHalf = 0
+  // 回の頭に立っている投手は、その回まだ1点も取られていない
+  defenseTeam.inningRunsAtEntry = 0
 
   while (outs < 3) {
     if (ctx.autoSubstitute) {
-      maybeChangePitcher(rng, defenseTeam, ctx)
+      maybeChangePitcher(rng, defenseTeam, ctx, runsThisHalf)
       // 競った場面なら代打、大差が付いていれば控えに経験を積ませる。
       // 点差の条件が重ならないので、同じ打者に両方は起きない
       maybePinchHit(rng, offense, ctx, outs, bases)
@@ -375,14 +377,24 @@ const PITCHER_PULL_FACTOR = 0.96
 /**
  * 投手交代の判断。
  *
- * 1. 消耗しきったら代える（従来どおり）
- * 2. **大差がついていたら、無事なうちに降ろして控えに投げさせる**
+ * 1. **打ち込まれたら代える**
+ * 2. 消耗しきったら代える
+ * 3. **大差がついていたら、無事なうちに降ろして控えに投げさせる**
  *
- * 2を入れる前は、大量リードでもエースが最後まで投げ切っていた。
+ * 1が無かった頃は、**スタミナさえ残っていれば何点取られても投げ続けていた**。
+ * 5点取られても球威が落ちていなければ続投で、
+ * 「今日は合っていないから代える」という当たり前の判断が存在しなかった。
+ *
+ * 3を入れる前は、大量リードでもエースが最後まで投げ切っていた。
  * 勝敗が決した試合で主戦を消耗させる理由は無く、
  * 2番手以降に経験を積ませる機会も失われていた。
  */
-function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
+function maybeChangePitcher(
+  rng: Rng,
+  team: MatchTeam,
+  ctx: HalfContext,
+  runsThisHalf: number,
+): void {
   const current = findPlayer(team, team.pitcherId)
   if (!current) return
 
@@ -401,17 +413,57 @@ function maybeChangePitcher(rng: Rng, team: MatchTeam, ctx: HalfContext): void {
     }
   }
 
-  if (staminaFactor(current, team.faced) > PITCHER_PULL_FACTOR) return
+  const hit = isHitHard(team, runsThisHalf)
+  if (!hit && staminaFactor(current, team.faced) > PITCHER_PULL_FACTOR) return
 
   const reliever = reliefCandidates(team)[0]
   if (!reliever) return
-  // 現状よりはっきり良くならないなら代えない（消耗ぶんを見込んで比べる）
-  if (pitcherValue(reliever) < pitcherValue(current) * 0.7) return
-  // 交代のタイミングには幅を持たせる
-  if (rng.chance(0.2)) return
 
-  sendToMound(team, reliever, ctx)
+  /*
+   * 現状よりはっきり良くならないなら代えない（消耗ぶんを見込んで比べる）。
+   * **打ち込まれているときは、多少落ちても代える。**
+   * 「今日は合っていない」ときに同じ投手を続けても好転しない
+   */
+  if (pitcherValue(reliever) < pitcherValue(current) * (hit ? 0.62 : 0.7)) return
+  // 交代のタイミングには幅を持たせる（打ち込まれているときは迷わない）
+  if (!hit && rng.chance(0.2)) return
+
+  sendToMound(team, reliever, ctx, hit ? '打ち込まれた' : undefined)
+  // 出てきた投手は、この回の失点を引き継がない
+  team.inningRunsAtEntry = runsThisHalf
 }
+
+/**
+ * 打ち込まれているか。
+ *
+ * **スタミナとは別の物差し。** 球威が残っていても、
+ * 抑えられていないなら代えるのが普通の判断。
+ *
+ * - この回に3点以上取られた（ビッグイニングの途中降板）
+ * - この試合で5点以上取られた
+ * - 立ち上がりに崩れた（2回もたずに3失点）
+ */
+function isHitHard(team: MatchTeam, runsThisHalf: number): boolean {
+  const line = team.pitching.find((entry) => entry.playerId === team.pitcherId)
+  if (!line) return false
+
+  // その投手がこの回に取られたぶんだけを見る
+  if (runsThisHalf - (team.inningRunsAtEntry ?? 0) >= BIG_INNING_RUNS) return true
+  if (line.runs >= PULL_RUNS) return true
+  return line.outs <= EARLY_OUTS && line.runs >= EARLY_RUNS
+}
+
+/**
+ * この回に取られたら代える点数。
+ * **3では代えすぎた**（1試合に3.7人使い、控えを使い切っていた）。
+ * 高校野球は継投の駒が少ないので、1イニング4失点を目安にする。
+ */
+const BIG_INNING_RUNS = 4
+/** 試合を通して取られたら代える点数 */
+const PULL_RUNS = 5
+/** 立ち上がりの崩れ（2回もたずに4失点） */
+const EARLY_OUTS = 5
+const EARLY_RUNS = 4
 
 /**
  * まだ登板していない控え投手を返す。
