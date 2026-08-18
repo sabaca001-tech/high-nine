@@ -63,11 +63,11 @@ describe('疲労の溜まり方', () => {
     )
   })
 
-  it('持ちいっぱいまで投げると、中4日ほど必要な疲労になる', () => {
+  it('持ちいっぱいまで投げても、中3日で万全に戻る', () => {
     // スタミナDが5回＝ほぼ持ちいっぱい
     const full = fatigueAfterPitching(withStamina(55), innings(5))
-    expect(full).toBeGreaterThan(40)
-    expect(recoveredFatigue(full, 5)).toBe(0)
+    expect(full).toBeGreaterThan(25)
+    expect(recoveredFatigue(full, 4)).toBe(0)
   })
 
   it('上限を超えない', () => {
