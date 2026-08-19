@@ -259,7 +259,9 @@ describe('selectCard', () => {
       expect(player.motivation).toBeGreaterThanOrEqual(-2)
       expect(player.motivation).toBeLessThanOrEqual(2)
     }
-  })
+    // 24年ぶん回すので単体で2秒かかる。他のファイルと並んで走ると
+    // 既定の5秒を超えることがあり、たまに落ちていた
+  }, 60_000)
 
   it('ログが上限を超えて溜まらない', () => {
     let state = startedGame({ seed: 21 })
@@ -269,7 +271,7 @@ describe('selectCard', () => {
     }
     expect(state.log.length).toBeLessThanOrEqual(LOG_LIMIT)
     expect(new Set(state.log.map((l) => l.id)).size).toBe(state.log.length)
-  })
+  }, 60_000)
 })
 
 describe('日単位の移動', () => {

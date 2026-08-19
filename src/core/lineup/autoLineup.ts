@@ -13,7 +13,7 @@ import {
   runningScore,
   sluggingScore,
 } from './battingTraits'
-import { FATIGUE_AVOID, FATIGUE_MAX, fatigueOf } from '@/core/player/fatigue'
+import { fatigueLevel, fatiguePenalty } from '@/core/player/fatigue'
 import { pitcherValue } from '@/core/match/teamState'
 import { YOUTH_TIEBREAK } from '@/core/player/squad'
 
@@ -120,10 +120,14 @@ function fitFor(plan: AutoLineupPlan, player: Player, position: Position): numbe
   // **投手枠は投球能力で決める。**
   // 守備適性と打力で選んでいたので、球威も制球も見ずに
   // 「打てる投手」が先発になっていた。
-  // さらに疲労を織り込む。連投明けのエースより、休んでいる2番手のほうが計算が立つ
+  //
+  // 疲労は**試合と同じ物差し**（`fatiguePenalty`）で織り込む。
+  // ここだけ別の係数（疲労100で6割引き）を持っていた頃は、
+  // 試合では15%しか落ちない疲労46のエースが28%引きで値踏みされ、
+  // **完投した翌日というだけで2番手に先発を譲っていた**。
+  // 選ぶ側と判定する側で物差しが違えば、選び方は必ずどこかで狂う。
   if (position === 'P') {
-    const rest = 1 - (fatigueOf(player) / FATIGUE_MAX) * FATIGUE_PICK_WEIGHT
-    return pitcherValue(player) * rest + youth
+    return pitcherValue(player) * fatiguePenalty(player) + youth
   }
 
   const share = defenseShare(position)
@@ -139,12 +143,6 @@ function fitFor(plan: AutoLineupPlan, player: Player, position: Position): numbe
       return defense * share + hitting * (1 - share) + youth
   }
 }
-
-/**
- * 先発を選ぶときに疲労をどれだけ嫌うか。
- * 疲労50でおよそ3割引き。エースを休ませて2番手を立てる判断が自然に出る強さ。
- */
-const FATIGUE_PICK_WEIGHT = 0.6
 
 /**
  * スタメンを自動で組む。
@@ -169,11 +167,16 @@ export function autoLineup(players: Player[], plan: AutoLineupPlan = 'balanced')
         ? candidates.filter((p) => p.pitching)
         : candidates
 
-    // 連投で消耗した投手は先発から外す。**投げられる者が他に居るときだけ。**
-    // 全員疲れている日もあるので、絞り切って0人にはしない
+    // **「限界」の投手だけ先発から外す。**（投げられる者が他に居るときだけ。
+    // 全員疲れている日もあるので、絞り切って0人にはしない）
+    //
+    // 以前は「やや疲労」の一歩先（疲労55）で切っていたので、
+    // 完投した翌日のエースが**格下の2番手に無条件で先発を譲っていた**。
+    // それ以下の疲労は上の `fitFor` が試合と同じ割合で値引きするので、
+    // 「今日はどちらが強いか」で自然に決まる。
     if (position === 'P') {
-      const fresh = eligible.filter((p) => fatigueOf(p) < FATIGUE_AVOID)
-      if (fresh.length > 0) eligible = fresh
+      const usable = eligible.filter((p) => fatigueLevel(p) !== 'dead')
+      if (usable.length > 0) eligible = usable
     }
 
     const best = eligible.reduce((a, b) =>

@@ -15,6 +15,7 @@ import {
   validateLineup,
 } from './autoLineup'
 import { battingScore, onBaseScore, runningScore, sluggingScore } from './battingTraits'
+import { fatiguePenalty } from '@/core/player/fatigue'
 import { pitcherValue } from '@/core/match/teamState'
 import { YOUTH_TIEBREAK } from '@/core/player/squad'
 
@@ -107,6 +108,45 @@ describe('autoLineup', () => {
       const best = [...pitchers].sort((a, b) => pitcherValue(b) - pitcherValue(a))[0]
       expect(starterOf(lineup)).toBe(best.id)
     }
+  })
+
+  it('完投ぶんの疲労で先発を外れるのは、実力差がひっくり返るときだけ', () => {
+    /*
+     * **選ぶ側と判定する側で物差しを揃える。**
+     * 先発の値踏みだけ疲労を6割引きで嫌っていた頃は、
+     * 試合では16%しか落ちない疲労46（完投1回ぶん）のエースが28%引きで測られ、
+     * 完投した翌日というだけで格下の2番手に先発を譲っていた。
+     */
+    let bigGap = 0
+
+    for (let seed = 0; seed < 40; seed++) {
+      const roster = createInitialRoster(createRng(seed)).map((player) => ({
+        ...player,
+        grade: 2 as const,
+      }))
+      const pitchers = roster.filter((p) => p.pitching)
+      if (pitchers.length < 2) continue
+
+      const ranked = [...pitchers].sort((a, b) => pitcherValue(b) - pitcherValue(a))
+      const ace = ranked[0]
+      // 完投1回ぶん（FATIGUE_PER_FULL_OUTING）の疲労
+      const tired = roster.map((p) => (p.id === ace.id ? { ...p, fatigue: 46 } : p))
+
+      const starter = tired.find((p) => p.id === starterOf(autoLineup(tired)))!
+      const today = (p: Player) => pitcherValue(p) * fatiguePenalty(p)
+      const best = tired.reduce((a, b) => (b.pitching && today(b) > today(a) ? b : a))
+
+      // 「今日いちばん強い投手」が先発する（僅差の学年差は許す）
+      expect(today(best) - today(starter)).toBeLessThanOrEqual(YOUTH_TIEBREAK * 2 + 0.001)
+
+      // 疲労で覆るほどの差ではない相手なら、エースが投げ続ける
+      if (pitcherValue(ace) > pitcherValue(ranked[1]) * 1.2) {
+        bigGap++
+        expect(starter.id).toBe(ace.id)
+      }
+    }
+
+    expect(bigGap).toBeGreaterThan(0)
   })
 
   it('学年差で投手が入れ替わるのは僅差のときだけ', () => {
