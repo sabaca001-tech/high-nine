@@ -62,6 +62,7 @@ import { runRivalSeason } from '@/core/rival/rivalSeason'
 import { rivalRoster, seasonProgressOfCell } from '@/core/rival/rivalRoster'
 import {
   allProspects,
+  canScoutTrip,
   createNationalTeam,
   createProspects,
   emptyScouting,
@@ -71,6 +72,7 @@ import {
   prospectSkillName,
   SCOUT_OPEN_MONTH,
   successChance,
+  tripsOf,
 } from '@/core/scout/scouting'
 import type { ScoutRegion, ScoutResult } from '@/core/scout/scouting'
 import { createTraits, shiftTraits } from '@/core/scout/scoutTraits'
@@ -2577,6 +2579,8 @@ function advanceYear(state: GameState): EngineResult {
         regions: [],
         visiting: null,
         results: scouted.results,
+        // 出張の回数も年度ごとに戻る
+        trips: 0,
       },
       // 県の傾向も毎年引き直す。固定だと一度良い県を見つけたら
       // 毎年そこへ行くだけになり、行き先を選ぶ判断が1年目で終わってしまう
@@ -2717,6 +2721,10 @@ function visitScoutRegion(state: GameState, regionId: RegionId): EngineResult {
   // すでに出張中なら、まず誰かに会う
   if (state.scouting.visiting !== null) return { state, events: [] }
 
+  // **年に出られる回数は決まっている。** 部費があるだけ行けるのでは、
+  // 「どの県へ行くか」ではなく「何回行けるか」の話になってしまう
+  if (!canScoutTrip(state.scouting)) return { state, events: [] }
+
   const home = findRegion(state.regionId)
   const target = findRegion(regionId)
   const cost = scoutTripCost(home, target)
@@ -2765,6 +2773,7 @@ function visitScoutRegion(state: GameState, regionId: RegionId): EngineResult {
       scouting: {
         ...state.scouting,
         visiting: regionId,
+        trips: tripsOf(state.scouting) + 1,
         regions: existing
           ? state.scouting.regions.map((r) => (r.regionId === regionId ? region : r))
           : [...state.scouting.regions, region],

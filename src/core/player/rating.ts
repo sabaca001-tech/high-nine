@@ -272,17 +272,18 @@ export function playerPoints(player: Player): number {
  *
  *   パワー ＝ ミート ＞ 守備 ＞ 走力 ＞ 捕球 ＞ 肩力 ＞ 弾道
  *
- * 打てなければ試合に出られないので打撃を最上位に置き、
- * 守備は「守れるかどうか」で起用が決まるぶん走力より重い。
- * 肩は効く場面が限られるので、能力の中ではいちばん軽い。
+ * **打撃の価値をさらに上げてある**（.24 → .28）。
+ * 打てなければ試合にならないし、守備の穴は守る位置を選べば隠せる。
+ * 守備は「守れるかどうか」で起用が決まるぶん走力より重く、
+ * 肩は効く場面が限られるので能力の中ではいちばん軽い。
  */
 const BATTER_WEIGHTS = {
-  meet: 0.24,
-  power: 0.24,
-  fielding: 0.18,
-  speed: 0.14,
-  catching: 0.11,
-  arm: 0.09,
+  meet: 0.28,
+  power: 0.28,
+  fielding: 0.16,
+  speed: 0.12,
+  catching: 0.09,
+  arm: 0.07,
 }
 
 function batterPoints(b: BattingAbilities): number {

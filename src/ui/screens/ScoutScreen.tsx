@@ -2,10 +2,13 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { toRank } from '@/core/player/rating'
 import {
-  findScoutRegion,
   MAX_APPROACHES,
+  MAX_SCOUT_TRIPS,
   SCOUT_OPEN_MONTH,
+  canScoutTrip,
+  findScoutRegion,
   successChance,
+  tripsOf,
 } from '@/core/scout/scouting'
 import type { Prospect, ScoutRegion } from '@/core/scout/scouting'
 import { TRAIT_LABELS, TRAIT_NOTES } from '@/core/scout/scoutTraits'
@@ -52,6 +55,9 @@ export function ScoutScreen() {
 
   // スカウトは秋に解禁され、年度末まで続く
   const open = game.month >= SCOUT_OPEN_MONTH || game.month <= 3
+  const trips = tripsOf(scouting)
+  // 回数を使い切ったら、行き先は選べない
+  const canTrip = open && canScoutTrip(scouting)
 
   if (region && showing) {
     return (
@@ -68,13 +74,22 @@ export function ScoutScreen() {
   }
 
   return (
-    <AppLayout title="スカウト" subtitle={`部費 ${formatFunds(game.funds)}`} scrollable>
+    <AppLayout
+      title="スカウト"
+      subtitle={`部費 ${formatFunds(game.funds)} ／ 残り${MAX_SCOUT_TRIPS - trips}回`}
+      scrollable
+    >
       <p className={styles.note}>
         {open ? (
           <>
             視察する県を選びます。<strong>出張費は距離で決まります。</strong>
             1回の出張で会えるのは1人だけなので、誰に会うかを選んでください。
-            同じ県へは何度でも通えます。
+            {/*
+              **回数を出す。** 部費だけを見せていた頃は、
+              残り何回行けるのかが分からないまま出張していた
+            */}
+            出張は<strong>1年に{MAX_SCOUT_TRIPS}回まで</strong>
+            （今年はあと{MAX_SCOUT_TRIPS - trips}回）。
           </>
         ) : (
           <>スカウトは{SCOUT_OPEN_MONTH}月に解禁されます。それまでは視察に出られません。</>
@@ -87,6 +102,7 @@ export function ScoutScreen() {
         reputation={game.reputation}
         funds={game.funds}
         open={open}
+        canTrip={canTrip}
         busy={scouting.visiting !== null}
       />
 
@@ -95,6 +111,7 @@ export function ScoutScreen() {
         traits={game.scoutTraits}
         funds={game.funds}
         open={open}
+        canTrip={canTrip}
         visiting={scouting.visiting}
         visited={scouting.regions}
         onOpen={(regionId) => {
@@ -120,6 +137,7 @@ function NationalTeamSection({
   reputation,
   funds,
   open,
+  canTrip,
   busy,
 }: {
   prospects: Prospect[]
@@ -127,6 +145,8 @@ function NationalTeamSection({
   reputation: number
   funds: number
   open: boolean
+  /** 出張の回数がまだ残っているか */
+  canTrip: boolean
   busy: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -173,12 +193,14 @@ function NationalTeamSection({
                 action={{
                   label: !open
                     ? `${SCOUT_OPEN_MONTH}月に解禁されます`
-                    : busy
-                      ? '出張中'
-                      : poor
-                        ? `部費が足りない ${formatFunds(cost)}`
-                        : `会いに行く ${formatFunds(cost)}`,
-                  disabled: !open || busy || poor,
+                    : !canTrip
+                      ? '今年の出張は使い切りました'
+                      : busy
+                        ? '出張中'
+                        : poor
+                          ? `部費が足りない ${formatFunds(cost)}`
+                          : `会いに行く ${formatFunds(cost)}`,
+                  disabled: !canTrip || busy || poor,
                   onClick: () => approachNationalProspect(prospect.id),
                 }}
               />
@@ -196,6 +218,7 @@ function RegionList({
   traits,
   funds,
   open,
+  canTrip,
   visiting,
   visited,
   onOpen,
@@ -204,6 +227,8 @@ function RegionList({
   traits: Record<RegionId, ScoutTrait>
   funds: number
   open: boolean
+  /** 出張の回数がまだ残っているか */
+  canTrip: boolean
   visiting: RegionId | null
   visited: ScoutRegion[]
   onOpen: (regionId: RegionId) => void
@@ -254,16 +279,20 @@ function RegionList({
               <button
                 type="button"
                 className={styles.primary}
-                disabled={!here && (!open || poor || busy)}
+                disabled={!here && (!canTrip || poor || busy)}
                 onClick={() => (here ? onOpen(region.id) : visitScoutRegion(region.id))}
               >
                 {here
                   ? 'いま視察中。候補を見る'
-                  : busy
-                    ? '出張中'
-                    : poor
-                      ? `部費が足りない ${formatFunds(cost)}`
-                      : `視察する ${formatFunds(cost)}`}
+                  : !open
+                    ? `${SCOUT_OPEN_MONTH}月から`
+                    : !canTrip
+                      ? '出張を使い切りました'
+                      : busy
+                        ? '出張中'
+                        : poor
+                          ? `部費が足りない ${formatFunds(cost)}`
+                          : `視察する ${formatFunds(cost)}`}
               </button>
             </div>
           </section>

@@ -116,10 +116,36 @@ export type ScoutingState = {
   visiting: RegionId | null
   /** 直近の結果。次の世代交代まで残す */
   results: ScoutResult[]
+  /**
+   * その年度に出張した回数。**年度が替わると0に戻る。**
+   *
+   * 部費さえあれば何度でも視察に行けた頃は、
+   * 「どの県へ行くか」ではなく「何回行けるだけ部費があるか」の話になっていた。
+   * 回数を絞ると、県を選ぶこと自体が判断になる。
+   */
+  trips?: number
 }
 
 export function emptyScouting(): ScoutingState {
-  return { nationalTeam: [], regions: [], visiting: null, results: [] }
+  return { nationalTeam: [], regions: [], visiting: null, results: [], trips: 0 }
+}
+
+/**
+ * 1年に出張できる回数。
+ *
+ * 10回あれば、県外を数か所まわって気になる選手に通う余裕はある。
+ * 無制限だと部費の多寡がそのまま獲得数になり、選ぶ意味が消える。
+ */
+export const MAX_SCOUT_TRIPS = 10
+
+/** その年度に使った出張の回数 */
+export function tripsOf(scouting: ScoutingState): number {
+  return scouting.trips ?? 0
+}
+
+/** まだ出張に出られるか */
+export function canScoutTrip(scouting: ScoutingState): boolean {
+  return tripsOf(scouting) < MAX_SCOUT_TRIPS
 }
 
 /** スカウトを始められる月。冬を挟んで通う時間を作る */

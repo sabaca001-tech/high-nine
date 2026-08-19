@@ -50,6 +50,7 @@ import type { GrowableKey } from './types/player'
 import {
   findScoutRegion,
   MAX_APPROACHES,
+  MAX_SCOUT_TRIPS,
   NATIONAL_TEAM_SIZE,
   PROSPECTS_PER_REGION,
   SCOUT_OPEN_MONTH,
@@ -2414,7 +2415,10 @@ describe('試合中の選手交代', () => {
     }
 
     expect(state.pendingMatch).not.toBeNull()
-    expect(state.pendingMatch!.innings.length).toBeGreaterThanOrEqual(9)
+    // **コールドで終わることもある**（5回10点差・7回7点差）ので、
+    // 「9回まで」ではなく「決着まで進んだか」で見る
+    expect(state.pendingMatch!.innings.length).toBeGreaterThanOrEqual(5)
+    expect(state.pendingMatch!.outcome).not.toBe('draw')
   })
 
   it('半回ずつ進めても、一気に進めても結果は同じ', () => {
@@ -2611,6 +2615,35 @@ describe('スカウト', () => {
     expect(
       applyCommand(after, { type: 'approachProspect', prospectId: second.id }).state,
     ).toBe(after)
+  })
+
+  it('出張は1年に MAX_SCOUT_TRIPS 回まで', () => {
+    // **部費だけが制約だと、貯まった時点で制約が消える。**
+    // 900,000円あれば全県の候補を総なめにできてしまっていた
+    let state = untilScoutOpen(5020, 9_000_000)
+
+    for (let i = 0; i < MAX_SCOUT_TRIPS; i++) {
+      state = applyCommand(state, { type: 'visitScoutRegion', regionId: state.regionId }).state
+      expect(state.scouting.trips).toBe(i + 1)
+
+      // 次の出張に出るには、まず誰かに会って今回の出張を使い切る。
+      // 同じ選手には MAX_APPROACHES 回しか会えないので、毎回別の選手にする
+      const region = findScoutRegion(state.scouting, state.regionId)!
+      state = applyCommand(state, {
+        type: 'approachProspect',
+        prospectId: region.prospects[i].id,
+      }).state
+    }
+
+    const funds = state.funds
+    const after = applyCommand(state, {
+      type: 'visitScoutRegion',
+      regionId: state.regionId,
+    }).state
+
+    // 回数を使い切ったら、部費が有り余っていても出られない
+    expect(after).toBe(state)
+    expect(after.funds).toBe(funds)
   })
 
   it('会いに行くと見込みが上がる', () => {
