@@ -119,4 +119,79 @@ describe('バランス確認', () => {
         `四球${(walks / trials).toFixed(1)}`,
     )
   }, DIAG_TIMEOUT)
+
+  /**
+   * **打撃能力が成績にどれだけ効くか。**
+   *
+   * 評価点はミートとパワーをいちばん重く見ている（それぞれ .28）ので、
+   * 実際の打撃成績もそれに見合って動いていないと、
+   * 「点数は高いのに打てない選手」が生まれる。
+   *
+   * 打者9人のミート・パワーだけを揃えて、同じ相手と200試合戦わせる。
+   * 弾道は2に固定（本塁打は弾道でも動くので、混ぜると効きが読めない）。
+   */
+  it('打撃能力の帯ごとの成績を出力する（常に成功する診断用）', () => {
+    const cases: { label: string; meet: number; power: number }[] = [
+      { label: 'ミート40 / パワー40', meet: 40, power: 40 },
+      { label: 'ミート55 / パワー55', meet: 55, power: 55 },
+      { label: 'ミート70 / パワー70', meet: 70, power: 70 },
+      { label: 'ミート85 / パワー85', meet: 85, power: 85 },
+      { label: 'ミート85 / パワー40', meet: 85, power: 40 },
+      { label: 'ミート40 / パワー85', meet: 40, power: 85 },
+    ]
+
+    console.log('打者9人の能力を揃えて200試合（相手は互角。弾道は2に固定）')
+
+    for (const item of cases) {
+      const trials = 200
+      let hits = 0
+      let atBats = 0
+      let homeruns = 0
+      let walks = 0
+      let strikeouts = 0
+      let runs = 0
+
+      for (let seed = 0; seed < trials; seed++) {
+        const base = createInitialRoster(createRng(seed))
+        const players = base.map((player) =>
+          player.isPitcher
+            ? player
+            : {
+                ...player,
+                batting: {
+                  ...player.batting,
+                  meet: item.meet,
+                  power: item.power,
+                  trajectory: 2,
+                },
+              },
+        )
+
+        const result = simulateGame(createRng(seed * 13 + 1), {
+          players,
+          lineup: autoLineup(players),
+          opponentName: '',
+          opponentStrength: Math.round(INITIAL_TALENT / ROSTER_TALENT_RATE),
+          kind: 'friendly',
+        })
+
+        runs += result.finalScore.player
+        for (const line of result.battingLines) {
+          hits += line.hits
+          atBats += line.atBats
+          homeruns += line.homeruns
+          walks += line.walks
+          strikeouts += line.strikeouts
+        }
+      }
+
+      const average = hits / atBats
+      const onBase = (hits + walks) / (atBats + walks)
+      console.log(
+        `  ${item.label}: 打率${average.toFixed(3)} 出塁${onBase.toFixed(3)} ` +
+          `本塁打${(homeruns / trials).toFixed(2)}/試合 三振${(strikeouts / trials).toFixed(1)} ` +
+          `得点${(runs / trials).toFixed(2)}`,
+      )
+    }
+  }, DIAG_TIMEOUT)
 })
