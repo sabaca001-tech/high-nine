@@ -91,6 +91,28 @@
   flex: 1 1 auto;
   min-width: 0;
   font-weight: 700;
+  /*
+   * 長い名前だけ小さくする（`nameFontSize`）。
+   * 省略記号にすると「カルロス …」で誰か分からなくなる
+   */
+  font-size: var(--name-size, var(--fs-sm));
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  overflow: hidden;
+}
+
+/* 長い名前は姓と名で折り返す。長いほうの塊だけが幅を決めるようになる */
+.stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.15;
+}
+
+.family,
+.given {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

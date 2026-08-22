@@ -2,6 +2,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from
 import { playerPoints, pointsRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { plateGradient, rankColorOf } from '@/ui/theme/playerColors'
+import { nameFontSize, shouldStackName, splitName } from './nameFontSize'
 import { useLongPress } from './useLongPress'
 import styles from './NamePlate.module.css'
 
@@ -51,6 +52,12 @@ export function NamePlate({
   const style = {
     background: plateGradient(player),
     '--rank-color': rankColorOf(rank),
+    /*
+      **長い名前は縮めて出す。**
+      切り詰めていた頃は、留学生が「カルロス …」となって
+      スタメンの並びから誰なのか読み取れなかった
+    */
+    '--name-size': nameFontSize(player.name),
   } as CSSProperties
 
   // 長押しを渡されたときだけ、タップと長押しを使い分ける
@@ -59,6 +66,11 @@ export function NamePlate({
     onClick: onClick ?? (() => {}),
   })
   const pressProps = onLongPress ? press : { onClick }
+
+  const [family, given] = splitName(player.name)
+  const nameClass = shouldStackName(player.name)
+    ? `${styles.name} ${styles.stacked}`
+    : styles.name
 
   const classNames = [styles.plate]
   if (selected) classNames.push(styles.selected)
@@ -82,7 +94,14 @@ export function NamePlate({
         </span>
       )}
       {lead !== undefined && <span className={styles.lead}>{lead}</span>}
-      <span className={styles.name}>{player.name}</span>
+      {/*
+        **長い名前は姓と名で折り返す。** 1行のままでは、
+        入る大きさ（7px）まで縮めないと収まらず読めなくなる
+      */}
+      <span className={nameClass}>
+        <span className={styles.family}>{family}</span>
+        {given && <span className={styles.given}>{given}</span>}
+      </span>
       {/*
         評価点は**名前のすぐ横**に出す。
         誰と誰を入れ替えるかは結局この数字で決めるので、
