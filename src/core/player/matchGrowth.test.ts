@@ -110,6 +110,53 @@ describe('applyMatchGrowth', () => {
     )
   })
 
+  it('高い能力ほど伸びにくい（練習と同じ）', () => {
+    /*
+     * **見ていなかった頃は、AもGも同じように +1 されていた。**
+     * 練習では遠いはずのA以上が試合だけで積み上がるので、
+     * 「試合に出し続ければ全能力S」という育て方ができてしまう。
+     */
+    const at = (level: number) => {
+      const player = {
+        ...batter,
+        batting: {
+          ...batter.batting,
+          meet: level,
+          power: level,
+          speed: level,
+          fielding: level,
+        },
+      }
+      return totalDelta(
+        { batting: batting({ atBats: 4, hits: 3, rbi: 2, doubles: 1 }) },
+        player,
+        300,
+      )
+    }
+
+    const low = at(50)
+    const high = at(85)
+
+    expect(high).toBeLessThan(low / 2)
+    expect(high).toBeGreaterThan(0)
+  })
+
+  it('落ちるほうは鈍らせない', () => {
+    // 鈍らせると「高い能力ほど落ちにくい」になって、上とあわせて凍りつく
+    const at = (level: number) =>
+      totalDelta(
+        { batting: batting({ atBats: 4, hits: 0, strikeouts: 2 }) },
+        {
+          ...batter,
+          batting: { ...batter.batting, meet: level, power: level, speed: level, fielding: level },
+        },
+        300,
+      )
+
+    expect(at(85)).toBeLessThan(0)
+    expect(at(85)).toBeCloseTo(at(50), 1)
+  })
+
   it('投球の結果で打撃能力は動かない', () => {
     // **投打をまとめて1つの点数にしていた頃は、完封した投手のミートが伸びていた。**
     // 何をして得た点数なのかが分からなくなるので、最初から分けて数える

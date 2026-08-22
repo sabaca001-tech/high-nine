@@ -658,6 +658,25 @@ function bankedGrowth(player: Player, gain: PracticeGain, multiplier: number): n
  */
 const TRANSFER_DIMINISH_FLOOR = 0.6
 
+/**
+ * **その能力がまだ伸びる余地**（0〜1）。
+ *
+ * 練習（`calcGrowth`）では伸び幅そのものに掛かる係数だが、
+ * 試合の成長は1段階ずつ動かすので、**通る確率**として使う
+ * （`matchGrowth` / `tournamentGrowth`）。
+ *
+ * 試合の成長がこれを見ていなかった頃は、**Aの能力もGの能力も同じように +1** され、
+ * 練習では遠いはずのA以上が試合だけで積み上がっていた。
+ * 伸びにくさは能力の話であって、伸ばした場所の話ではない。
+ */
+export function growthChanceFor(player: Player, key: GrowableKey): number {
+  const current = getAbility(player, key)
+  if (current === null) return 0
+
+  // 球速だけ尺度が違う。伸びにくさは km/h ではなく0〜100に直して見る
+  return diminishingMultiplier(key === 'velocity' ? velocityScore(current) : current)
+}
+
 /** 進捗は小数で持つ。桁を切らないとセーブに長い小数が並ぶ */
 function round2(value: number): number {
   return Math.round(value * 100) / 100

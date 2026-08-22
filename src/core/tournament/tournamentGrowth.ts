@@ -18,7 +18,7 @@
  */
 
 import type { Rng } from '@/core/rng/random'
-import { raiseAbility } from '@/core/player/growth'
+import { growthChanceFor, raiseAbility } from '@/core/player/growth'
 import { grantSkill } from '@/core/skill/grantSkill'
 import type { AbilityChange, GrowableKey, Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
@@ -129,7 +129,11 @@ export function applyTournamentGrowth(
 
     const steps = rollSteps(rng, gained / POINTS_PER_STEP)
     for (let i = 0; i < steps; i++) {
-      const result = raiseAbility(current, rng.pick(keysFor(current)), 1)
+      const key = rng.pick(keysFor(current))
+      // 高い能力ほど上がりにくいのは、練習でも大会でも同じ
+      if (!rng.chance(growthChanceFor(current, key))) continue
+
+      const result = raiseAbility(current, key, 1)
       current = result.player
       if (result.change) changes.push(result.change)
     }

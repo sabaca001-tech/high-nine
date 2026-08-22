@@ -18,6 +18,10 @@
  * 初戦で負けた年と優勝した年で3年後の姿がほとんど変わらなかった。
  * 練習（`CARD_GROWTH_SCALE`）を下げて、そのぶんを試合に寄せてある。
  *
+ * **伸びにくさは練習と同じ**（`growthChanceFor`）。
+ * 見ていなかった頃は、Aの能力もGの能力も同じように +1 されていて、
+ * 練習では遠いはずのA以上が試合だけで積み上がっていた。
+ *
  * **投げた結果は投手能力、打った結果は打撃能力。**
  * 1試合の出来をひとつの点数にまとめていた頃は、
  * 完封した投手のミートが伸びることがあった。
@@ -27,7 +31,7 @@
 import type { Rng } from '@/core/rng/random'
 import type { BattingLine, PitchingLine } from '@/core/types/match'
 import type { AbilityChange, GrowableKey, Player } from '@/core/types/player'
-import { raiseAbility } from './growth'
+import { growthChanceFor, raiseAbility } from './growth'
 
 /**
  * 打撃の点数。
@@ -126,7 +130,13 @@ export function applyMatchGrowth(
 
     const delta = steps > 0 ? 1 : -1
     for (let i = 0; i < Math.abs(steps); i++) {
-      const result = raiseAbility(current, rng.pick(keys), delta)
+      const key = rng.pick(keys)
+      // **高い能力ほど上がりにくいのは、練習でも試合でも同じ。**
+      // 見ていなかった頃は、AもGも同じように +1 されていた。
+      // 落ちるほうは鈍らせない（高い能力ほど落ちにくい、では逆になる）
+      if (delta > 0 && !rng.chance(growthChanceFor(current, key))) continue
+
+      const result = raiseAbility(current, key, delta)
       current = result.player
       if (result.change) changes.push(result.change)
     }

@@ -107,6 +107,43 @@ describe('applyTournamentGrowth', () => {
     expect(total).toBeGreaterThan(singleTotal)
   })
 
+  it('高い能力ほど伸びにくい（練習と同じ）', () => {
+    // 大会だけAやSまで積み上がるのでは、練習の頭打ちが意味を失う
+    const at = (level: number) => {
+      const leveled = roster.map((player) => ({
+        ...player,
+        batting: {
+          ...player.batting,
+          meet: level,
+          power: level,
+          speed: level,
+          arm: level,
+          fielding: level,
+          catching: level,
+        },
+      }))
+
+      let total = 0
+      for (let seed = 1; seed <= 60; seed++) {
+        const result = applyTournamentGrowth(createRng(seed), leveled, {
+          kind: 'summerPref',
+          won: true,
+          champion: true,
+          starters,
+          squad,
+        })
+        for (const change of result.changes) total += change.after - change.before
+      }
+      return total
+    }
+
+    const low = at(50)
+    const high = at(85)
+
+    expect(high).toBeLessThan(low / 2)
+    expect(high).toBeGreaterThan(0)
+  })
+
   it('ベンチ外の選手は伸びない', () => {
     const outsider = roster.find((player) => !squad.includes(player.id))!
     let touched = false
