@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import { staminaFactor } from '@/core/match/halfInning'
+import { pitcherFormFactor, staminaFactor } from '@/core/match/halfInning'
 import { createInitialRoster } from './createPlayer'
 import {
   FATIGUE_MAX,
@@ -113,7 +113,18 @@ describe('疲労の効き方', () => {
    */
   it('1人目の打者から能力が落ちる', () => {
     expect(fatiguePenalty(tired(60))).toBeLessThan(1)
-    expect(staminaFactor(tired(60), 1)).toBeLessThan(staminaFactor(tired(0), 1))
+    expect(pitcherFormFactor(tired(60), 1)).toBeLessThan(pitcherFormFactor(tired(0), 1))
+  })
+
+  it('交代の判断には疲労を混ぜない', () => {
+    /*
+     * **投げる前に降ろされていた。** 消耗の物差し（`staminaFactor`）に
+     * 疲労を掛けていたので、疲労12を持っているだけで
+     * 投げ始めた瞬間に交代の目安（0.96）を下回り、
+     * 先発が1人も相手にしないうちに代えられていた。
+     */
+    expect(staminaFactor(tired(60), 0)).toBe(staminaFactor(tired(0), 0))
+    expect(staminaFactor(tired(60), 0)).toBe(1)
   })
 
   it('疲労が重いほど落ちる', () => {

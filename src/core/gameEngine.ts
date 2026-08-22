@@ -2877,6 +2877,9 @@ function approachNationalProspect(state: GameState, prospectId: string): EngineR
   if (state.month < SCOUT_OPEN_MONTH && state.month > 3) return { state, events: [] }
   // 県への出張中は動けない。まずそちらで誰かに会う
   if (state.scouting.visiting !== null) return { state, events: [] }
+  // **U15の候補に会うのも1回の出張。** 数えていなかった頃は、
+  // 県の視察だけ10回に縛られ、代表の30人には部費の続くかぎり会えた
+  if (!canScoutTrip(state.scouting)) return { state, events: [] }
 
   const prospect = findNationalProspect(state.scouting, prospectId)
   if (!prospect) return { state, events: [] }
@@ -2900,6 +2903,7 @@ function approachNationalProspect(state: GameState, prospectId: string): EngineR
       funds: state.funds - cost,
       scouting: {
         ...state.scouting,
+        trips: tripsOf(state.scouting) + 1,
         nationalTeam: state.scouting.nationalTeam.map((entry) =>
           entry.id === prospectId ? { ...entry, approaches: entry.approaches + 1 } : entry,
         ),

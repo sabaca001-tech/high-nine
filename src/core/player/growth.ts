@@ -354,8 +354,8 @@ export function applyPractice(
      */
     if (current.focus?.type === 'trajectory') {
       const gain: PracticeGain = { key: 'power', amount: TRAJECTORY_GAIN_AMOUNT, target: 'all' }
-      const banked = calcGrowth(rng, current, gain, playerMultiplier * FOCUS_BONUS)
-      const progress = (current.trajectoryProgress ?? 0) + banked
+      const banked = bankedGrowth(current, gain, playerMultiplier * FOCUS_BONUS)
+      const progress = round2((current.trajectoryProgress ?? 0) + banked)
 
       if (progress >= TRAJECTORY_COST) {
         const raised = raiseTrajectory(current, 1)
@@ -376,8 +376,8 @@ export function applyPractice(
      */
     if (current.focus?.type === 'pitch' && current.pitching) {
       const gain: PracticeGain = { key: 'sharpness', amount: PITCH_GAIN_AMOUNT, target: 'pitcher' }
-      const banked = calcGrowth(rng, current, gain, playerMultiplier * FOCUS_BONUS)
-      const progress = (current.pitchProgress ?? 0) + banked
+      const banked = bankedGrowth(current, gain, playerMultiplier * FOCUS_BONUS)
+      const progress = round2((current.pitchProgress ?? 0) + banked)
 
       if (progress >= PITCH_COST) {
         const result = improvePitches(
@@ -589,6 +589,24 @@ function calcGrowth(
   gain: PracticeGain,
   rareMultiplier: number,
 ): number {
+  const raw = growthRaw(player, gain, rareMultiplier)
+  const floor = Math.floor(raw)
+  const fraction = raw - floor
+  return floor + (rng.chance(fraction) ? 1 : 0)
+}
+
+/**
+ * 1回の練習で積み上がる量（丸める前）。
+ *
+ * @param diminish 能力が高いほど伸びにくくする係数。
+ *   **振り替え（弾道・持ち球）では緩める**（`bankedGrowth`）
+ */
+function growthRaw(
+  player: Player,
+  gain: PracticeGain,
+  rareMultiplier: number,
+  diminish: (value: number) => number = diminishingMultiplier,
+): number {
   const current = getAbility(player, gain.key)
   if (current === null) return 0
 
@@ -596,7 +614,7 @@ function calcGrowth(
   const isVelocity = gain.key === 'velocity'
   const scaled = isVelocity ? velocityScore(current) : current
 
-  const raw =
+  return (
     gain.amount *
     (isVelocity ? VELOCITY_GAIN_RATE : 1) *
     CARD_GROWTH_SCALE *
@@ -606,13 +624,43 @@ function calcGrowth(
     motivationMultiplierFor(player) *
     GRADE_MULTIPLIER[player.grade] *
     conditionMultiplierFor(player) *
-    diminishingMultiplier(scaled) *
+    diminish(scaled) *
     effectOf(player.personality).growth *
     rareMultiplier
+  )
+}
 
-  const floor = Math.floor(raw)
-  const fraction = raw - floor
-  return floor + (rng.chance(fraction) ? 1 : 0)
+/**
+ * 弾道・持ち球に**振り替える**ぶんの練習量。
+ *
+ * **丸めない。** 1回ぶんは1未満なので、`calcGrowth` のように
+ * 確率で0か1にすると、溜める仕組みが確率の当たり待ちになる。
+ * 小数のまま足していけば、進捗は毎手きちんと動く。
+ *
+ * **頭打ちも緩める。** 振り替え元の能力（弾道ならパワー）の
+ * 頭打ちをそのまま掛けていたので、**パワーがSに近い選手ほど弾道が上がらず、
+ * 進捗が42%で止まったまま何年も動かない**ということが起きていた。
+ * パワーのある打者ほどアーチが遠い、では逆で、
+ * 弾道はパワーそのものを上げているわけではない。
+ * 影響を残しつつ（`TRANSFER_DIMINISH_FLOOR`）、止まらないようにする。
+ */
+function bankedGrowth(player: Player, gain: PracticeGain, multiplier: number): number {
+  return growthRaw(player, gain, multiplier, (value) =>
+    Math.max(TRANSFER_DIMINISH_FLOOR, diminishingMultiplier(value)),
+  )
+}
+
+/**
+ * 振り替えにかかる頭打ちの下限。
+ *
+ * 素の頭打ちはパワー90で0.1（10倍かかる）。
+ * 0.6 なら、パワー90の選手でもパワー60の選手の85%の速さで溜まる。
+ */
+const TRANSFER_DIMINISH_FLOOR = 0.6
+
+/** 進捗は小数で持つ。桁を切らないとセーブに長い小数が並ぶ */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
 }
 
 /** 能力値を取得する。その選手が持たない能力なら null */

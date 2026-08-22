@@ -108,7 +108,7 @@ export function playHalf(rng: Rng, ctx: HalfContext): number {
       outs,
       inning,
       scoreDiff: offense.runs - defenseTeam.runs,
-      pitcherStaminaFactor: staminaFactor(pitcher, defenseTeam.faced),
+      pitcherStaminaFactor: pitcherFormFactor(pitcher, defenseTeam.faced),
     })
 
     const outsBefore = outs
@@ -348,16 +348,19 @@ export function staminaCapacity(stamina: number): number {
 }
 
 /**
- * 投手の消耗による能力倍率。
- * スタミナが切れてからも投げ続けられるが、そのぶん打たれる。
+ * **この試合でどれだけ消耗したか**による能力倍率。
  *
- * **疲労（`fatigue`）は「スタミナの目減り」として効く。**
- * 連投した投手は同じスタミナでも早く崩れ、さらに1人目の打者から少し球威が落ちる。
+ * スタミナが切れてからも投げ続けられるが、そのぶん打たれる。
+ * 交代の判断（`PITCHER_PULL_FACTOR`）はこの値だけを見る。
+ *
+ * **疲労（`fatigue`）はここに掛けない。**
+ * 掛けていた頃は、疲労12（前の試合の名残）を持っているだけで
+ * 投げ始めた瞬間から交代の目安（0.96）を下回り、
+ * **1人も投げないうちに先発が降ろされていた**。
+ * 疲労で短くなるのは投球回ではなく能力のほう（`fatiguePenalty`）。
  */
 export function staminaFactor(pitcher: Player, faced: number): number {
   // 「鉄腕」「省エネ投法」でスタミナが底上げされ、「スタミナ切れ」で減る
-  // **疲労はここに掛けない。** 疲れているぶんは能力そのものを下げる
-  // （`fatiguePenalty`）ので、投げられる回は変わらない
   const stamina = pitcher.pitching
     ? pitcher.pitching.stamina + skillBonus(pitcher, 'stamina')
     : 20
@@ -367,8 +370,18 @@ export function staminaFactor(pitcher: Player, faced: number): number {
   // 「走者ありで球威が上がる」特殊能力を持っているかで見る
   const rate = skillBonus(pitcher, 'stuff', ['runner']) > 0 ? 0.018 : 0.03
   // 下限0.5。球威も制球も半減するので、続投すれば確実に失点が増える
-  const worn = Math.max(0.5, 1 - Math.min(0.5, over * rate))
-  return worn * fatiguePenalty(pitcher)
+  return Math.max(0.5, 1 - Math.min(0.5, over * rate))
+}
+
+/**
+ * 打席の判定で効く投手の落ち込み。
+ * **この試合の消耗と、持ち越した疲労の両方**を掛ける。
+ *
+ * 交代の判断とは分けてある。疲れた投手は
+ * 「早く降りる」のではなく「最初から打たれる」。
+ */
+export function pitcherFormFactor(pitcher: Player, faced: number): number {
+  return staminaFactor(pitcher, faced) * fatiguePenalty(pitcher)
 }
 
 /** スタミナが切れた投手を降ろす目安 */

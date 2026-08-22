@@ -139,3 +139,38 @@ describe('守備から投手を上げる', () => {
     expect(relieved).toBeGreaterThan(20)
   })
 })
+
+describe('疲労を持った先発', () => {
+  it('1人も相手にしないうちに降ろされない', () => {
+    /*
+     * **投げる前に交代していた。** 消耗の物差し（`staminaFactor`）に
+     * 疲労を掛けていたので、疲労12を持っているだけで
+     * 投げ始めた瞬間に交代の目安（0.96）を下回っていた。
+     * 実測で、疲労30の先発の**6割が1球も投げずに交代**していた。
+     */
+    let pulled = 0
+    const trials = 40
+
+    for (let seed = 0; seed < trials; seed++) {
+      const roster = createInitialRoster(createRng(seed + 500))
+      const lineup = autoLineup(roster)
+      const starterId = lineup.slots.find((slot) => slot.position === 'P')!.playerId
+      const tired = roster.map((player) =>
+        player.id === starterId ? { ...player, fatigue: 30 } : player,
+      )
+
+      const result = simulateGame(createRng(seed + 1), {
+        players: tired,
+        lineup,
+        opponentName: '相手校',
+        opponentStrength: 0,
+        kind: 'friendly',
+      })
+
+      const line = result.pitchingLines.find((entry) => entry.playerId === starterId)
+      if (!line || line.outs === 0) pulled += 1
+    }
+
+    expect(pulled).toBe(0)
+  })
+})
