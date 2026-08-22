@@ -5,6 +5,7 @@ import { createRng } from '@/core/rng/random'
 import {
   applyRoundResult,
   createTournament,
+  earlyExitPenalty,
   opponentStrengthFor,
   reputationGain,
 } from './tournament'
@@ -254,5 +255,64 @@ describe('reputationGain', () => {
       return reputationGain(t)
     }
     expect(champion('nationals')).toBeGreaterThan(champion('summerPref'))
+  })
+})
+
+describe('earlyExitPenalty', () => {
+  /** 指定した回数だけ勝って、その次に負けた大会を作る */
+  function exitAfter(wins: number, region = KANAGAWA) {
+    let t = createTournament('summerPref', region)
+    for (let i = 0; i < wins; i++) {
+      t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 3, scoreAgainst: 1, won: true })
+    }
+    return applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 0, scoreAgainst: 4, won: false })
+  }
+
+  it('早く負けるほど大きく下がる', () => {
+    const first = earlyExitPenalty(exitAfter(0), 70)
+    const second = earlyExitPenalty(exitAfter(1), 70)
+    const third = earlyExitPenalty(exitAfter(2), 70)
+
+    expect(first).toBeLessThan(second)
+    expect(second).toBeLessThan(third)
+    expect(third).toBeLessThanOrEqual(0)
+  })
+
+  it('期待されている学校ほど、早い敗退が重い', () => {
+    // **これが「一度上がった評判が落ちない」を壊す仕組み。**
+    // 加点だけだった頃は、初戦敗退の年に起きるのが「何も貰えない」だけだった
+    const elite = earlyExitPenalty(exitAfter(0), 90)
+    const unknown = earlyExitPenalty(exitAfter(0), 10)
+
+    expect(elite).toBeLessThan(unknown)
+    // 無名校でも、負けは負け
+    expect(unknown).toBeLessThan(0)
+  })
+
+  it('半分まで勝ち上がれば下がらない', () => {
+    const t = createTournament('summerPref', KANAGAWA)
+    const half = exitAfter(Math.ceil(t.totalRounds / 2))
+
+    expect(earlyExitPenalty(half, 90)).toBe(0)
+  })
+
+  it('優勝したら下がらない', () => {
+    let t = createTournament('summerPref', TOTTORI)
+    for (let i = 0; i < t.totalRounds; i++) {
+      t = applyRoundResult(rng, t, { opponentName: 'X', scoreFor: 2, scoreAgainst: 1, won: true })
+    }
+    expect(earlyExitPenalty(t, 90)).toBe(0)
+  })
+
+  it('全国大会の初戦敗退は、地区大会より軽い', () => {
+    // 甲子園は出ること自体が評価される。夏の地区は3年生にとって最後の大会
+    const nationals = applyRoundResult(rng, createTournament('nationals', KANAGAWA), {
+      opponentName: 'X',
+      scoreFor: 1,
+      scoreAgainst: 2,
+      won: false,
+    })
+
+    expect(earlyExitPenalty(nationals, 80)).toBeGreaterThan(earlyExitPenalty(exitAfter(0), 80))
   })
 })

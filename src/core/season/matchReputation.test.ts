@@ -105,8 +105,45 @@ describe('matchReputationDelta', () => {
       outcome: 'lose',
       ourRating: our,
       opponentStrength: -30,
+      stage: 'nationals',
     })
-    expect(-collapse).toBeLessThanOrEqual(2.5)
+    expect(-collapse).toBeLessThanOrEqual(6)
+  })
+
+  it('練習試合の増減は大会よりずっと小さい', () => {
+    /*
+     * **どの試合も同じ重さだった頃は、評判が練習試合の積み重ねで決まっていた。**
+     * 学校の評判は大会でどこまで勝ったかで決まるもので、
+     * 練習試合はそのための調整という位置づけにする。
+     */
+    for (const outcome of ['win', 'lose'] as const) {
+      const practice = matchReputationDelta({
+        outcome,
+        ourRating: our,
+        opponentStrength: -10,
+        stage: 'practice',
+      })
+      const pref = matchReputationDelta({
+        outcome,
+        ourRating: our,
+        opponentStrength: -10,
+        stage: 'pref',
+      })
+
+      expect(Math.abs(practice)).toBeLessThan(Math.abs(pref) / 2)
+    }
+  })
+
+  it('舞台を省略すると練習試合として扱う', () => {
+    const omitted = matchReputationDelta({ outcome: 'lose', ourRating: our, opponentStrength: 0 })
+    const practice = matchReputationDelta({
+      outcome: 'lose',
+      ourRating: our,
+      opponentStrength: 0,
+      stage: 'practice',
+    })
+
+    expect(omitted).toBe(practice)
   })
 
   it('格上を倒すことが評判の主な稼ぎになる', () => {

@@ -157,6 +157,55 @@ export function reputationGain(tournament: Tournament): number {
  */
 const RUNNER_UP_SHARE = 0.55
 
+/**
+ * **早く負けるほど評判を失う。**
+ *
+ * 「どこまで勝ったか」で加点するだけだった頃は、
+ * 初戦敗退の年に起きるのが「何も貰えない」だけで、
+ * 一度上がった評判はほとんど落ちなかった。
+ *
+ * 期待されている学校ほど、早い敗退は取り返しがつかない。
+ * 無名校の1回戦負けは誰も気にしないが、
+ * 甲子園に出ている学校が県の1回戦で消えれば評判は大きく傷つく。
+ *
+ * @param reputation いまの評判。**期待の大きさ**として使う
+ */
+export function earlyExitPenalty(tournament: Tournament, reputation: number): number {
+  if (tournament.champion || tournament.totalRounds <= 1) return 0
+
+  const cleared = Math.max(0, tournament.round - 1)
+  const progress = cleared / tournament.totalRounds
+
+  // 半分まで勝ち上がれば「早い敗退」ではない（8回戦ならベスト8前後）
+  const missed = Math.max(0, 1 - progress / EXPECTED_PROGRESS)
+  if (missed <= 0) return 0
+
+  // 評判0の学校でも少しは下がる（`EXPECTATION_FLOOR`）が、
+  // 大半は「その学校に何が期待されていたか」で決まる
+  const expectation = EXPECTATION_FLOOR + (1 - EXPECTATION_FLOOR) * (reputation / 100)
+  return -round1(EARLY_EXIT_PENALTY[tournament.kind] * missed * expectation)
+}
+
+/**
+ * 初戦敗退したときに失う評判（期待が最大の学校の場合）。
+ *
+ * **夏の地区大会がいちばん重い。** 3年生にとって最後の大会で、
+ * ここを勝てなければその年は終わる。
+ * 全国大会は出ること自体が評価なので、負けても失うものは小さい。
+ */
+const EARLY_EXIT_PENALTY: Record<TournamentKind, number> = {
+  summerPref: 7,
+  autumnPref: 3,
+  nationals: 3,
+  springNationals: 2.5,
+}
+
+/** ここまで勝ち上がれば「早い敗退」とは呼ばない */
+const EXPECTED_PROGRESS = 0.5
+
+/** 評判が0の学校にかかる分。期待されていなくても、負けは負け */
+const EXPECTATION_FLOOR = 0.2
+
 function round1(value: number): number {
   return Math.round(value * 10) / 10
 }

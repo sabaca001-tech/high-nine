@@ -133,6 +133,7 @@ import {
   applyRoundResult,
   createTournament,
   opponentStrengthFor,
+  earlyExitPenalty,
   reputationGain,
 } from '@/core/tournament/tournament'
 import { createBracket, opponentAt } from '@/core/tournament/bracket'
@@ -922,7 +923,10 @@ function finishTournament(state: GameState): EngineResult {
     return { state, events: [] }
   }
 
-  const gain = reputationGain(tournament)
+  // どこまで勝ったかで加点し、**早く負けたぶんは差し引く**。
+  // 加点だけだった頃は、初戦敗退の年に起きるのが「何も貰えない」だけで、
+  // 一度上がった評判がほとんど落ちなかった
+  const gain = reputationGain(tournament) + earlyExitPenalty(tournament, state.reputation)
   // 評判は上に行くほど伸びにくい。そうしないと1年目で100に張り付く
   const reputation = applyReputation(state.reputation, gain)
   const prize = tournamentPrize(tournament)
@@ -1319,6 +1323,8 @@ function finishMatch(state: GameState): EngineResult {
     outcome: match.outcome,
     ourRating,
     opponentStrength: match.opponentStrength,
+    // 練習試合の1敗と、大会の1敗は同じ重さではない
+    stage,
   })
   const reputation = applyReputation(state.reputation, reputationDelta)
 
