@@ -8,6 +8,7 @@ import { applyCommand } from './gameEngine'
 import { playUntilYearEnd, startedGame } from './autoPlay'
 import { overallRating } from './player/rating'
 import type { GameState } from './types/game'
+import type { Player } from './types/player'
 
 /**
  * バランス確認用の診断スクリプト。
@@ -131,13 +132,17 @@ describe('バランス確認', () => {
    * 弾道は2に固定（本塁打は弾道でも動くので、混ぜると効きが読めない）。
    */
   it('打撃能力の帯ごとの成績を出力する（常に成功する診断用）', () => {
-    const cases: { label: string; meet: number; power: number }[] = [
+    const cases: { label: string; meet: number; power: number; speed?: number }[] = [
       { label: 'ミート40 / パワー40', meet: 40, power: 40 },
       { label: 'ミート55 / パワー55', meet: 55, power: 55 },
       { label: 'ミート70 / パワー70', meet: 70, power: 70 },
       { label: 'ミート85 / パワー85', meet: 85, power: 85 },
       { label: 'ミート85 / パワー40', meet: 85, power: 40 },
       { label: 'ミート40 / パワー85', meet: 40, power: 85 },
+      // 走力だけを動かす。内野安打と、単打を二塁打にする走塁に効く
+      { label: 'ミート55 / パワー55 / 走力20', meet: 55, power: 55, speed: 20 },
+      { label: 'ミート55 / パワー55 / 走力55', meet: 55, power: 55, speed: 55 },
+      { label: 'ミート55 / パワー55 / 走力90', meet: 55, power: 55, speed: 90 },
     ]
 
     console.log('打者9人の能力を揃えて200試合（相手は互角。弾道は2に固定）')
@@ -149,11 +154,12 @@ describe('バランス確認', () => {
       let homeruns = 0
       let walks = 0
       let strikeouts = 0
+      let doubles = 0
       let runs = 0
 
       for (let seed = 0; seed < trials; seed++) {
         const base = createInitialRoster(createRng(seed))
-        const players = base.map((player) =>
+        const players: Player[] = base.map((player) =>
           player.isPitcher
             ? player
             : {
@@ -163,6 +169,7 @@ describe('バランス確認', () => {
                   meet: item.meet,
                   power: item.power,
                   trajectory: 2,
+                  ...(item.speed === undefined ? {} : { speed: item.speed }),
                 },
               },
         )
@@ -182,6 +189,7 @@ describe('バランス確認', () => {
           homeruns += line.homeruns
           walks += line.walks
           strikeouts += line.strikeouts
+          doubles += line.doubles
         }
       }
 
@@ -189,8 +197,8 @@ describe('バランス確認', () => {
       const onBase = (hits + walks) / (atBats + walks)
       console.log(
         `  ${item.label}: 打率${average.toFixed(3)} 出塁${onBase.toFixed(3)} ` +
-          `本塁打${(homeruns / trials).toFixed(2)}/試合 三振${(strikeouts / trials).toFixed(1)} ` +
-          `得点${(runs / trials).toFixed(2)}`,
+          `二塁打${(doubles / trials).toFixed(2)} 本塁打${(homeruns / trials).toFixed(2)} ` +
+          `三振${(strikeouts / trials).toFixed(1)} 得点${(runs / trials).toFixed(2)}`,
       )
     }
   }, DIAG_TIMEOUT)

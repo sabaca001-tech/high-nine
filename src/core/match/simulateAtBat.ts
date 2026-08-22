@@ -218,6 +218,9 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   )
   if (rng.chance(strikeoutRate)) return 'strikeout'
 
+  // 走力。**内野安打と、単打を二塁打にする走塁**に効く
+  const speed = batter.batting.speed * batterBoost
+
   // ── 打球が飛んだ場合 ──────────────────
   // 適性を無視した起用は、まず失策として返ってくる。
   // 遊撃にG適性を置くと 1.0*5 = 5 → +2.5% で失策がほぼ倍になる。
@@ -229,21 +232,47 @@ export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {
   )
   if (rng.chance(errorRate)) return 'error'
 
-  // 失策にならなくても、守備範囲の狭さぶんヒットが増える
+  /*
+   * 失策にならなくても、守備範囲の狭さぶんヒットが増える。
+   *
+   * **走力もここに効く（内野安打）。** 打球の質はミートとパワーで決まるが、
+   * 一塁までの速さで抜ける当たりがある。
+   * ミート（0.6）やパワー（0.5）より軽く見るのは、
+   * 走力で稼げるのは内野への当たりだけだから。
+   *
+   * **パワーの係数を 0.4 → 0.5 に上げてある。** 同じ合計でも
+   * ミート寄り（85/40）が6.37点、パワー寄り（40/85）が5.58点と
+   * 14%の差があり、評価点が同じ重みで見ているのと食い違っていた。
+   */
   const hitRate = clamp(
-    0.31 +
-      (contact * 0.6 + power * 0.4 - stuff * 0.5 - control * 0.3 - defense * 0.2) / 430 +
+    HIT_BASE +
+      (contact * 0.6 +
+        power * 0.5 +
+        speed * 0.15 -
+        stuff * 0.5 -
+        control * 0.3 -
+        defense * 0.2) /
+        430 +
       ctx.misplacement * 0.004,
     0.12,
     0.58,
   )
 
   if (rng.chance(hitRate)) {
-    return hitType(rng, batter, power, longballRate)
+    return hitType(rng, batter, power, speed, longballRate)
   }
 
   return outType(rng, batter, bases, outs, groundBias)
 }
+
+/**
+ * 打球が抜ける素の率。
+ *
+ * **能力の係数を増やしたぶん、ここを下げてある**（0.31 → 0.288）。
+ * 下げずに係数だけ足すと、打率が全体に上がって投手が弱くなる。
+ * 素の値を下げて係数を上げるほうが、**能力の差がそのまま成績の差になる**。
+ */
+const HIT_BASE = 0.288
 
 /**
  * 安打の種類を決める。
@@ -262,16 +291,22 @@ function hitType(
   rng: Rng,
   batter: Player,
   power: number,
+  speed: number,
   /** 被本塁打の倍率。1.0が標準（投手の特殊能力で増減する） */
   longballRate = 1,
 ): PlayResult {
   const homerunShare = clamp(
-    (0.03 + (power - 45) / 500 + (batter.batting.trajectory - 2) * 0.03) * longballRate,
+    (0.03 + (power - 45) / 420 + (batter.batting.trajectory - 2) * 0.03) * longballRate,
     0.004,
     0.35,
   )
-  const tripleShare = clamp(0.02 + (batter.batting.speed - 50) / 1200, 0.005, 0.06)
-  const doubleShare = 0.2
+  const tripleShare = clamp(0.02 + (speed - 50) / 1200, 0.005, 0.06)
+  /*
+   * **二塁打も走力で動く。** 0.2で固定していた頃は、
+   * 同じ当たりでも足の速い打者が二塁を陥れる、という走塁が存在しなかった。
+   * 走力90で0.25、走力20で0.16。
+   */
+  const doubleShare = clamp(0.2 + (speed - 50) / 800, 0.12, 0.3)
 
   return rng.weighted<PlayResult>([
     { value: 'homerun', weight: homerunShare },
