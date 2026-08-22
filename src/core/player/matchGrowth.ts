@@ -12,6 +12,16 @@
  *
  * 練習と違って**回数が少ない**（1年に十数試合）ので、
  * 1試合の振れ幅は練習1回より大きくてよい。
+ *
+ * **日々の練習より、試合のほうが選手を変える。**
+ * 伸びの土台を練習に置いていた頃は、大会で勝ち上がっても育成上の見返りが薄く、
+ * 初戦で負けた年と優勝した年で3年後の姿がほとんど変わらなかった。
+ * 練習（`CARD_GROWTH_SCALE`）を下げて、そのぶんを試合に寄せてある。
+ *
+ * **投げた結果は投手能力、打った結果は打撃能力。**
+ * 1試合の出来をひとつの点数にまとめていた頃は、
+ * 完封した投手のミートが伸びることがあった。
+ * 何をして得た点数なのかが分からなくなるので、最初から分けて数える。
  */
 
 import type { Rng } from '@/core/rng/random'
@@ -41,8 +51,11 @@ const EARNED_RUN_POINT = -0.8
 const HIT_ALLOWED_POINT = -0.15
 const WALK_ALLOWED_POINT = -0.2
 
-/** これだけの点数で能力が1動く */
-const POINTS_PER_STEP = 3
+/**
+ * これだけの点数で能力が1動く。
+ * **3から下げてある。** 日々の練習の伸びを落としたぶん、試合の見返りを厚くする。
+ */
+const POINTS_PER_STEP = 1.25
 
 /**
  * 下がるときは緩やかにする。
@@ -62,15 +75,15 @@ export type MatchStage = 'practice' | 'pref' | 'nationals'
 
 const STAGE_MULTIPLIER: Record<MatchStage, number> = {
   practice: 1,
-  pref: 1.5,
-  nationals: 2,
+  pref: 1.8,
+  nationals: 2.6,
 }
 
 /** 1試合で伸びる上限。大勝したときに一気に完成させないための蓋 */
 const STAGE_MAX_STEPS: Record<MatchStage, number> = {
   practice: 3,
-  pref: 4,
-  nationals: 5,
+  pref: 5,
+  nationals: 6,
 }
 
 export type MatchGrowthResult = {
@@ -94,31 +107,35 @@ export function applyMatchGrowth(
 ): MatchGrowthResult {
   if (!params.batting && !params.pitching) return { player, changes: [] }
 
-  const points = performancePoints(params.batting, params.pitching)
   const stage = params.stage ?? 'practice'
-
-  const steps =
-    points >= 0
-      ? Math.min(
-          STAGE_MAX_STEPS[stage],
-          rollSteps(rng, (points * STAGE_MULTIPLIER[stage]) / POINTS_PER_STEP),
-        )
-      : -Math.min(MAX_DECLINE, rollSteps(rng, (-points * DECLINE_SCALE) / POINTS_PER_STEP))
-
-  if (steps === 0) return { player, changes: [] }
-
-  // 変動する能力は**何をした試合か**に寄せる。投げた選手は投手能力、走ったなら走力
-  const keys = keysFor(params.batting, params.pitching)
-  const delta = steps > 0 ? 1 : -1
 
   let current = player
   const changes: AbilityChange[] = []
 
-  for (let i = 0; i < Math.abs(steps); i++) {
-    const result = raiseAbility(current, rng.pick(keys), delta)
-    current = result.player
-    if (result.change) changes.push(result.change)
+  /** 片方ぶん（打撃なら打撃）の点数を、その系統の能力に配る */
+  const apply = (points: number, keys: GrowableKey[]) => {
+    if (keys.length === 0) return
+
+    const steps =
+      points >= 0
+        ? Math.min(
+            STAGE_MAX_STEPS[stage],
+            rollSteps(rng, (points * STAGE_MULTIPLIER[stage]) / POINTS_PER_STEP),
+          )
+        : -Math.min(MAX_DECLINE, rollSteps(rng, (-points * DECLINE_SCALE) / POINTS_PER_STEP))
+
+    const delta = steps > 0 ? 1 : -1
+    for (let i = 0; i < Math.abs(steps); i++) {
+      const result = raiseAbility(current, rng.pick(keys), delta)
+      current = result.player
+      if (result.change) changes.push(result.change)
+    }
   }
+
+  // **投打は別々に数える。** まとめて1つの点数にすると、
+  // 完封した投手のミートが伸びたり、猛打賞の日に制球が落ちたりする
+  if (params.pitching) apply(performancePoints(undefined, params.pitching), PITCHING_KEYS)
+  if (params.batting) apply(performancePoints(params.batting, undefined), battingKeysFor(params.batting))
 
   return { player: current, changes }
 }
@@ -155,22 +172,25 @@ export function performancePoints(batting?: BattingLine, pitching?: PitchingLine
 }
 
 /**
- * 変動する能力の候補。
+ * 投球の結果で動く能力。
+ *
+ * **球速は入れない。** 球速は体づくりで上がるもので、
+ * 好投した日に速くなるものではない（練習では伸びる）。
+ * ここで動くのは、投げながら身につく制球・スタミナ・キレ・ノビ。
+ */
+const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'sharpness', 'life']
+
+/**
+ * 打席と守備の結果で動く能力。
  * 内容に関係なく全能力が動くと「試合に出しただけ」の成長になるので、
  * **何をした試合か**に寄せる。
  */
-function keysFor(batting?: BattingLine, pitching?: PitchingLine): GrowableKey[] {
-  const keys: GrowableKey[] = []
+function battingKeysFor(batting: BattingLine): GrowableKey[] {
+  const keys: GrowableKey[] = ['meet', 'power']
 
-  if (pitching && pitching.outs > 0) {
-    keys.push('control', 'stamina', 'sharpness')
-  }
-  if (batting) {
-    keys.push('meet', 'power')
-    // 長打を放った選手はパワーが、走った選手は走力が動きやすい
-    if (batting.doubles + batting.triples + batting.homeruns > 0) keys.push('power')
-    if (batting.steals > 0) keys.push('speed')
-  }
+  // 長打を放った選手はパワーが、走った選手は走力が動きやすい
+  if (batting.doubles + batting.triples + batting.homeruns > 0) keys.push('power')
+  if (batting.steals > 0) keys.push('speed')
 
   // 出場して守っていれば守備も動く
   keys.push('fielding')

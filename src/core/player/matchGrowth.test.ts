@@ -105,6 +105,47 @@ describe('applyMatchGrowth', () => {
       })
       for (const change of result.changes) keys.add(change.key)
     }
-    expect([...keys].some((key) => ['control', 'stamina', 'breaking'].includes(key))).toBe(true)
+    expect([...keys].some((key) => ['control', 'stamina', 'sharpness', 'life'].includes(key))).toBe(
+      true,
+    )
+  })
+
+  it('投球の結果で打撃能力は動かない', () => {
+    // **投打をまとめて1つの点数にしていた頃は、完封した投手のミートが伸びていた。**
+    // 何をして得た点数なのかが分からなくなるので、最初から分けて数える
+    const rng = createRng(7)
+    const keys = new Set<string>()
+    for (let i = 0; i < 120; i++) {
+      const result = applyMatchGrowth(rng, pitcher, {
+        pitching: pitching({ outs: 27, strikeouts: 14 }),
+        stage: 'nationals',
+      })
+      for (const change of result.changes) keys.add(change.key)
+    }
+
+    expect(keys.size).toBeGreaterThan(0)
+    expect([...keys].every((key) => ['control', 'stamina', 'sharpness', 'life'].includes(key))).toBe(
+      true,
+    )
+  })
+
+  it('打った結果は打撃能力に出る（投げていても）', () => {
+    // 投手が打った日は打撃が伸びてよい。**引き金がどちらの結果かだけが大事**
+    const rng = createRng(11)
+    const keys = new Set<string>()
+    for (let i = 0; i < 120; i++) {
+      const result = applyMatchGrowth(rng, pitcher, {
+        batting: batting({ atBats: 4, hits: 3, homeruns: 1, rbi: 3 }),
+        pitching: pitching({ outs: 6, earnedRuns: 5, hits: 9 }),
+        stage: 'pref',
+      })
+      for (const change of result.changes) keys.add(change.key)
+    }
+
+    // 打って伸び、投げて落ちるので、両方の系統が動く
+    expect([...keys].some((key) => ['meet', 'power', 'fielding'].includes(key))).toBe(true)
+    expect([...keys].some((key) => ['control', 'stamina', 'sharpness', 'life'].includes(key))).toBe(
+      true,
+    )
   })
 })

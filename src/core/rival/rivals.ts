@@ -155,39 +155,19 @@ const STRONG_PRESTIGE = 10
 const NOTABLE_PRESTIGE = 2
 
 /**
- * ゲームを始めた時点での戦績。
+ * **戦績は積み上げたものだけ。** 開始時はどの学校も0で、
+ * 「甲子園◯回出場」はプレイヤーと同じ世界で実際に勝った回数を数えている
+ * （`runRivalSeason` が毎年、県ごとに優勝校を1つ決める）。
  *
- * **世界に歴史を持たせる。** 戦績を0から積み上げる形にしていたので、
- * 始めた年はどの学校も無印で、「昔から強い名門」が一校も存在しなかった。
- * プレイヤーが最初に見る一覧が全部同じ顔なら、格という仕組み自体が無いのと同じ。
+ * 以前は地力から逆算した回数を最初から配っていた（`initialTitles`）。
+ * 一覧の初年度が賑やかになる代わりに、
+ * **その「甲子園12回」はどこにも起きていない出来事**で、
+ * 勝ち上がりを数えている現在の回数と意味が混ざっていた。
+ * 名門は数年〜十数年かけて生まれる。
  *
- * 地力（`tradition`）はその学校が何十年も積んできたものなので、
- * そこから逆算した回数を最初から持たせる。
- * **県優勝は甲子園出場より必ず多い**（甲子園は県を勝ち抜いた先にある）。
+ * 強さそのものは地力（`tradition`）が持っているので、
+ * 初年度でも「県の筆頭校は強い」ことは変わらない。
  */
-export function initialTitles(rng: Rng, tradition: number): RivalTitles | undefined {
-  // 名門（`prestigeLabel` が24以上）に届くのは、この帯だけ
-  if (tradition >= 48) {
-    const nationals = rng.int(4, 12)
-    return {
-      championships: rng.chance(0.45) ? rng.int(1, 2) : 0,
-      nationals,
-      region: nationals + rng.int(2, 6),
-    }
-  }
-  if (tradition >= 38) {
-    const nationals = rng.int(1, 3)
-    return { championships: 0, nationals, region: nationals + rng.int(1, 4) }
-  }
-  if (tradition >= 26) {
-    const nationals = rng.int(0, 1)
-    return { championships: 0, nationals, region: nationals + rng.int(1, 3) }
-  }
-  if (tradition >= 12 && rng.chance(0.35)) {
-    return { championships: 0, nationals: 0, region: 1 }
-  }
-  return undefined
-}
 
 /** 戦績を1年ぶん足す */
 export function addTitles(school: RivalSchool, gained: Partial<RivalTitles>): RivalSchool {
@@ -408,11 +388,6 @@ export function createRivals(
       tradition,
       strength: tradition + rng.int(-DRIFT, DRIFT),
       trend: 0,
-      // **始めた時点の戦績。** 無いと、初年度は名門も新設校も同じ顔で並ぶ
-      ...(() => {
-        const titles = initialTitles(rng, tradition)
-        return titles ? { titles } : {}
-      })(),
       ...(notable ? { notable: true, stars: createStars(rng, id, tradition, playerNames, year) } : {}),
       rosterSeed: rng.int(1, 2_000_000_000),
     })

@@ -124,8 +124,13 @@ const VELOCITY_GAIN_RATE = 0.55
  * 3年間の伸びが `GRADE_BASE[3] - GRADE_BASE[1]`（＝14）とおおよそ
  * 釣り合っていないと、3年生になった選手が初期3年生を大きく追い越してしまう。
  * 変えたら必ず seasonBalance.test.ts を回すこと。
+ *
+ * **試合の成長を厚くしたぶん、さらに下げてある**（0.0080 → 0.0070）。
+ * 日々の練習が伸びの大半を占めていた頃は、大会で勝ち上がっても
+ * 育成上の見返りが薄く、初戦で負けた年と優勝した年で3年後の姿が変わらなかった。
+ * 総量は変えず、**練習から試合へ**（`matchGrowth` / `tournamentGrowth`）寄せている。
  */
-export const CARD_GROWTH_SCALE = 0.0080
+export const CARD_GROWTH_SCALE = 0.0070
 
 /**
  * 1日ぶんの体力・信頼度の倍率。

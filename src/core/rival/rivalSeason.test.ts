@@ -8,11 +8,7 @@ import { REGIONS } from '@/core/types/region'
 
 const schools = createRivals(createRng(7), 'kanagawa')
 
-/**
- * その年に増えたぶんだけを見る。
- * **学校は最初から戦績を持っている**（`initialTitles`）ので、
- * 絶対値で数えると開始時の歴史まで数えてしまう。
- */
+/** その年に増えたぶんだけを見る */
 function gained(
   before: typeof schools,
   after: typeof schools,
