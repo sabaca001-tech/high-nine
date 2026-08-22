@@ -2,7 +2,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from
 import { playerPoints, pointsRank } from '@/core/player/rating'
 import type { Player } from '@/core/types/player'
 import { plateGradient, rankColorOf } from '@/ui/theme/playerColors'
-import { nameFontSize, shouldStackName, splitName } from './nameFontSize'
+import { nameFontSize, splitName } from './nameFontSize'
 import { useLongPress } from './useLongPress'
 import styles from './NamePlate.module.css'
 
@@ -68,9 +68,6 @@ export function NamePlate({
   const pressProps = onLongPress ? press : { onClick }
 
   const [family, given] = splitName(player.name)
-  const nameClass = shouldStackName(player.name)
-    ? `${styles.name} ${styles.stacked}`
-    : styles.name
 
   const classNames = [styles.plate]
   if (selected) classNames.push(styles.selected)
@@ -95,10 +92,13 @@ export function NamePlate({
       )}
       {lead !== undefined && <span className={styles.lead}>{lead}</span>}
       {/*
-        **長い名前は姓と名で折り返す。** 1行のままでは、
-        入る大きさ（7px）まで縮めないと収まらず読めなくなる
+        **入らない名前だけ、姓と名のあいだで折り返る。**
+        1行のままでは、入る大きさ（7px）まで縮めないと収まらず読めなくなる。
+        どこで折れるかは幅しだいなので、**文字数では決めずにブラウザに任せる**
+        （`flex-wrap`。数えて決めていた頃は、
+        「ライアン セペダ」のように閾値の手前で入らない名前が漏れていた）
       */}
-      <span className={nameClass}>
+      <span className={styles.name}>
         <span className={styles.family}>{family}</span>
         {given && <span className={styles.given}>{given}</span>}
       </span>

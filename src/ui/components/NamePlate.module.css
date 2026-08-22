@@ -96,17 +96,16 @@
    * 省略記号にすると「カルロス …」で誰か分からなくなる
    */
   font-size: var(--name-size, var(--fs-sm));
+  /*
+   * **入らないときだけ、姓と名のあいだで折り返す。**
+   * 折るかどうかを文字数で決めていた頃は、閾値の手前で入らない名前
+   * （「ライアン セペダ」）が1行のまま省略記号になっていた。
+   * 幅で決まることは幅に決めさせる。
+   */
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px;
-  overflow: hidden;
-}
-
-/* 長い名前は姓と名で折り返す。長いほうの塊だけが幅を決めるようになる */
-.stacked {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
+  gap: 0 4px;
   line-height: 1.15;
 }
 

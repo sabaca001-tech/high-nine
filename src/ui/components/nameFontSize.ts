@@ -52,23 +52,3 @@ export function splitName(name: string): [string, string] {
   const at = name.indexOf(' ')
   return at < 0 ? [name, ''] : [name.slice(0, at), name.slice(at + 1)]
 }
-
-/**
- * 姓と名を**2行に分けて出すか**。
- *
- * スタメンの行は、打順・評価点・学年・守備位置と並ぶので
- * 名前に残る幅が**76pxしかない**。
- * 「アレハンドロ ラミレス」は1行だと9pxまで縮めても92px要るので入らず、
- * 入る大きさ（7px）まで落とすと今度は読めない。
- *
- * **2行にすれば、長いほうの塊だけが幅を決める**ので
- * 「アレハンドロ」54px（9px×6）で収まる。
- * 短い名前まで2行にすると行の見え方が変わるので、入らないものだけ折る。
- */
-export function shouldStackName(name: string): boolean {
-  const [family, given] = splitName(name)
-  return given.length > 0 && family.length + given.length >= STACK_LETTERS
-}
-
-/** ここから2行にする。「長谷川 龍之介」（6文字）は1行のまま */
-const STACK_LETTERS = 8
