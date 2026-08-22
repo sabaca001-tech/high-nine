@@ -1,5 +1,6 @@
 import { isTournamentOver, roundName } from '@/core/types/tournament'
 import { findRegion } from '@/core/types/region'
+import { lineupPoints } from '@/core/player/rating'
 import { matchupLabel, teamRating } from '@/core/season/matchReputation'
 import { formatFunds } from '@/core/shop/funds'
 import { tournamentTravel } from '@/core/shop/travel'
@@ -139,6 +140,7 @@ export function TournamentScreen() {
           schools={game.rivals}
           year={game.year}
           progress={seasonProgressOfCell(game.boardPosition)}
+          ourPoints={lineupPoints(game.players, game.lineup)}
         />
 
         {over && !tournament.champion && champion && (

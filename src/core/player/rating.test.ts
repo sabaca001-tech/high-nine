@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
-import { createPlayer } from './createPlayer'
+import { createInitialRoster, createPlayer } from './createPlayer'
+import { autoLineup } from '@/core/lineup/autoLineup'
 import {
   abilityPoints,
+  lineupPoints,
+  teamPointsFromRating,
   breakAmountScore,
   PITCHER_WEIGHTS,
   varietyScore,
@@ -352,5 +355,41 @@ describe('評価の優先順', () => {
         { direction: 'down', name: 'フ', level: 1 },
       ]),
     )
+  })
+})
+
+describe('lineupPoints', () => {
+  /**
+   * **自校だけ実測していなかった。**
+   * トーナメント表で自校の評価点を「互角の基準（強さ0）から見込んだ固定値」で
+   * 出していたので、甲子園でベスト8まで勝ち上がっても E 2,511 のまま
+   * （周りは B 6,000 台）という表示になっていた。
+   */
+  it('スタメン9人の評価点の合計', () => {
+    const roster = createInitialRoster(createRng(41))
+    const lineup = autoLineup(roster)
+    const starters = new Set(lineup.slots.map((slot) => slot.playerId))
+    const expected = roster
+      .filter((player) => starters.has(player.id))
+      .reduce((sum, player) => sum + playerPoints(player), 0)
+
+    expect(lineupPoints(roster, lineup)).toBeCloseTo(expected, 6)
+  })
+
+  it('チームが強くなれば数字も動く（固定値ではない）', () => {
+    const roster = createInitialRoster(createRng(42))
+    const lineup = autoLineup(roster)
+    const grown = roster.map((player) => ({
+      ...player,
+      batting: {
+        ...player.batting,
+        meet: Math.min(100, player.batting.meet + 20),
+        power: Math.min(100, player.batting.power + 20),
+      },
+    }))
+
+    expect(lineupPoints(grown, lineup)).toBeGreaterThan(lineupPoints(roster, lineup))
+    // 見込み値（強さ0 ＝ E 2,511）に張り付いていない
+    expect(lineupPoints(grown, lineup)).not.toBeCloseTo(teamPointsFromRating(46.5), 0)
   })
 })

@@ -1,5 +1,6 @@
 /** 能力値の表示・評価に関する変換 */
 
+import type { Lineup } from '@/core/types/lineup'
 import type { BattingAbilities, Pitch, PitchingAbilities, Player } from '@/core/types/player'
 import { velocityGrade, velocityScore } from '@/core/types/player'
 import { arsenalScore } from './pitchDefs'
@@ -393,6 +394,19 @@ export const LINEUP_SIZE = 9
  */
 export function teamPoints(players: Player[]): number {
   return players.reduce((sum, player) => sum + playerPoints(player), 0)
+}
+
+/**
+ * 自校のスタメンの評価点。
+ *
+ * **他校と同じ物差しで出すためのもの。**（他校は `lineupPointsOf`）
+ * トーナメント表で自校だけ「互角の基準（強さ0）から見込んだ固定値」を
+ * 出していたので、甲子園でベスト8まで来ても **E 2,511 のまま**で、
+ * 周りの B 6,000 台と並ぶと自校だけ極端に弱く見えていた。
+ */
+export function lineupPoints(players: Player[], lineup: Lineup): number {
+  const starters = new Set(lineup.slots.map((slot) => slot.playerId))
+  return teamPoints(players.filter((player) => starters.has(player.id)))
 }
 
 /**

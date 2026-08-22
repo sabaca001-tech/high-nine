@@ -11,7 +11,7 @@ import {
   playerPoints,
   pointsFromRating,
   pointsRank,
-  teamPoints,
+  lineupPoints,
   teamPointsLabel,
   teamPointsRank,
   toRank,
@@ -136,9 +136,8 @@ function TeamTab() {
   const region = findRegion(game.regionId)
   const grade = reputationGrade(game.reputation)
   const squad = new Set(game.squad)
-  const starters = new Set(game.lineup.slots.map((slot) => slot.playerId))
   const injured = game.players.filter((player) => player.injuryMonths > 0).length
-  const starterPoints = teamPoints(game.players.filter((player) => starters.has(player.id)))
+  const starterPoints = lineupPoints(game.players, game.lineup)
 
   return (
     <>

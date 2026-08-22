@@ -28,6 +28,7 @@ export function BracketView({
   schools,
   year,
   progress,
+  ourPoints,
 }: {
   bracket: Bracket
   totalRounds: number
@@ -37,6 +38,15 @@ export function BracketView({
   year: number
   /** 年度の進み具合（0〜1）。他校の部員は年度が進むほど伸びている */
   progress?: number
+  /**
+   * 自校のスタメンの評価点（`lineupPoints`）。
+   *
+   * **自校だけ実測していなかった。** 他校は名簿から評価点を出しているのに、
+   * 自校は枠に入れてある強さ（互角＝0）から見込んだ固定値だったので、
+   * 甲子園でベスト8まで勝ち上がっても **E 2,511 のまま**で、
+   * 周りの B 6,000 台と並ぶと自校だけ極端に弱く見えていた。
+   */
+  ourPoints: number
 }) {
   /**
    * 0は「山（ブロック）」の表示。
@@ -56,6 +66,9 @@ export function BracketView({
    * 学校が見つからないときだけ戦力から見込みを立てる。
    */
   const rate = (team: BracketTeam): number => {
+    // 自校は名簿がそのまま手元にあるので、見込みではなく実測を出す
+    if (team.ours) return ourPoints
+
     const school = team.schoolId ? schools.find((item) => item.id === team.schoolId) : undefined
     return school
       ? lineupPointsOf(school, year, progress)
