@@ -2,6 +2,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import { PRACTICE_DEFS } from '@/core/card/cardDefs'
+import { injuryRiskOf, injuryWeightOf } from '@/core/player/condition'
 import { clamp, raiseAbility } from '@/core/player/growth'
 import { overallRating } from '@/core/player/rating'
 import { createFriendlyOffers } from '@/core/match/friendlyOffers'
@@ -359,15 +360,32 @@ const INJURY_MONTHS = { min: 1, max: 3 }
 function resolveBadEvent(rng: Rng, players: Player[]): CellOutcome {
   const kind = rng.int(1, 4)
 
-  // 4: 怪我。体力が低い選手ほど起きやすい
+  // 4: 怪我。**体力が低いほど、起きやすく・選ばれやすい**
   if (kind === 4) {
     const healthy = players.filter((p) => p.injuryMonths === 0)
     if (healthy.length > 0) {
       // 体力が低いほど選ばれやすい
       const target = rng.weighted(
-        healthy.map((p) => ({ value: p, weight: Math.max(1, 110 - p.condition) })),
+        healthy.map((p) => ({ value: p, weight: injuryWeightOf(p.condition) })),
       )
       const months = rng.int(INJURY_MONTHS.min, INJURY_MONTHS.max)
+
+      // **起きるかどうかも体力で決まる。**
+      // 以前はここで必ず怪我をしていたので、
+      // チーム全体を疲れさせても怪我は増えず、
+      // 体力を保って怪我を防ぐ、ということができなかった
+      if (!rng.chance(injuryRiskOf(target.condition))) {
+        return {
+          players,
+          events: [
+            {
+              type: 'message',
+              text: `${target.name}がヒヤリとする場面があったが、大事には至らなかった`,
+              tone: 'normal',
+            },
+          ],
+        }
+      }
 
       return {
         players: players.map((p) =>

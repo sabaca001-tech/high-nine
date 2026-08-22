@@ -24,6 +24,7 @@ import {
   VELOCITY_MIN,
   velocityScore,
 } from '@/core/types/player'
+import { conditionGrowthRate } from './condition'
 import { effectOf } from './personality'
 import { improvePitches, isArsenalComplete } from './pitchDefs'
 import {
@@ -161,20 +162,17 @@ const GRADE_MULTIPLIER: Record<Grade, number> = {
   3: 0.85,
 }
 
-/** 体力による成長倍率。疲れていると伸びない */
-function conditionMultiplier(condition: number): number {
-  if (condition >= 70) return 1.0
-  if (condition >= 40) return 0.85
-  if (condition >= 20) return 0.6
-  return 0.4
-}
-
 /**
- * 性格を加味した体力ペナルティ。
+ * 性格を加味した体力の倍率（`conditionGrowthRate`）。
  * 「ど根性」は疲れていても伸びる（ペナルティが半分）。
+ *
+ * **1を超えるぶんは性格で薄めない。** ペナルティを和らげる性格が
+ * 「万全のときの伸び」まで削ってしまうと、意味が逆になる。
  */
 function conditionMultiplierFor(player: Player): number {
-  const base = conditionMultiplier(player.condition)
+  const base = conditionGrowthRate(player.condition)
+  if (base >= 1) return base
+
   const resilience = effectOf(player.personality).conditionResilience
   return 1 - (1 - base) * resilience
 }

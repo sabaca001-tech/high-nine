@@ -16,6 +16,7 @@
  */
 
 import type { Rng } from '@/core/rng/random'
+import { injuryRiskOf } from '@/core/player/condition'
 import { clamp, raiseAbility, raiseTrajectory, TRAJECTORY_MAX } from '@/core/player/growth'
 import { TRAJECTORY_LABELS } from '@/core/player/rating'
 import { improvePitches } from '@/core/player/pitchDefs'
@@ -111,6 +112,12 @@ const TRAJECTORY_UP_CHANCE = 0.45
 
 // ── イベント定義 ────────────────────────────────────
 
+/**
+ * 「投げ込ませる」で肩を壊す確率の上限（体力0のとき）。
+ * 実際は体力で薄まる（`injuryRiskOf`。体力95で25%、40で48%）。
+ */
+const SORE_ARM_RISK = 0.7
+
 export const PLAYER_EVENTS: PlayerEventDef[] = [
   {
     id: 'slump',
@@ -172,6 +179,7 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
   {
     id: 'sore-arm',
     title: '肩の違和感',
+    // 壊す確率は体力しだい（`SORE_ARM_RISK` × `injuryRiskOf`）
     text: '{name}が肩に張りを感じているという。',
     applies: (player) => player.isPitcher && player.injuryMonths === 0,
     choices: [
@@ -191,7 +199,10 @@ export const PLAYER_EVENTS: PlayerEventDef[] = [
         label: '投げ込ませる',
         hint: '球威は上がるが、壊す危険がある',
         resolve: (rng, player) => {
-          if (rng.chance(0.35)) {
+          // **疲れているほど壊しやすい。** 0.35 の固定にしていた頃は、
+          // 万全の投手に投げ込ませるのと、消耗しきった投手に投げ込ませるのが
+          // まったく同じ賭けだった（体力95で25%、体力40で48%）
+          if (rng.chance(SORE_ARM_RISK * injuryRiskOf(player.condition))) {
             return {
               player: {
                 ...withCondition(player, -15),
