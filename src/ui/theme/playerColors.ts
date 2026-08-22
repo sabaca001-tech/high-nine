@@ -7,6 +7,8 @@
  * 選手ごとの区別は、ポジションで色分けするネームプレートで付ける。
  */
 
+import { ALL_POSITIONS, positionGroupOf } from '@/core/lineup/aptitude'
+import type { PositionGroup } from '@/core/lineup/aptitude'
 import type { Aptitude, Player, Position } from '@/core/types/player'
 import { normalizeUniform } from '@/core/team/uniforms'
 import type { UniformId } from '@/core/team/uniforms'
@@ -27,22 +29,12 @@ export function teamCapColor(uniform: UniformId): string {
 }
 
 /**
- * ポジションの系統。ネームプレートの色分けに使う。
- * 投手＝ピンク、捕手＝水色、内野＝黄、外野＝緑。
+ * ポジションの系統の色。投手＝ピンク、捕手＝水色、内野＝黄、外野＝緑。
+ * **系統そのものの定義は core にある**（`lineup/aptitude.ts`）。
+ * 代表の枠のようにゲームのルールが系統を見るので、色分けの都合ではない。
  */
-export type PositionGroup = 'pitcher' | 'catcher' | 'infield' | 'outfield'
 
-const GROUP_OF: Record<Position, PositionGroup> = {
-  P: 'pitcher',
-  C: 'catcher',
-  '1B': 'infield',
-  '2B': 'infield',
-  '3B': 'infield',
-  SS: 'infield',
-  LF: 'outfield',
-  CF: 'outfield',
-  RF: 'outfield',
-}
+export type { PositionGroup }
 
 export const POSITION_GROUP_COLORS: Record<PositionGroup, string> = {
   pitcher: 'var(--pos-pitcher)',
@@ -59,7 +51,7 @@ export const POSITION_GROUP_LABELS: Record<PositionGroup, string> = {
 }
 
 export function groupOf(position: Position): PositionGroup {
-  return GROUP_OF[position]
+  return positionGroupOf({ position })
 }
 
 /** ネームプレートに色を出す適性の下限。ここ未満は「守れない」扱い */
@@ -75,7 +67,7 @@ function isPlateWorthy(aptitude: Aptitude): boolean {
  */
 export function groupsOf(player: Player): PositionGroup[] {
   const main = groupOf(player.position)
-  const others = (Object.keys(GROUP_OF) as Position[])
+  const others = ALL_POSITIONS
     .filter((position) => position !== player.position)
     .filter((position) => isPlateWorthy(player.aptitudes[position]))
     .map(groupOf)

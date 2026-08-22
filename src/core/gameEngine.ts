@@ -76,8 +76,9 @@ import {
 } from '@/core/scout/scouting'
 import type { ScoutRegion, ScoutResult } from '@/core/scout/scouting'
 import { createTraits, shiftTraits } from '@/core/scout/scoutTraits'
-import { playU18 } from '@/core/player/u18'
-import { ourU18Players, selectU18Squad } from '@/core/player/u18Squad'
+import { ourU18Players, resolveU18Squad, selectU18Squad, u18Players } from '@/core/player/u18Squad'
+import { playU18Series } from '@/core/player/u18Series'
+import type { U18Performance } from '@/core/player/u18Series'
 import {
   applyCamp,
   campSeasonOf,
@@ -1085,30 +1086,82 @@ function callU18(
     progress: seasonProgressOfCell(state.boardPosition),
   })
 
-  let players = state.players
-  for (const player of ourU18Players(squad, players)) {
-    const outcome = playU18(rng, player, state.year)
-    players = players.map((p) => (p.id === player.id ? outcome.player : p))
+  const called = ourU18Players(squad, state.players)
+  if (called.length === 0) return { u18Squad: squad, rngState: rng.state }
 
+  for (const player of called) {
     events.push({
       type: 'message',
       text: `${player.name}がU18日本代表に選出された！`,
       tone: 'good',
     })
-    events.push({
-      type: 'message',
-      text:
-        outcome.performance >= 70
-          ? `${player.name}は国際大会で活躍し、スカウトの評価を大きく上げた`
-          : outcome.performance >= 35
-            ? `${player.name}は国際大会で経験を積んだ`
-            : `${player.name}は世界の壁を思い知らされた`,
-      tone: outcome.performance >= 35 ? 'good' : 'normal',
-    })
-    if (outcome.changes.length > 0) events.push({ type: 'ability', changes: outcome.changes })
   }
 
-  return { players, u18Squad: squad, rngState: rng.state }
+  /*
+   * **実際に試合をする。** 活躍度を能力から乱数で出していた頃は、
+   * 強い選手が強い数字を出すだけで、
+   * 「世界に通用しなかった」も「無名が化けた」も起きなかった。
+   */
+  const series = playU18Series(rng, {
+    squad: u18Players(
+      resolveU18Squad(squad, {
+        schools: state.rivals,
+        ourPlayers: state.players,
+        ourSchoolName: state.schoolName,
+        year: state.year,
+        progress: seasonProgressOfCell(state.boardPosition),
+      }),
+    ),
+    ourPlayers: state.players,
+    year: state.year,
+  })
+
+  for (const game of series.games) {
+    events.push({
+      type: 'message',
+      text: `U18代表 ${game.scoreFor} - ${game.scoreAgainst} ${game.opponentName}`,
+      tone: game.outcome === 'win' ? 'good' : 'normal',
+    })
+  }
+
+  for (const entry of series.performances) {
+    events.push({
+      type: 'message',
+      text: `${entry.name}：${u18LineText(entry)}`,
+      tone: entry.performance >= 60 ? 'good' : entry.performance >= 30 ? 'normal' : 'bad',
+    })
+  }
+
+  if (series.changes.length > 0) events.push({ type: 'ability', changes: series.changes })
+
+  return { players: series.players, u18Squad: squad, rngState: rng.state }
+}
+
+/** 代表での成績を1行にする。「3試合 打率.417 2本」のように */
+function u18LineText(entry: U18Performance): string {
+  const parts: string[] = []
+
+  if (entry.batting && entry.batting.atBats > 0) {
+    const average = (entry.batting.hits / entry.batting.atBats).toFixed(3).replace(/^0/, '')
+    parts.push(`${entry.batting.atBats}打数${entry.batting.hits}安打（${average}）`)
+    if (entry.batting.homeruns > 0) parts.push(`${entry.batting.homeruns}本塁打`)
+  }
+
+  if (entry.pitching && entry.pitching.outs > 0) {
+    const innings = (entry.pitching.outs / 3).toFixed(1)
+    parts.push(`${innings}回 ${entry.pitching.earnedRuns}自責 ${entry.pitching.strikeouts}奪三振`)
+  }
+
+  if (parts.length === 0) return '出番は無かった'
+
+  const verdict =
+    entry.performance >= 70
+      ? 'スカウトの評価を大きく上げた'
+      : entry.performance >= 40
+        ? '世界を相手に経験を積んだ'
+        : '世界の壁を思い知らされた'
+
+  return `${parts.join(' / ')}。${verdict}`
 }
 
 /**

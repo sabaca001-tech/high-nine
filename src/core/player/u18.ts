@@ -1,76 +1,19 @@
 /**
- * U18日本代表での「その大会ぶんの結果」。
+ * U18日本代表の記録。
  *
- * **誰が選ばれるかは `u18Squad.ts` が決める**（全国から30人）。
- * ここは選ばれた自校の選手に何が起きるかだけを扱う。
+ * **誰が選ばれるかは `u18Squad.ts`、何が起きるかは `u18Series.ts`。**
+ * ここは残る記録（代表歴）と、その使い道だけを持つ。
  *
  * 代表で活躍するとプロが本気で見に来るようになり、
  * 卒業時のドラフト指名の確率が大きく上がる（career.ts の decidePath）。
  */
 
-import type { Rng } from '@/core/rng/random'
-import type { Player } from '@/core/types/player'
-import { playerPoints } from './rating'
-import { raiseAbility } from './growth'
-import type { AbilityChange, GrowableKey } from '@/core/types/player'
 
 /** 代表での1回の活躍度（0〜100） */
 export type U18Cap = {
   year: number
   /** その大会での活躍度。0〜100 */
   performance: number
-}
-
-export type U18Outcome = {
-  player: Player
-  /** その大会での活躍度 0〜100 */
-  performance: number
-  changes: AbilityChange[]
-}
-
-/**
- * 代表に参加した1人の結果。
- *
- * 世界の強豪と当たるので、活躍できるかは実力次第。
- * 活躍すれば大きく伸び、通用しなければ経験だけが残る。
- */
-export function playU18(rng: Rng, player: Player, year: number): U18Outcome {
-  /*
-   * **選考と同じ物差しで測る。** 総合（加重平均）で活躍度を出していた頃は、
-   * 評価点で選ばれた一芸型が、来た途端に「通用しなかった」と判定されていた。
-   * 評価点780（全能力A手前）で平均40、1190（全能力S級）で平均76くらい。
-   */
-  const performance = clamp(
-    Math.round((playerPoints(player) - 340) * 0.09 + rng.int(-22, 22)),
-    0,
-    100,
-  )
-
-  // 活躍度が高いほど大きく伸びる。0〜3段階
-  const steps = performance >= 75 ? 3 : performance >= 50 ? 2 : performance >= 25 ? 1 : 0
-
-  const keys: GrowableKey[] = player.pitching
-    ? ['control', 'stamina', 'sharpness']
-    : ['meet', 'power', 'speed', 'fielding']
-
-  let current = player
-  const changes: AbilityChange[] = []
-  for (let i = 0; i < steps; i++) {
-    const result = raiseAbility(current, rng.pick(keys), 1)
-    current = result.player
-    if (result.change) changes.push(result.change)
-  }
-
-  return {
-    player: {
-      ...current,
-      u18: [...current.u18, { year, performance }],
-      // 代表に呼ばれること自体が自信になる
-      trust: Math.min(100, current.trust + 6),
-    },
-    performance,
-    changes,
-  }
 }
 
 /**
@@ -83,6 +26,3 @@ export function draftBonus(caps: readonly U18Cap[]): number {
   return caps.length * 3 + Math.round(best / 6)
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}

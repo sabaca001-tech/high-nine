@@ -2,48 +2,79 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
 import { createInitialRoster } from './createPlayer'
 import type { Player } from '@/core/types/player'
-import { draftBonus, playU18 } from './u18'
+import { emptyBattingLine } from '@/core/types/match'
+import { draftBonus } from './u18'
+import { performanceFrom, playU18Series } from './u18Series'
 
-const players = createInitialRoster(createRng(3))
-
-/** 総合が指定の水準になるよう能力を底上げした選手を作る */
-function strong(player: Player, level: number): Player {
-  return {
-    ...player,
-    grade: 3,
-    batting: {
-      ...player.batting,
-      meet: level,
-      power: level,
-      speed: level,
-      arm: level,
-      fielding: level,
-      catching: level,
-    },
-    pitching: player.pitching
-      ? { ...player.pitching, velocity: 150, control: level, stamina: level, sharpness: level }
-      : null,
+describe('playU18Series', () => {
+  /** 代表30人ぶんの名簿。自校の選手を数人混ぜる */
+  function squadOf(ours: Player[]): Player[] {
+    const others = createInitialRoster(createRng(21)).map((player, index) => ({
+      ...player,
+      id: `x${index}`,
+      grade: 3 as const,
+    }))
+    return [...ours, ...others].slice(0, 30)
   }
-}
 
-describe('playU18', () => {
-  it('能力が高い選手ほど活躍する', () => {
-    const rng = createRng(17)
-    let high = 0
-    let low = 0
+  const ours = createInitialRoster(createRng(11))
+    .slice(0, 4)
+    .map((player) => ({ ...player, grade: 3 as const }))
 
-    for (let i = 0; i < 40; i++) {
-      high += playU18(rng, strong(players[0], 95), 3).performance
-      low += playU18(rng, strong(players[0], 72), 3).performance
+  it('実際に試合をして、成績が活躍度になる', () => {
+    const outcome = playU18Series(createRng(5), {
+      squad: squadOf(ours),
+      ourPlayers: ours,
+      year: 3,
+    })
+
+    expect(outcome.games).toHaveLength(3)
+    for (const game of outcome.games) {
+      expect(game.scoreFor + game.scoreAgainst).toBeGreaterThanOrEqual(0)
     }
-
-    expect(high).toBeGreaterThan(low)
+    // 出場した自校の選手には成績が付く
+    expect(outcome.performances.length).toBeGreaterThan(0)
   })
 
   it('代表歴が記録に残る', () => {
-    const outcome = playU18(createRng(2), strong(players[0], 90), 3)
-    expect(outcome.player.u18).toHaveLength(1)
-    expect(outcome.player.u18[0].year).toBe(3)
+    const outcome = playU18Series(createRng(7), {
+      squad: squadOf(ours),
+      ourPlayers: ours,
+      year: 3,
+    })
+
+    const played = outcome.players.filter((player) => player.u18.length > 0)
+    expect(played.length).toBeGreaterThan(0)
+    expect(played[0].u18[0].year).toBe(3)
+  })
+
+  it('自校の選手が居なければ何も起きない', () => {
+    const outsiders = createInitialRoster(createRng(31)).map((player, index) => ({
+      ...player,
+      id: `y${index}`,
+      grade: 3 as const,
+    }))
+    const outcome = playU18Series(createRng(9), {
+      squad: outsiders,
+      ourPlayers: ours,
+      year: 3,
+    })
+
+    expect(outcome.games).toHaveLength(0)
+    expect(outcome.players).toEqual(ours)
+  })
+
+  it('打てば活躍度が上がり、打てなければ下がる', () => {
+    const line = (hits: number, homeruns: number) => ({
+      ...emptyBattingLine('p', 'テスト'),
+      atBats: 12,
+      hits,
+      homeruns,
+      rbi: homeruns * 2,
+    })
+
+    expect(performanceFrom(line(6, 2), null)).toBeGreaterThan(performanceFrom(line(1, 0), null))
+    expect(performanceFrom(line(0, 0), null)).toBeLessThan(45)
   })
 })
 

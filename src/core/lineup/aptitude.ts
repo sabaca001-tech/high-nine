@@ -6,6 +6,34 @@ import type { Aptitude, Player, Position } from '@/core/types/player'
 
 export const ALL_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
 
+/**
+ * ポジションの系統。
+ *
+ * **core に置く。** 代表の枠（`U18_QUOTA`）のように
+ * ゲームのルールが系統を見るので、UIの色分けの都合ではない。
+ * 色との対応づけは `ui/theme/playerColors.ts` に置く（core は色を知らない）。
+ */
+export type PositionGroup = 'pitcher' | 'catcher' | 'infield' | 'outfield'
+
+export const POSITION_GROUPS: PositionGroup[] = ['pitcher', 'catcher', 'infield', 'outfield']
+
+const GROUP_OF: Record<Position, PositionGroup> = {
+  P: 'pitcher',
+  C: 'catcher',
+  '1B': 'infield',
+  '2B': 'infield',
+  '3B': 'infield',
+  SS: 'infield',
+  LF: 'outfield',
+  CF: 'outfield',
+  RF: 'outfield',
+}
+
+/** その選手の系統。**投手として登録されていれば必ず投手**（守備位置ではなく役割で見る） */
+export function positionGroupOf(player: { position: Position; isPitcher?: boolean }): PositionGroup {
+  return player.isPitcher ? 'pitcher' : GROUP_OF[player.position]
+}
+
 /** 守備位置のグループ。近いポジションほど適性が付きやすい */
 const INFIELD: Position[] = ['1B', '2B', '3B', 'SS']
 const OUTFIELD: Position[] = ['LF', 'CF', 'RF']

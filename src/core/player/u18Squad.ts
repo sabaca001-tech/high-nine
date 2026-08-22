@@ -19,6 +19,8 @@
  * **名簿の大半が名前だけの行**になってしまう。
  */
 
+import { positionGroupOf } from '@/core/lineup/aptitude'
+import type { PositionGroup } from '@/core/lineup/aptitude'
 import type { Player } from '@/core/types/player'
 import { isAvailable } from '@/core/types/player'
 import type { RivalSchool } from '@/core/rival/rivals'
@@ -66,17 +68,44 @@ export type U18Squad = {
  */
 export const U18_SQUAD_SIZE = 30
 
-/** 1校から選ばれる上限。1校から何人も選ばれるのは不自然 */
-export const U18_MAX_PER_SCHOOL = 2
+/**
+ * 1校から選ばれる上限。
+ *
+ * **2では、強い学校の下級生が構造的に締め出されていた。**
+ * 3年生2人で枠が埋まるので、全国屈指の2年生を抱えていても呼ばれない。
+ * 実際の代表も、その年の主力を出した学校からは3人選ばれることがある。
+ */
+export const U18_MAX_PER_SCHOOL = 3
 
 /** 代表に選ばれるのは上級生だけ */
 export const U18_MIN_GRADE = 2
 
 /**
- * 代表に必ず入れる投手の数。
- * 30人のうち3分の1。投手のいない代表は試合にならない。
+ * **ポジションごとの枠**（合計30人）。
+ *
+ * 評価点順に30人を切っていた頃は、
+ * - 上位が野手で埋まって**投手が0人**の年があり（先に10人取ることで凌いでいた）
+ * - 捕手が1人も居ない代表ができ
+ * - 各校の上位2人しか候補に上がらないので、
+ *   **3年生が2人いる学校の2年生は、どれだけ強くても候補にすら入らなかった**
+ *
+ * 実際の代表はポジションごとに人数を決めて選ぶ。
+ * 系統ごとに枠を置くと、その系統でいちばん良い選手が素直に選ばれる。
  */
-export const U18_MIN_PITCHERS = 10
+export const U18_QUOTA: Record<PositionGroup, number> = {
+  pitcher: 10,
+  catcher: 3,
+  infield: 9,
+  outfield: 8,
+}
+
+/**
+ * 来年に向けて必ず入れる2年生の数。
+ *
+ * 枠を系統で分けても、同じ系統に3年生が並べば2年生は押し出される。
+ * 実際の代表も、翌年の主力になる下級生を数人入れる。
+ */
+export const U18_MIN_SECOND_YEARS = 4
 
 /**
  * 名簿を作る前に絞り込む学校数。
@@ -119,28 +148,56 @@ export function selectU18Squad(params: {
 }): U18Squad {
   const { schools, ourPlayers, year, progress, size = U18_SQUAD_SIZE } = params
 
-  const pool: { member: U18Member; rating: number; isPitcher: boolean }[] = []
+  const pool: Candidate[] = []
 
+  /**
+   * 候補に挙げる。**系統ごとにその学校の最上位**を出す。
+   *
+   * 評価点上位2人で切っていた頃は、3年生の投手が2人いる学校の捕手は、
+   * 全国屈指でも候補にすら入らなかった。
+   * 1校から何人も選ばれないようにするのは**選ぶ側の仕事**（`U18_MAX_PER_SCHOOL`）で、
+   * 候補を出す段階で絞ってしまうと、その学校のいちばん良い捕手が消える。
+   */
   const addFrom = (schoolId: string | null, players: Player[]) => {
-    const picked = players
-      .filter((player) => isAvailable(player) && player.grade >= U18_MIN_GRADE)
-      .sort((a, b) => playerPoints(b) - playerPoints(a))
-      .slice(0, U18_MAX_PER_SCHOOL)
+    const best = new Map<PositionGroup, Player[]>()
 
-    for (const player of picked) {
-      pool.push({
-        member: {
-          schoolId,
-          playerId: player.id,
-          name: player.name,
+    for (const player of players) {
+      if (!isAvailable(player) || player.grade < U18_MIN_GRADE) continue
+
+      const group = positionGroupOf(player)
+      const list = [...(best.get(group) ?? []), player]
+        .sort((a, b) => playerPoints(b) - playerPoints(a))
+        .slice(0, CANDIDATES_PER_GROUP)
+      best.set(group, list)
+    }
+
+    for (const [group, list] of best) {
+      for (const player of list) {
+        pool.push({
+          member: {
+            schoolId,
+            playerId: player.id,
+            name: player.name,
+            grade: player.grade,
+            snapshot: { ...player, history: [], stats: emptyCareerStats() },
+          },
+          rating: playerPoints(player),
+          group,
           grade: player.grade,
-          snapshot: { ...player, history: [], stats: emptyCareerStats() },
-        },
-        rating: playerPoints(player),
-        isPitcher: player.isPitcher,
-      })
+          schoolId,
+        })
+      }
     }
   }
+
+/**
+ * 1校・1系統から候補に出す人数。
+ *
+ * **1人に絞ると、層の厚い学校の2番手が消える。**
+ * 同じ学校に全国屈指の外野手が2人いることはあるし、
+ * 3年生が居るというだけで下級生が候補から外れるのも違う。
+ */
+const CANDIDATES_PER_GROUP = 2
 
   addFrom(null, ourPlayers)
 
@@ -153,26 +210,80 @@ export function selectU18Squad(params: {
   }
 
   const ranked = [...pool].sort((a, b) => b.rating - a.rating)
+  const chosen: Candidate[] = []
+  const perSchool = new Map<string, number>()
 
-  /*
-   * **投手の枠を先に取る。**
-   * 評価点だけで30人を切ると、代表が野手30人になる年があった。
-   * 野手は6項目すべてがSになりうるのに対し、投手は球速も持ち球も
-   * その帯まで届きにくいので、上位は野手で埋まる。
-   * 実際の代表も投手を投手として選ぶ（`MIN_SQUAD_PITCHERS` と同じ考え方）。
-   */
-  const chosen = new Set(ranked.filter((entry) => entry.isPitcher).slice(0, U18_MIN_PITCHERS))
-  for (const entry of ranked) {
-    if (chosen.size >= size) break
-    chosen.add(entry)
+  /** 1校2人までを守りながら加える。入れたら true */
+  const take = (entry: Candidate): boolean => {
+    if (chosen.includes(entry)) return false
+
+    const key = entry.schoolId ?? 'ours'
+    const used = perSchool.get(key) ?? 0
+    if (used >= U18_MAX_PER_SCHOOL) return false
+
+    chosen.push(entry)
+    perSchool.set(key, used + 1)
+    return true
   }
 
-  const members = ranked
-    .filter((entry) => chosen.has(entry))
-    .slice(0, size)
-    .map((entry) => entry.member)
+  // 1. 系統ごとの枠を埋める
+  for (const group of Object.keys(U18_QUOTA) as PositionGroup[]) {
+    let left = U18_QUOTA[group]
+    for (const entry of ranked) {
+      if (left <= 0) break
+      if (entry.group === group && take(entry)) left--
+    }
+  }
+
+  // 2. 枠が埋まらなかったぶん（その系統の候補が足りない年）は評価点順で埋める
+  for (const entry of ranked) {
+    if (chosen.length >= size) break
+    take(entry)
+  }
+
+  /*
+   * 3. 来年に向けて2年生を確保する。
+   *
+   * **人数を足すのではなく、入れ替える。** 足す形にすると
+   * あとで人数を切り詰めるときに投手が落ちて、
+   * せっかく系統ごとに取った枠が崩れる。
+   * 同じ系統の中で、いちばん評価点の低い3年生と入れ替える。
+   */
+  let juniors = chosen.filter((entry) => entry.grade === U18_MIN_GRADE).length
+  for (const entry of ranked) {
+    if (juniors >= U18_MIN_SECOND_YEARS) break
+    if (entry.grade !== U18_MIN_GRADE || chosen.includes(entry)) continue
+
+    const key = entry.schoolId ?? 'ours'
+    if ((perSchool.get(key) ?? 0) >= U18_MAX_PER_SCHOOL) continue
+
+    // 同じ系統の、いちばん評価点の低い3年生
+    const weakest = chosen
+      .filter((item) => item.group === entry.group && item.grade > U18_MIN_GRADE)
+      .sort((a, b) => a.rating - b.rating)[0]
+    if (!weakest) continue
+
+    const droppedKey = weakest.schoolId ?? 'ours'
+    perSchool.set(droppedKey, Math.max(0, (perSchool.get(droppedKey) ?? 1) - 1))
+    chosen.splice(chosen.indexOf(weakest), 1)
+
+    chosen.push(entry)
+    perSchool.set(key, (perSchool.get(key) ?? 0) + 1)
+    juniors++
+  }
+
+  const members = chosen.sort((a, b) => b.rating - a.rating).map((entry) => entry.member)
 
   return { year, members }
+}
+
+/** 選考の途中で持ち回る1人 */
+type Candidate = {
+  member: U18Member
+  rating: number
+  group: PositionGroup
+  grade: number
+  schoolId: string | null
 }
 
 /** 名簿の1人を、いまの選手として引き当てたもの */

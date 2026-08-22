@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '@/core/rng/random'
+import { positionGroupOf } from '@/core/lineup/aptitude'
 import { createInitialRoster } from './createPlayer'
 import { createRivals } from '@/core/rival/rivals'
 import { overallRating } from './rating'
@@ -10,8 +11,11 @@ import {
   selectU18Squad,
   U18_MAX_PER_SCHOOL,
   U18_MIN_GRADE,
+  U18_MIN_SECOND_YEARS,
+  U18_QUOTA,
   U18_SQUAD_SIZE,
 } from './u18Squad'
+import type { Player } from '@/core/types/player'
 
 const schools = createRivals(createRng(7), 'kanagawa')
 const ourPlayers = createInitialRoster(createRng(3))
@@ -166,5 +170,76 @@ describe('球速の水準', () => {
 
     expect(velocities.length).toBeGreaterThan(0)
     expect(Math.max(...velocities)).toBeLessThan(160)
+  })
+})
+
+describe('ポジションごとの枠', () => {
+  it('系統ごとに人数が決まっている', () => {
+    /*
+     * **評価点順に30人を切ると、捕手が1人も居ない代表ができた。**
+     * 実際の代表はポジションごとに人数を決めて選ぶ。
+     */
+    const squad = selectU18Squad({
+      schools,
+      ourPlayers: createInitialRoster(createRng(9)),
+      year: 4,
+    })
+
+    const counts = new Map<string, number>()
+    for (const member of squad.members) {
+      const group = positionGroupOf(member.snapshot!)
+      counts.set(group, (counts.get(group) ?? 0) + 1)
+    }
+
+    expect(squad.members).toHaveLength(U18_SQUAD_SIZE)
+    expect(counts.get('pitcher')).toBe(U18_QUOTA.pitcher)
+    expect(counts.get('catcher')).toBe(U18_QUOTA.catcher)
+  })
+
+  it('来年に向けて2年生が入る', () => {
+    // 系統で枠を分けても、同じ系統に3年生が並べば2年生は押し出される
+    const squad = selectU18Squad({
+      schools,
+      ourPlayers: createInitialRoster(createRng(9)),
+      year: 4,
+    })
+
+    const juniors = squad.members.filter((member) => member.grade === 2)
+    expect(juniors.length).toBeGreaterThanOrEqual(U18_MIN_SECOND_YEARS)
+  })
+
+  it('強い下級生が、同じ学校の3年生に押し出されない', () => {
+    /*
+     * **1校の候補を評価点上位2人で切っていた頃の穴。**
+     * 3年生2人で枠が埋まるので、全国屈指の2年生を抱えていても呼ばれなかった。
+     */
+    const base = createInitialRoster(createRng(9))
+    const boost = (player: Player, level: number, grade: 2 | 3): Player => ({
+      ...player,
+      grade,
+      batting: {
+        ...player.batting,
+        meet: level,
+        power: level,
+        speed: level,
+        arm: level,
+        fielding: level,
+        catching: level,
+      },
+    })
+
+    const outfielders = base.filter((player) => positionGroupOf(player) === 'outfield')
+    if (outfielders.length < 2) return
+
+    const ours = base.map((player) => {
+      if (player.id === outfielders[0].id) return boost(player, 96, 3)
+      if (player.id === outfielders[1].id) return boost(player, 93, 2)
+      return player
+    })
+
+    const squad = selectU18Squad({ schools, ourPlayers: ours, year: 6 })
+    const picked = squad.members.filter((member) => member.schoolId === null)
+
+    expect(picked.some((member) => member.playerId === outfielders[1].id)).toBe(true)
   })
 })
