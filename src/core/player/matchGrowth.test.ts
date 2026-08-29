@@ -176,6 +176,34 @@ describe('applyMatchGrowth', () => {
     )
   })
 
+  it('投手は、打った日でも主に投手能力が伸びる', () => {
+    /*
+     * **打った結果がそのまま打撃能力に乗っていた。**
+     * 9回を投げ切って3安打、という試合で伸びたのが
+     * ミートとパワーだけ、ということが起きていた。
+     * 練習で野手のカードを投球に読み替えているのと同じ考え方。
+     */
+    const rng = createRng(13)
+    const pitchingKeys = new Set(['control', 'stamina', 'life', 'sharpness'])
+
+    let pitchingCount = 0
+    let battingCount = 0
+    for (let i = 0; i < 400; i++) {
+      const result = applyMatchGrowth(rng, pitcher, {
+        pitching: pitching({ outs: 27, strikeouts: 10, hits: 3, earnedRuns: 1 }),
+        batting: batting({ atBats: 4, hits: 2, rbi: 1 }),
+        stage: 'pref',
+      })
+      for (const change of result.changes) {
+        if (pitchingKeys.has(change.key)) pitchingCount++
+        else battingCount++
+      }
+    }
+
+    expect(pitchingCount / (pitchingCount + battingCount)).toBeGreaterThan(0.75)
+    expect(battingCount).toBeGreaterThan(0)
+  })
+
   it('打った結果は打撃能力に出る（投げていても）', () => {
     // 投手が打った日は打撃が伸びてよい。**引き金がどちらの結果かだけが大事**
     const rng = createRng(11)

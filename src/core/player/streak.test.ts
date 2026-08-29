@@ -100,6 +100,46 @@ describe('applyStreaks', () => {
     expect(totalFor('天才肌')).toBeGreaterThan(totalFor('クール'))
   })
 
+  it('投手が急成長すると、主に投手能力が伸びる', () => {
+    /*
+     * **打撃6・投手4の10個から選んでいた頃は、6割が打撃能力に乗っていた。**
+     * 「エースが急成長した」と出ても、伸びたのはミートと走力、
+     * ということが起きていた。
+     */
+    const pitcher = roster(31).find((player) => player.isPitcher)!
+    const rng = createRng(7)
+    const pitchingKeys = new Set(['control', 'stamina', 'life', 'sharpness'])
+
+    let pitching = 0
+    let batting = 0
+    for (let i = 0; i < 2000; i++) {
+      for (const event of applyStreaks(rng, [pitcher]).events) {
+        for (const change of event.changes) {
+          if (pitchingKeys.has(change.key)) pitching++
+          else batting++
+        }
+      }
+    }
+
+    expect(pitching / (pitching + batting)).toBeGreaterThan(0.75)
+    // 打撃も締め出しはしない（投手も打席に立つ）
+    expect(batting).toBeGreaterThan(0)
+  })
+
+  it('野手には投手能力が付かない', () => {
+    const fielder = roster(31).find((player) => !player.isPitcher)!
+    const rng = createRng(11)
+    const pitchingKeys = new Set(['control', 'stamina', 'life', 'sharpness'])
+
+    for (let i = 0; i < 500; i++) {
+      for (const event of applyStreaks(rng, [fielder]).events) {
+        for (const change of event.changes) {
+          expect(pitchingKeys.has(change.key)).toBe(false)
+        }
+      }
+    }
+  })
+
   it('元の選手を変更しない', () => {
     const players = roster()
     const before = JSON.parse(JSON.stringify(players))

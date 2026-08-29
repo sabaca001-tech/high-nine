@@ -149,7 +149,9 @@ export function applyMatchGrowth(
   // **投打は別々に数える。** まとめて1つの点数にすると、
   // 完封した投手のミートが伸びたり、猛打賞の日に制球が落ちたりする
   if (params.pitching) apply(performancePoints(undefined, params.pitching), PITCHING_KEYS)
-  if (params.batting) apply(performancePoints(params.batting, undefined), battingKeysFor(params.batting))
+  if (params.batting) {
+    apply(performancePoints(params.batting, undefined), battingKeysFor(player, params.batting))
+  }
 
   return { player: current, changes }
 }
@@ -198,8 +200,15 @@ const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'sharpness', 'life']
  * 打席と守備の結果で動く能力。
  * 内容に関係なく全能力が動くと「試合に出しただけ」の成長になるので、
  * **何をした試合か**に寄せる。
+ *
+ * **投手が打った日は、主に投球に返す。**
+ * 打った結果がそのまま打撃能力に乗っていた頃は、
+ * 「9回を投げ切って打っても3安打」という試合で
+ * 伸びたのがミートとパワーだけ、ということが起きていた。
+ * 練習で野手のカードを投球に読み替えているのと同じ考え方
+ * （振る力は投げる力、走れる下半身は投げ続ける下半身。`PITCHER_REDIRECT`）。
  */
-function battingKeysFor(batting: BattingLine): GrowableKey[] {
+function battingKeysFor(player: Player, batting: BattingLine): GrowableKey[] {
   const keys: GrowableKey[] = ['meet', 'power']
 
   // 長打を放った選手はパワーが、走った選手は走力が動きやすい
@@ -208,7 +217,9 @@ function battingKeysFor(batting: BattingLine): GrowableKey[] {
 
   // 出場して守っていれば守備も動く
   keys.push('fielding')
-  return keys
+
+  // 投手なら**投球寄り**にする。打撃も動くが、主役は投げるほう
+  return player.pitching ? [...PITCHING_KEYS, ...PITCHING_KEYS, ...keys] : keys
 }
 
 /** 端数は確率で切り上げる（1.4 なら 40% で 2、60% で 1） */

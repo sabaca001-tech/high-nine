@@ -89,7 +89,7 @@ function applyChange(
     ? rng.int(BREAKOUT_KEYS.min, BREAKOUT_KEYS.max)
     : rng.int(SLUMP_KEYS.min, SLUMP_KEYS.max)
 
-  const keys = rng.shuffle(growableKeysOf(player)).slice(0, count)
+  const keys = streakKeysOf(rng, player, count)
   const changes: AbilityChange[] = []
   let current = player
 
@@ -132,9 +132,29 @@ function ceilingFactor(player: Player, key: GrowableKey): number {
   return 1
 }
 
-/** その選手が持っている能力のキー */
-function growableKeysOf(player: Player): GrowableKey[] {
-  const batting: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
-  const pitching: GrowableKey[] = ['control', 'stamina', 'life', 'sharpness']
-  return player.isPitcher ? [...batting, ...pitching] : batting
+const BATTING_KEYS: GrowableKey[] = ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
+const PITCHING_KEYS: GrowableKey[] = ['control', 'stamina', 'life', 'sharpness']
+
+/**
+ * 急成長・スランプで動く能力を選ぶ。
+ *
+ * **投手は投手能力が主役。** 打撃6・投手4をまとめた10個から選んでいた頃は、
+ * 急成長の6割が打撃能力に乗っていて、
+ * 「エースが急成長した」と出ても伸びたのはミートと走力、ということが起きていた。
+ *
+ * ただし打撃を締め出しはしない（投手も打席に立つ）。
+ */
+function streakKeysOf(rng: Rng, player: Player, count: number): GrowableKey[] {
+  if (!player.isPitcher) return rng.shuffle(BATTING_KEYS).slice(0, count)
+
+  const keys = rng.shuffle(PITCHING_KEYS).slice(0, count)
+
+  // ときどき1つだけ打撃が混ざる
+  if (keys.length > 1 && rng.chance(PITCHER_BATTING_SHARE)) {
+    keys[keys.length - 1] = rng.pick(BATTING_KEYS)
+  }
+  return keys
 }
+
+/** 投手の急成長に打撃が混ざる割合 */
+const PITCHER_BATTING_SHARE = 0.3
