@@ -126,10 +126,17 @@ export function MatchScreen() {
   const finished = result !== null && shown >= timeline.length
   const lastPlay = [...visible].reverse().find((entry) => entry.kind === 'play')
   const score = lastPlay?.kind === 'play' ? lastPlay.play.score : { player: 0, opponent: 0 }
-  const shownInnings = lastPlay?.kind === 'play' ? lastPlay.play.inning : 0
 
   const opponentName = live?.away.name ?? result?.opponentName ?? ''
-  const innings = live?.innings ?? result?.innings ?? []
+  /*
+   * **スコアボードは再生済みの打席から組む。**
+   *
+   * `live.innings` をそのまま出していた頃は、半回ぶんが一括で計算されるので
+   * **回の頭でその回の得点が両チームぶん出てしまい、
+   * そのあとから打席の結果が流れてきていた**（点が入る前から点が見えている）。
+   * 打席を1つ再生するたびに、その打席で入った点だけが増えるようにする。
+   */
+  const innings = inningsFromPlays(visible)
 
   return (
     <div className={styles.screen}>
@@ -138,7 +145,6 @@ export function MatchScreen() {
         innings={innings}
         finalScore={result?.finalScore ?? score}
         score={score}
-        shownInnings={shownInnings}
         finished={finished}
       />
 
@@ -238,6 +244,45 @@ export function MatchScreen() {
       )}
     </div>
   )
+}
+
+/** スコアボードの1回ぶん。まだ始まっていない半回は伏せる */
+type InningScore = {
+  player: number
+  opponent: number
+  /** その半回が始まったか。始まっていなければ数字を出さない */
+  topSeen: boolean
+  bottomSeen: boolean
+}
+
+/**
+ * 再生済みの打席から、回ごとの得点を組み立てる。
+ *
+ * **結果（`innings`）を使わない。** 結果はもう決まっているので、
+ * それを出すと打席より先に点が見えてしまう。
+ */
+function inningsFromPlays(entries: Entry[]): InningScore[] {
+  const rows: InningScore[] = []
+
+  for (const entry of entries) {
+    if (entry.kind !== 'play') continue
+
+    const { inning, half, runsScored } = entry.play
+    while (rows.length < inning) {
+      rows.push({ player: 0, opponent: 0, topSeen: false, bottomSeen: false })
+    }
+
+    const row = rows[inning - 1]
+    if (half === 'top') {
+      row.topSeen = true
+      row.opponent += runsScored
+    } else {
+      row.bottomSeen = true
+      row.player += runsScored
+    }
+  }
+
+  return rows
 }
 
 function toTimeline(plays: PlayLog[], events: MatchEventLog[]): Entry[] {
@@ -388,14 +433,12 @@ function Scoreboard({
   innings,
   finalScore,
   score,
-  shownInnings,
   finished,
 }: {
   opponentName: string
-  innings: { player: number; opponent: number }[]
+  innings: InningScore[]
   finalScore: { player: number; opponent: number }
   score: { player: number; opponent: number }
-  shownInnings: number
   finished: boolean
 }) {
   const shownScore = finished ? finalScore : score
@@ -431,24 +474,24 @@ function Scoreboard({
       <div className={styles.inningTable}>
         {Array.from({ length: columns }, (_, index) => {
           const inning = innings[index]
-          // まだ再生していないイニングは伏せる
-          const revealed = inning !== undefined && (finished || index + 1 <= shownInnings)
+          // **まだ打席が回っていない半回は伏せる。**
+          // 表と裏で別に見るので、進行中の回も「表だけ数字が出ている」形になる
+          const top = inning?.topSeen === true
+          const bottom = inning?.bottomSeen === true
           return (
             <div key={index} className={styles.inningColumn}>
               <div className={styles.inningHead}>{index + 1}</div>
               <div
-                className={
-                  revealed ? styles.inningCell : `${styles.inningCell} ${styles.inningPending}`
-                }
+                className={top ? styles.inningCell : `${styles.inningCell} ${styles.inningPending}`}
               >
-                {revealed ? inning.opponent : '-'}
+                {top ? inning.opponent : '-'}
               </div>
               <div
                 className={
-                  revealed ? styles.inningCell : `${styles.inningCell} ${styles.inningPending}`
+                  bottom ? styles.inningCell : `${styles.inningCell} ${styles.inningPending}`
                 }
               >
-                {revealed ? inning.player : '-'}
+                {bottom ? inning.player : '-'}
               </div>
             </div>
           )

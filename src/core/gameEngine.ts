@@ -784,9 +784,14 @@ function playTournamentMatch(state: GameState): EngineResult {
         // 「大会の開催中か」で見ていた頃は、回戦の合間に組んだ練習試合に
         // 負けると、そのまま県大会の敗退になっていた
         tournamentMatch: true,
-        // **コールドは地区大会だけ。** 甲子園まで来た相手に
-        // 「5回10点差で打ち切り」は成立しない
-        mercy: isLocalTournament(tournament.kind),
+        /*
+         * **コールドは地区大会だけ。**（甲子園まで来た相手に
+         * 「5回10点差で打ち切り」は成立しない）
+         *
+         * **決勝も無し。** 県大会の決勝は、その年の集大成として
+         * 最後まで戦うもので、5回で打ち切られる幕切れにはしない。
+         */
+        mercy: isLocalTournament(tournament.kind) && tournament.round < tournament.totalRounds,
         roundName: roundName(tournament.round, tournament.totalRounds),
       },
       phase: 'lineupCheck',

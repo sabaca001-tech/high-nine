@@ -175,19 +175,35 @@ export function successChance(prospect: Prospect, reputation: number): number {
   const fromReputation = (reputation - REPUTATION_INITIAL) / 180
   const fromApproaches = prospect.approaches * 0.12
   const difficulty = (prospect.rating - 50) / 150
-  // 代表は全国のスカウトが殺到している。通っても弱小校では2割前後
-  const national = prospect.national ? NATIONAL_PENALTY : 0
+  // 代表は全国のスカウトが殺到している。通っても弱小校では2割前後。
+  // **名門なら口説ける。** 評判が高いほど、この不利が薄れる
+  const national = prospect.national ? nationalPenaltyOf(reputation) : 0
 
   return clamp(0.05 + fromReputation + fromApproaches - difficulty - national, 0.01, 0.9)
 }
 
 /**
- * U15代表であることによる獲得率の下げ幅。
- *
- * 通い切った（4回）ときの見込みで、評判20なら約20%、評判95なら約58%。
+ * U15代表であることによる獲得率の下げ幅（評判20のとき）。
  * **評判がそのまま効く**ので、代表を獲れるかどうかが強豪校の証になる。
  */
 const NATIONAL_PENALTY = 0.3
+
+/**
+ * 評判で薄まった代表のペナルティ。
+ *
+ * **名門でも代表は獲りにくいままだった。** 一律 0.3 を引いていた頃は、
+ * 通い切っても評判95で58%、80で47%で、
+ * 全国から選ばれた30人を「うちに来てもらえる学校」という手応えが出なかった。
+ * 弱小校（評判20）の見込みは変えずに、上だけを持ち上げる。
+ *
+ * | 評判 | 20 | 50 | 80 | 95 |
+ * |---|---|---|---|---|
+ * | 4回通ったときの見込み | 14% | 36% | 60% | 71% |
+ */
+function nationalPenaltyOf(reputation: number): number {
+  const relief = clamp((reputation - REPUTATION_INITIAL) / 100, 0, 1)
+  return NATIONAL_PENALTY * (1 - relief * 0.7)
+}
 
 const FIELDER_POSITIONS: Position[] = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
 

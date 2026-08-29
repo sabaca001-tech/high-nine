@@ -52,7 +52,7 @@ const CHAMPION_BONUS = 2
  * 「勝てば強くなる／初戦で負ければ伸びない」という差を作る。
  * 練習の伸び（`CARD_GROWTH_SCALE`）を下げたぶんの受け皿でもある。
  */
-const POINTS_PER_STEP = 1.05
+const POINTS_PER_STEP = 0.9
 
 /** スタメンとベンチ入りで得るものが違う。ベンチは半分 */
 const STARTER_SHARE = 1
