@@ -191,6 +191,14 @@ export type MatchResult = {
   pitchingLines: PitchingLine[]
   /** 一番活躍した選手 */
   mvpPlayerId: string | null
+  /**
+   * 大会の試合だったか。
+   *
+   * **「大会の開催中か」とは別物。** 大会は回戦ごとに別のマスへ置かれ、
+   * そのあいだは普通に練習できるので、開催中というだけで勝敗を反映すると
+   * **合間に組んだ練習試合の負けが県大会の敗退になる**（実際になった）。
+   */
+  tournamentMatch: boolean
 }
 
 /** シミュレーションの入力 */
@@ -222,6 +230,8 @@ export type PendingMatchSetup = {
   opponentRegionName?: string
   /** 大会の回戦名（表示用） */
   roundName?: string
+  /** 大会の試合か。勝敗を大会に反映するかの判定に使う */
+  tournamentMatch?: boolean
 }
 
 export type MatchSetup = {
@@ -254,4 +264,9 @@ export type MatchSetup = {
    * 同じ学校と2回戦っても別人が出てくる。
    */
   opponentRoster?: Player[]
+  /**
+   * 大会の試合か。**勝敗を大会に反映するかの判定に使う。**
+   * 省略すると練習試合として扱う。
+   */
+  tournamentMatch?: boolean
 }

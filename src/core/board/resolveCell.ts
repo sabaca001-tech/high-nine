@@ -60,6 +60,15 @@ export type CellContext = {
   rivals?: RivalSchool[]
   /** 候補の id を採番するための通し番号 */
   serial?: number
+  /**
+   * 大会の最中か。**大会中は練習試合を組まない。**
+   *
+   * 大会は回戦ごとに別のマスへ置かれるので、そのあいだは普通に練習できる
+   * （`placeTournamentCells`）。そこで練習試合マスに止まると、
+   * **その勝敗が大会の結果として反映されていた**（練習試合に負けて県大会敗退）。
+   * そもそも大会の最中に練習試合を挟む監督はいない。
+   */
+  inTournament?: boolean
 }
 
 /** 黄マスで得られる練習効率バフの候補 */
@@ -468,6 +477,20 @@ function resolveRest(players: Player[]): CellOutcome {
  */
 function resolveFriendlyMatch(rng: Rng, context: CellContext): CellOutcome {
   const region = context.region
+
+  // 大会の最中は練習試合を組まない。次の回戦に備える日にする
+  if (context.inTournament) {
+    return {
+      players: context.players.map((player) => ({
+        ...player,
+        condition: clamp(player.condition + 10, 0, 100),
+      })),
+      events: [
+        { type: 'message', text: '大会の最中なので、次の試合に備えて調整した', tone: 'normal' },
+      ],
+    }
+  }
+
   if (!region) {
     return {
       players: context.players,

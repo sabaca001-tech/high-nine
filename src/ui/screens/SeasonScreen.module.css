@@ -148,6 +148,22 @@
   gap: var(--sp-2);
 }
 
+/**
+ * 天才肌の印。**推薦より目立たせる。**
+ * 50人に1人しか出ないので、見落とされては意味がない。
+ */
+.geniusBadge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  color: #3a2a00;
+  background: linear-gradient(135deg, #ffe08a, #ffb400);
+  border-radius: 999px;
+  padding: 0 6px;
+  margin-left: var(--sp-1);
+  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.35);
+}
+
 .recommendBadge {
   display: inline-block;
   font-size: 9px;

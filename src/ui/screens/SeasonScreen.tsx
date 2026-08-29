@@ -82,7 +82,14 @@ export function SeasonScreen() {
                 key={player.id}
                 player={player}
                 badge={
-                  recommended.has(player.id) && !player.origin ? (
+                  /*
+                    **天才肌は入部の時点で分かるようにする。**
+                    50人に1人しか出ないのに、名前と能力が並ぶだけでは
+                    他の1年生に埋もれて、育ててから気づくことになっていた
+                  */
+                  player.personality === '天才肌' ? (
+                    <span className={styles.geniusBadge}>天才</span>
+                  ) : recommended.has(player.id) && !player.origin ? (
                     <span className={styles.recommendBadge}>推薦</span>
                   ) : undefined
                 }

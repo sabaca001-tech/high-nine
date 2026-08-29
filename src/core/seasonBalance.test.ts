@@ -101,6 +101,8 @@ describe('世代交代の長期バランス', () => {
             if (seen.has(entry.id)) continue
             seen.add(entry.id)
 
+            // 後援会の支援（練習試合の勝利給）も収入
+            if (entry.text.includes('後援会から')) income += yen(entry.text)
             if (entry.text.includes('支給') || entry.text.includes('大会の成績で')) {
               income += yen(entry.text)
             }

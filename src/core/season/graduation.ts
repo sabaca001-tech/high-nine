@@ -60,6 +60,16 @@ export function talentFromReputation(reputation: number): number {
 const RECRUIT_BASE_TALENT = -10
 
 /**
+ * 推薦入学の上乗せ。
+ *
+ * **14ではスカウトで獲った選手より強かった。**
+ * 県外まで通って口説いた選手（U15代表で中心64）より、
+ * 勝手に来てくれる推薦の逸材のほうが上、というのは筋が通らない。
+ * スカウトの下、一般入部の上振れの上、という位置に置く。
+ */
+const RECOMMENDED_BONUS = 8
+
+/**
  * 一般入部の振れ幅（±）。自校の既定（18）より狭い。
  *
  * **11では上振れがスカウトと並んでいた。** 評判の高い学校だと
@@ -152,7 +162,7 @@ export function recruitFreshmen(
         newcomers.filter((p) => p.isPitcher).length,
         scoutedPitchers,
       ),
-      talentBonus: baseTalent + rng.int(-3, 3) + (isRecommended ? 14 : 0),
+      talentBonus: baseTalent + rng.int(-3, 3) + (isRecommended ? RECOMMENDED_BONUS : 0),
       /*
        * **一般入部は強豪でもDまで。**
        * 既定の振れ幅（±18）だと、評判が上がったチームには総合68（C）の

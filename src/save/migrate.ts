@@ -171,6 +171,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 42) {
     data = migrateV41ToV42(data)
   }
+  if (version < 43) {
+    data = migrateV42ToV43(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -1123,6 +1126,28 @@ function migrateV41ToV42(raw: Record<string, unknown>): Record<string, unknown> 
   const graduates = Array.isArray(raw.graduates) ? raw.graduates.map(convert) : raw.graduates
 
   return { ...raw, version: 42, players, graduates }
+}
+
+/**
+ * v42 → v43: 中断中の試合に「大会の試合か」を持たせる。
+ *
+ * **開催中かどうかで判定していたのをやめた。** 大会は回戦ごとに別のマスへ置かれ、
+ * そのあいだは普通に練習できるので、合間に組んだ練習試合に負けると
+ * そのまま県大会の敗退になっていた。
+ *
+ * 中断してセーブしていた試合は、そのとき大会が開かれていたなら大会の試合。
+ * （合間の練習試合だった可能性もあるが、
+ * 中断中の1試合だけの話なので、従来どおりに扱うほうが安全）
+ */
+function migrateV42ToV43(raw: Record<string, unknown>): Record<string, unknown> {
+  const matchState = isRecord(raw.matchState) ? raw.matchState : null
+  if (!matchState) return { ...raw, version: 43 }
+
+  return {
+    ...raw,
+    version: 43,
+    matchState: { ...matchState, tournamentMatch: raw.tournament !== null },
+  }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

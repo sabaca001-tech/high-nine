@@ -2629,11 +2629,11 @@ describe('スカウト', () => {
       expect(state.scouting.trips).toBe(i + 1)
 
       // 次の出張に出るには、まず誰かに会って今回の出張を使い切る。
-      // 同じ選手には MAX_APPROACHES 回しか会えないので、毎回別の選手にする
+      // 同じ選手には MAX_APPROACHES 回しか会えないので、候補を順に回す
       const region = findScoutRegion(state.scouting, state.regionId)!
       state = applyCommand(state, {
         type: 'approachProspect',
-        prospectId: region.prospects[i].id,
+        prospectId: region.prospects[i % region.prospects.length].id,
       }).state
     }
 

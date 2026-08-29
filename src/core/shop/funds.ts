@@ -46,19 +46,31 @@ export function monthlyFunds(reputation: number): number {
  * 勝ちたくないという歪んだ動機が生まれる。
  */
 const PRIZE_PER_WIN: Record<Tournament['kind'], number> = {
-  summerPref: 8_000,
-  autumnPref: 6_000,
-  nationals: 80_000,
-  springNationals: 60_000,
+  summerPref: 12_000,
+  autumnPref: 9_000,
+  nationals: 110_000,
+  springNationals: 85_000,
 }
 
 /** 優勝したときの追加分 */
 const CHAMPION_BONUS: Record<Tournament['kind'], number> = {
-  summerPref: 40_000,
-  nationals: 150_000,
-  springNationals: 100_000,
-  autumnPref: 15_000,
+  summerPref: 60_000,
+  nationals: 200_000,
+  springNationals: 140_000,
+  autumnPref: 22_000,
 }
+
+/**
+ * 練習試合に勝ったときの部費（後援会からの支援）。
+ *
+ * **遠征費と相殺されて手元に残らなかった。**
+ * 遠征は距離しだいで13,400〜62,000円かかるのに、勝っても入るものが無く、
+ * グラウンドの維持費が上がるほど「遠征しないほうが得」になっていた。
+ *
+ * 遠征のほうが厚いのは、遠くまで出向いて勝つことが学校の評価になるため。
+ * **遠征費を全部は取り戻せない**ようにしてある（それでは遠征し放題になる）。
+ */
+export const FRIENDLY_WIN_PRIZE = { home: 4_000, away: 12_000 }
 
 /**
  * 大会の成績でもらえる部費。

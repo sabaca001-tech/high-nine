@@ -133,10 +133,14 @@ export function emptyScouting(): ScoutingState {
 /**
  * 1年に出張できる回数。
  *
- * 10回あれば、県外を数か所まわって気になる選手に通う余裕はある。
+ * 県外を数か所まわって、気になる選手に通う余裕がある回数。
  * 無制限だと部費の多寡がそのまま獲得数になり、選ぶ意味が消える。
+ *
+ * **10から増やしてある。** 推薦入学（勝手に来る逸材）を弱くしたぶん、
+ * 自分で足を運んで獲る側の余地を広げた。
+ * 1人につき4回通えるので、15回なら「本命2人＋様子見数人」が組める。
  */
-export const MAX_SCOUT_TRIPS = 10
+export const MAX_SCOUT_TRIPS = 15
 
 /** その年度に使った出張の回数 */
 export function tripsOf(scouting: ScoutingState): number {

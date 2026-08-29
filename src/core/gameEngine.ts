@@ -106,7 +106,13 @@ import {
 } from '@/core/player/trainingFocus'
 import type { GrowthPlan, TrainingFocus } from '@/core/player/trainingFocus'
 import { fixedEventFor } from '@/core/calendar/fixedEvents'
-import { formatFunds, FUNDS_MAX, monthlyFunds, tournamentPrize } from '@/core/shop/funds'
+import {
+  formatFunds,
+  FRIENDLY_WIN_PRIZE,
+  FUNDS_MAX,
+  monthlyFunds,
+  tournamentPrize,
+} from '@/core/shop/funds'
 import { scoutTripCost, tournamentTravel } from '@/core/shop/travel'
 import { monthlyUpkeep, UNPAID_TRUST_PENALTY } from '@/core/shop/upkeep'
 import {
@@ -774,6 +780,10 @@ function playTournamentMatch(state: GameState): EngineResult {
           : { opponentRegionName: findRegion(rival.regionId).name }),
         // トーナメントなので引き分けはあり得ない
         decisive: true,
+        // **この試合の勝敗だけを大会に反映する。**
+        // 「大会の開催中か」で見ていた頃は、回戦の合間に組んだ練習試合に
+        // 負けると、そのまま県大会の敗退になっていた
+        tournamentMatch: true,
         // **コールドは地区大会だけ。** 甲子園まで来た相手に
         // 「5回10点差で打ち切り」は成立しない
         mercy: isLocalTournament(tournament.kind),
@@ -847,6 +857,8 @@ function startMatch(state: GameState): EngineResult {
     kind: setup.kind,
     ...(setup.decisive ? { decisive: true } : {}),
     ...(setup.mercy === false ? { mercy: false } : {}),
+    // この試合の勝敗を大会に反映するか（大会の開催中かではなく、試合そのもの）
+    ...(setup.tournamentMatch ? { tournamentMatch: true } : {}),
     defenseBonus: managerDefenseBonus(state.managers),
     // 相手が分かっているなら、その学校の部員をそのまま出す
     ...(opponentRoster ? { opponentRoster } : {}),
@@ -1406,6 +1418,28 @@ function finishMatch(state: GameState): EngineResult {
     },
   ]
 
+  /*
+   * **練習試合に勝つと後援会から支援が入る。**
+   * 遠征は距離しだいで13,400〜62,000円かかるのに、勝っても入るものが無く、
+   * グラウンドの維持費が上がるほど「遠征しないほうが得」になっていた。
+   *
+   * 遠征かどうかは**相手の学校の県**で見る（行き先は結果に持ち回っていない）。
+   */
+  let prize = 0
+  if (won && !match.tournamentMatch) {
+    const school = match.opponentSchoolId
+      ? state.rivals.find((item) => item.id === match.opponentSchoolId)
+      : undefined
+    const away = school !== undefined && school.regionId !== state.regionId
+
+    prize = away ? FRIENDLY_WIN_PRIZE.away : FRIENDLY_WIN_PRIZE.home
+    events.push({
+      type: 'message',
+      text: `後援会から ${formatFunds(prize)} の支援が届いた`,
+      tone: 'good',
+    })
+  }
+
   if (growthChanges.length > 0) {
     events.push({ type: 'ability', changes: growthChanges })
     const gained = new Set(
@@ -1436,8 +1470,14 @@ function finishMatch(state: GameState): EngineResult {
     })
   }
 
-  // 大会の試合だった場合は、勝敗を大会に反映する
-  if (state.tournament) {
+  /*
+   * 大会の試合だった場合は、勝敗を大会に反映する。
+   *
+   * **その試合が大会の試合だったかで見る。** `state.tournament` があるだけで
+   * 反映していた頃は、大会の合間（回戦のマスとマスのあいだ）に組んだ練習試合に
+   * 負けると、**そのまま県大会の敗退になっていた**。
+   */
+  if (state.tournament && match.tournamentMatch) {
     const tournament = applyRoundResult(rng, state.tournament, {
       opponentName: match.opponentName,
       scoreFor: match.finalScore.player,
@@ -1553,6 +1593,8 @@ function finishMatch(state: GameState): EngineResult {
       pendingMatch: null,
       pendingGrowth: matchGrowth,
       reputation,
+      // 練習試合に勝つと後援会から支援が入る（遠征のほうが厚い）
+      funds: clamp(state.funds + prize, 0, FUNDS_MAX),
       serial,
       phase: matchGrowth ? 'growthReport' : reachedGoal ? 'yearEnd' : 'cardSelect',
       log,
@@ -1970,6 +2012,8 @@ function selectCard(state: GameState, cardId: string): EngineResult {
     // 練習試合の相手はその土地の学校から引く（地元でも遠征先でも）
     rivals: state.rivals,
     serial: state.serial,
+    // 大会の最中は練習試合を組まない（負けると大会の敗退として扱われていた）
+    inTournament: state.tournament !== null,
   })
   events.push(...outcome.events)
 
@@ -2556,6 +2600,21 @@ function advanceYear(state: GameState): EngineResult {
     text: `${change.graduates.length}人が卒業し、${change.newcomers.length}人が入部した`,
     tone: 'normal',
   })
+
+  /*
+   * **天才肌が来たら、そう言う。**
+   * 50人に1人しか出ないのに、新入生の一覧に埋もれていて、
+   * 何年か育ててから「そういえば天才肌だった」と気づく程度の扱いだった。
+   */
+  for (const player of pendingSeason.newcomers) {
+    if (player.personality !== '天才肌') continue
+    events.push({
+      type: 'message',
+      text: `${player.name}は並の1年生ではない。何年かに一度の逸材だ`,
+      tone: 'good',
+    })
+  }
+
   for (const news of change.careerNews) {
     events.push({ type: 'message', text: news, tone: 'good' })
   }

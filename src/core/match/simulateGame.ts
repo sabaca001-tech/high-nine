@@ -98,6 +98,11 @@ export type MatchState = {
   serial: number
   /** 試合が終わっていれば結果。まだなら null */
   outcome: MatchResult['outcome'] | null
+  /**
+   * 大会の試合か。
+   * 中断してセーブすることがあるので、**結果まで持ち回る**。
+   */
+  tournamentMatch?: boolean
 }
 
 /** 試合を組み立てる。まだ1球も投げていない状態を返す */
@@ -111,6 +116,7 @@ export function startMatchState(rng: Rng, setup: MatchSetup): MatchState {
 
   return {
     kind: setup.kind,
+    tournamentMatch: setup.tournamentMatch === true,
     decisive: setup.decisive === true,
     // 省略時はコールドあり。無いのは全国大会だけ
     mercy: setup.mercy !== false,
@@ -286,6 +292,7 @@ export function finalizeMatch(rng: Rng, state: MatchState): MatchResult {
     battingLines,
     pitchingLines,
     mvpPlayerId: pickMvp(battingLines, pitchingLines, outcome),
+    tournamentMatch: state.tournamentMatch === true,
   }
 }
 
