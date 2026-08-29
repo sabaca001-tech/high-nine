@@ -162,6 +162,34 @@
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.62) 55%);
 }
 
+/*
+ * 押すとログが開く。**帯そのものをボタンにする。**
+ * 別にボタンを置くと、限られた縦幅を説明のためだけに使うことになる。
+ */
+.chatterButton {
+  pointer-events: auto;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  /* 指で押せる高さを確保する（帯は3行ぶんあるので足りている） */
+  min-height: var(--tap-min);
+}
+
+.chatterButton:active {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.75) 55%);
+}
+
+.chatterMore {
+  align-self: flex-end;
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
 .chatterLine {
   font-size: var(--fs-xs);
   font-weight: 700;

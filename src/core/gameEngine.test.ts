@@ -1657,17 +1657,28 @@ describe('練習器具', () => {
     expect(applyCommand(state, { type: 'buyEquipment', equipmentId: 'unknown' }).state).toBe(state)
   })
 
-  it('壊れると持ち物から消え、その練習カードも手札から消える', () => {
-    // 全部持たせて1年進めれば、いずれ壊れる
+  it('使った練習の器具が壊れ、その練習カードも手札から消える', () => {
+    /*
+     * **器具は使ったときだけ傷む。** 月ごとに判定していた頃は、
+     * 一度も使っていない器具が勝手に壊れていた。
+     * ここでは器具の練習を選び続けて、壊れるまで回す。
+     */
     let state: GameState = {
       ...startedGame({ seed: 605 }),
       equipment: EQUIPMENTS.map((equipment) => equipment.id),
     }
 
     let broke = false
-    while (state.phase !== 'yearEnd' && !broke) {
-      state = playStep(state)
+    let guard = 0
+    while (!broke && guard < 400) {
+      // 器具を使う練習があればそれを選ぶ
+      state = playStep(state, {
+        chooseCard: (s) =>
+          (s.hand.find((card) => requiresEquipment(card.kind)) ?? s.hand[0]).id,
+      })
       broke = state.equipment.length < EQUIPMENTS.length
+      if (state.phase === 'yearEnd') state = applyCommand(state, { type: 'advanceYear' }).state
+      guard++
     }
 
     expect(broke).toBe(true)

@@ -135,7 +135,11 @@ import {
   groundUpgradeCostFor,
 } from '@/core/shop/facility'
 import { applyItem, findItem } from '@/core/shop/itemDefs'
-import { findEquipment, unlockedKinds } from '@/core/shop/equipmentDefs'
+import {
+  breakEquipmentInUse,
+  findEquipment,
+  unlockedKinds,
+} from '@/core/shop/equipmentDefs'
 import {
   applyRoundResult,
   createTournament,
@@ -1978,10 +1982,28 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   players = special.players
   events.push(...special.events)
 
+  /*
+   * **器具は使った練習でだけ傷む。**
+   * 月ごとに判定していた頃は、一度も使っていない器具が勝手に壊れて、
+   * 買ったのに手札に出ないまま消えることがあった。
+   */
+  const brokenItem = breakEquipmentInUse(rng, state.equipment, card.kind)
+  const equipmentAfterUse = brokenItem
+    ? state.equipment.filter((id) => id !== brokenItem.id)
+    : state.equipment
+
+  if (brokenItem) {
+    events.push({
+      type: 'message',
+      text: `${brokenItem.name}が壊れてしまった。「${PRACTICE_LABELS[brokenItem.unlocks]}」は選べなくなる`,
+      tone: 'bad',
+    })
+  }
+
   // 月をまたいだぶんの処理をまとめて行う
   const monthly = applyMonthChanges(
     rng,
-    { ...state, players, groundLevel: special.groundLevel },
+    { ...state, players, groundLevel: special.groundLevel, equipment: equipmentAfterUse },
     from,
     to,
   )
@@ -2036,9 +2058,18 @@ function selectCard(state: GameState, cardId: string): EngineResult {
   const refilled = replaceCard(rng, state.hand, cardId, serial, handSize, unlocked, hasInjured)
   serial += Math.max(1, handSize - (state.hand.length - 1))
 
-  // 器具が壊れたら、その練習のカードは手札からも引き直す
-  const broken = replaceBrokenCards(rng, refilled, monthly.lostKinds, serial, unlocked, hasInjured)
-  serial += monthly.lostKinds.length > 0 ? refilled.length : 0
+  /*
+   * 器具が壊れたら、その練習のカードは手札からも引き直す。
+   *
+   * **この手で壊れたぶんも含める。** 使った練習で壊れる形にしたので、
+   * 月替わりの処理（`applyMonthChanges`）は壊れたことを知らない。
+   * 使えない練習が手札に残ると、選んでも何も起きないカードになる。
+   */
+  const lostKinds = brokenItem
+    ? [...monthly.lostKinds, brokenItem.unlocks]
+    : monthly.lostKinds
+  const broken = replaceBrokenCards(rng, refilled, lostKinds, serial, unlocked, hasInjured)
+  serial += lostKinds.length > 0 ? refilled.length : 0
 
   // 怪我人が復帰したら、残っている治療カードも引き直す
   const hand = replaceUselessCards(rng, broken, serial, unlocked, hasInjured)
@@ -2379,24 +2410,7 @@ export function applyOneMonth(
     })
   }
 
-  // 練習器具は使ううちに壊れる。壊れるとその練習カードは出なくなる
-  const broken = equipment.filter((id) => {
-    const item = findEquipment(id)
-    return item !== undefined && rng.chance(item.breakChance)
-  })
-  if (broken.length > 0) {
-    equipment = equipment.filter((id) => !broken.includes(id))
-    for (const id of broken) {
-      const item = findEquipment(id)
-      if (item) {
-        events.push({
-          type: 'message',
-          text: `${item.name}が壊れてしまった。「${PRACTICE_LABELS[item.unlocks]}」は選べなくなる`,
-          tone: 'bad',
-        })
-      }
-    }
-  }
+  // **器具は月では壊れない。** 使った練習でだけ傷む（`breakEquipmentInUse`）
 
   /*
    * 学校からの支援。

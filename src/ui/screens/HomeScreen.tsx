@@ -6,6 +6,7 @@ import { dayOfCell, formatDay } from '@/core/calendar/days'
 import { TOURNAMENT_LABELS } from '@/core/types/tournament'
 import type { PracticeKind } from '@/core/types/card'
 import type { GameState } from '@/core/types/game'
+import type { LogEntry } from '@/core/types/event'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { BoardTrack } from '@/ui/components/BoardTrack'
@@ -23,6 +24,13 @@ export function HomeScreen() {
 
   // 直近に選んだ練習。グラウンドの選手の動きに反映する
   const [lastPractice, setLastPractice] = useState<PracticeKind | null>(null)
+  /**
+   * これまでのログを開いているか。
+   *
+   * **直近3件が流れて消えるだけだった。** 少し前に何が起きたのかを
+   * 見返す手段がどこにも無く、成長の報告も試合の結果も一度きりだった。
+   */
+  const [logOpen, setLogOpen] = useState(false)
 
   if (!game) return null
 
@@ -72,7 +80,11 @@ export function HomeScreen() {
         practice={lastPractice}
         headline={headline}
         chatter={chatter}
+        logOpen={logOpen}
+        onOpenLog={() => setLogOpen((open) => !open)}
       />
+
+      {logOpen && <LogPanel log={game.log} onClose={() => setLogOpen(false)} />}
 
       <GrowthSummary events={lastEvents} />
 
@@ -93,6 +105,62 @@ export function HomeScreen() {
         </>
       )}
     </AppLayout>
+  )
+}
+
+/**
+ * これまでの出来事。**新しいものが上。**
+ *
+ * 高さに上限を置いて中でスクロールさせる。
+ * 置かないと、下にある手札やボタンを画面外へ押し出す。
+ */
+function LogPanel({ log, onClose }: { log: LogEntry[]; onClose: () => void }) {
+  const entries = [...log].reverse()
+
+  /*
+   * **シート（下から出る）で出す。** 画面の中に差し込むと、
+   * 下にある手札とボタンを押し出してしまう。
+   * 閉じれば元の画面がそのまま残るので、盤面を見失わない。
+   */
+  return (
+    <div
+      className={styles.logOverlay}
+      role="presentation"
+      onClick={(event) => {
+        // 外側を触ったら閉じる。中身のスクロールは邪魔しない
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <section className={styles.logPanel}>
+        <header className={styles.logHead}>
+          <span className={styles.logTitle}>これまでの出来事</span>
+          <button type="button" className={styles.logClose} onClick={onClose}>
+            閉じる
+          </button>
+        </header>
+
+        <div className={styles.logList}>
+          {entries.length === 0 ? (
+            <p className={styles.logEmpty}>まだ何も起きていない</p>
+          ) : (
+            entries.map((entry) => (
+              <p
+                key={entry.id}
+                className={`${styles.logLine} ${
+                  entry.tone === 'good'
+                    ? styles.logGood
+                    : entry.tone === 'bad'
+                      ? styles.logBad
+                      : ''
+                }`}
+              >
+                {entry.text}
+              </p>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
   )
 }
 

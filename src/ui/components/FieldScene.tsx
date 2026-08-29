@@ -60,6 +60,13 @@ type Props = {
   headline: LogEntry | null
   /** 吹き出しの下に流す直近のログ */
   chatter: LogEntry[]
+  /**
+   * 掛け声の帯を押したとき。
+   * 渡すと**これまでのログを開くボタン**になる。
+   */
+  onOpenLog?: () => void
+  /** ログを開いているか。矢印の向きに使う */
+  logOpen?: boolean
 }
 
 /**
@@ -68,7 +75,15 @@ type Props = {
  * 画像アセットを一切使わず SVG と CSS だけで描く。
  * 理由: 外部通信なしで動き、季節・時間帯の差し替えが色変数の変更だけで済むため。
  */
-export function FieldScene({ month, practice, uniform, headline, chatter }: Props) {
+export function FieldScene({
+  month,
+  practice,
+  uniform,
+  headline,
+  chatter,
+  onOpenLog,
+  logOpen = false,
+}: Props) {
   const season = seasonOf(month)
   const colors = teamColors(uniform)
   const particle = particleOf(season)
@@ -110,13 +125,42 @@ export function FieldScene({ month, practice, uniform, headline, chatter }: Prop
         <p className={`${styles.bubble} ${toneClass(headline.tone, 'bubble')}`}>{headline.text}</p>
       )}
 
-      <div className={styles.chatter}>
-        {chatter.map((entry) => (
-          <span key={entry.id} className={`${styles.chatterLine} ${toneClass(entry.tone, 'chatter')}`}>
-            {entry.text}
+      {/*
+        **掛け声の帯は、これまでのログへの入口でもある。**
+        直近3件が流れて消えるだけだったので、
+        少し前に何が起きたのかを見返す手段がどこにも無かった。
+      */}
+      {onOpenLog ? (
+        <button
+          type="button"
+          className={`${styles.chatter} ${styles.chatterButton}`}
+          onClick={onOpenLog}
+          aria-expanded={logOpen}
+        >
+          {chatter.map((entry) => (
+            <span
+              key={entry.id}
+              className={`${styles.chatterLine} ${toneClass(entry.tone, 'chatter')}`}
+            >
+              {entry.text}
+            </span>
+          ))}
+          <span className={styles.chatterMore}>
+            {logOpen ? '閉じる ▲' : 'これまでの出来事 ▼'}
           </span>
-        ))}
-      </div>
+        </button>
+      ) : (
+        <div className={styles.chatter}>
+          {chatter.map((entry) => (
+            <span
+              key={entry.id}
+              className={`${styles.chatterLine} ${toneClass(entry.tone, 'chatter')}`}
+            >
+              {entry.text}
+            </span>
+          ))}
+        </div>
+      )}
 
     </div>
   )

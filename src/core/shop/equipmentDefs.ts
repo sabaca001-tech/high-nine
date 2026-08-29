@@ -28,9 +28,17 @@ export type Equipment = {
   description: string
   price: number
   /**
-   * 月ごとに壊れる確率。
+   * **その器具の練習を1回するごとに**壊れる確率。
+   *
+   * 月ごとの判定にしていた頃は、**一度も使っていない器具が勝手に壊れた**。
+   * 買ったのに手札に出ないまま消えることがあり、
+   * 「使うから傷む」という当たり前の因果が無かった。
+   *
    * 酷使する器具ほど壊れやすい。安い器具ほど壊れやすい、ではない
    * （安いから壊れるのでは「安物買い」の話になり、選択が単純になる）。
+   *
+   * 月ごとの値の**半分**に置き直してある。使う頻度ぶん判定が増えるので、
+   * そのままでは壊れすぎる。
    */
   breakChance: number
 }
@@ -42,7 +50,7 @@ export const EQUIPMENTS: Equipment[] = [
     unlocks: 'teeBatting',
     description: 'ティー打撃ができるようになる（ミートが大きく伸びる）',
     price: 60_000,
-    breakChance: 0.1,
+    breakChance: 0.05,
   },
   {
     id: 'bench',
@@ -50,7 +58,7 @@ export const EQUIPMENTS: Equipment[] = [
     unlocks: 'weight',
     description: 'ウエイトトレーニングができるようになる（パワーが大きく伸びる）',
     price: 120_000,
-    breakChance: 0.05,
+    breakChance: 0.025,
   },
   {
     id: 'ladder',
@@ -58,7 +66,7 @@ export const EQUIPMENTS: Equipment[] = [
     unlocks: 'agility',
     description: 'アジリティ練習ができるようになる（走力と守備が伸びる）',
     price: 80_000,
-    breakChance: 0.09,
+    breakChance: 0.045,
   },
   {
     id: 'machine',
@@ -66,7 +74,7 @@ export const EQUIPMENTS: Equipment[] = [
     unlocks: 'machineBatting',
     description: 'マシン打撃ができるようになる（ミートとパワーが伸びる）',
     price: 200_000,
-    breakChance: 0.12,
+    breakChance: 0.06,
   },
   {
     id: 'bullpen',
@@ -74,7 +82,7 @@ export const EQUIPMENTS: Equipment[] = [
     unlocks: 'bullpen',
     description: 'ブルペン投球ができるようになる（コントロールとスタミナが伸びる）',
     price: 160_000,
-    breakChance: 0.06,
+    breakChance: 0.03,
   },
   {
     id: 'video',
@@ -82,7 +90,7 @@ export const EQUIPMENTS: Equipment[] = [
     unlocks: 'videoStudy',
     description: 'ビデオ分析ができるようになる（変化球とミートが伸び、消耗しない）',
     price: 140_000,
-    breakChance: 0.08,
+    breakChance: 0.04,
   },
 ]
 
@@ -109,4 +117,26 @@ export function requiresEquipment(kind: PracticeKind): boolean {
 /** その練習を使えるようにする器具 */
 export function equipmentFor(kind: PracticeKind): Equipment | undefined {
   return EQUIPMENTS.find((equipment) => equipment.unlocks === kind)
+}
+
+/**
+ * その練習で使う器具を、確率で壊す。
+ *
+ * **使ったときだけ傷む。** 月ごとに判定していた頃は、
+ * 一度も使っていない器具が勝手に壊れて、
+ * 買ったのに手札に出ないまま消えることがあった。
+ *
+ * @returns 壊れた器具（壊れなければ null）
+ */
+export function breakEquipmentInUse(
+  rng: { chance: (probability: number) => boolean },
+  owned: readonly string[],
+  kind: PracticeKind,
+): Equipment | null {
+  const item = owned
+    .map((id) => findEquipment(id))
+    .find((entry): entry is Equipment => entry !== undefined && entry.unlocks === kind)
+
+  if (!item) return null
+  return rng.chance(item.breakChance) ? item : null
 }
