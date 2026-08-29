@@ -130,9 +130,10 @@ const PERSONALITY_WEIGHTS: { value: Personality; weight: number }[] = [
  * **8では「レアなのに普通の新入生」だった。** 50人に1人しか出ないのに、
  * 入部の時点では他の1年生に埋もれていて、
  * 育ててみて初めて「そういえば天才肌だった」と気づく程度の差しかなかった。
- * 出会った瞬間に分かる水準（総合で1学年ぶん上）に置く。
+ * 出会った瞬間に分かる水準に置く。
+ * 20なら、1年生で入ってきた時点で**3年生の平均を超える**。
  */
-export const GENIUS_TALENT_BONUS = 14
+export const GENIUS_TALENT_BONUS = 20
 
 /**
  * 留学生の出現率。**天才肌と同じくらいの珍しさ**にしてある。
@@ -143,12 +144,22 @@ export const GENIUS_TALENT_BONUS = 14
 export const EXCHANGE_RATE = 0.02
 
 /**
+ * 留学生の入学時の上乗せ。
+ *
+ * **総合を動かしていなかった。** 体つきの偏り（下記）だけを付けていたので、
+ * 2%しか出ないのに「パワーはあるがミートは低い、総合は普通の1年生」で、
+ * 引き当てた実感が薄かった。
+ * 天才肌（+20）ほどではないが、入学の時点で1学年ぶん上にいる。
+ */
+const EXCHANGE_TALENT_BONUS = 10
+
+/**
  * 留学生の体つき。**合計0で振り分ける。**
  *
  * 身体能力（パワー・走力・肩力）に振って、
  * そのぶん技術（ミート・守備・捕球）を引く。
- * 総合そのものは動かさないので、スカウトの「素質◯◯」とも食い違わない。
- * 上がるのは「何が得意な選手か」の分かりやすさだけ。
+ * 偏りは総合を動かさない（上乗せは `EXCHANGE_TALENT_BONUS` のほう）ので、
+ * 「何が得意な選手か」の分かりやすさだけが上がる。
  */
 const EXCHANGE_FIELDER_TILT = 7
 
@@ -340,7 +351,12 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const spread = options.talentSpread ?? TALENT_SPREAD
   const talent = spread > 0 ? rng.int(-spread, spread) : 0
 
-  const base = GRADE_BASE[grade] + talentBonus + talent + (genius ? GENIUS_TALENT_BONUS : 0)
+  const base =
+    GRADE_BASE[grade] +
+    talentBonus +
+    talent +
+    (genius ? GENIUS_TALENT_BONUS : 0) +
+    (exchange ? EXCHANGE_TALENT_BONUS : 0)
 
   /*
    * 能力ごとのばらつき。
@@ -421,7 +437,7 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
     injuryMonths: 0,
     personality,
     academics: rollAcademics(rng, personality),
-    growthAptitude: createGrowthAptitude(rng, isPitcher, exchange),
+    growthAptitude: createGrowthAptitude(rng, isPitcher, exchange, genius),
     aptitudes: createAptitudes(rng, position),
     skills: [],
     history: [],
@@ -481,6 +497,8 @@ export function createGrowthAptitude(
   isPitcher: boolean,
   /** 留学生。身体能力の伸び代が上乗せされる */
   exchange = false,
+  /** 天才肌。**苦手を作らない**（下限が上がる） */
+  genius = false,
 ): Partial<Record<GrowableKey, number>> {
   // 持っていない能力に伸び代を付けても意味が無い。
   // **球速も対象に入れる。** 入れていなかった頃は、
@@ -496,11 +514,17 @@ export function createGrowthAptitude(
    * 「この選手はよく伸びる」が作れない（`TALENT_SPREAD` と同じ話）。
    * 素質が入学時の能力を決めるのに対して、こちらは3年間の伸びを決める。
    */
-  const talent = 0.75 + rng.float() * 0.5
+  const talent = genius ? GENIUS_TALENT_FLOOR + rng.float() * 0.4 : 0.75 + rng.float() * 0.5
 
   const aptitude: Partial<Record<GrowableKey, number>> = {}
   for (const key of pool) {
-    aptitude[key] = round2(clampAptitude(talent * (KEY_MIN + rng.float() * KEY_RANGE)))
+    const raw = talent * (KEY_MIN + rng.float() * KEY_RANGE)
+    /*
+     * **天才肌に苦手は無い。** 50人に1人しか出ないのに、
+     * 「よく伸びるが走力だけは動かない」という選手になることがあった。
+     * 下限を置いて、どの能力も普通の選手の標準より速く伸びるようにする。
+     */
+    aptitude[key] = round2(clampAptitude(genius ? Math.max(GENIUS_KEY_FLOOR, raw) : raw))
   }
 
   /*
@@ -535,6 +559,18 @@ export function createGrowthAptitude(
 
   return aptitude
 }
+
+/**
+ * 天才肌の「選手そのものの伸びやすさ」の下限。
+ * 普通の選手は 0.75〜1.25 で、天才は 1.15〜1.55。
+ */
+const GENIUS_TALENT_FLOOR = 1.15
+
+/**
+ * 天才肌の**1項目ごとの下限**。
+ * 普通の選手の標準（1.0）を下回らない。
+ */
+const GENIUS_KEY_FLOOR = 1.05
 
 /**
  * 能力ごとの伸び代の幅。平均が1.0になるように取る。

@@ -82,18 +82,27 @@ describe('留学生', () => {
         (exchange.batting.catching - normal.batting.catching)
     }
 
-    expect(physical).toBeGreaterThan(0)
-    expect(technical).toBeLessThan(0)
+    // 上乗せ（`EXCHANGE_TALENT_BONUS`）ぶん、技術も素の値より高くなる。
+    // 見たいのは**偏り**なので、身体能力のほうが大きく上がっているかで測る
+    expect(physical).toBeGreaterThan(technical)
   })
 
-  it('総合は変わらない（凸凹が変わるだけ）', () => {
+  it('入学の時点で1学年ぶん上にいる', () => {
+    /*
+     * **総合を動かしていなかった。** 体つきの偏りだけを付けていたので、
+     * 2%しか出ないのに「パワーはあるが総合は普通の1年生」で、
+     * 引き当てた実感が薄かった。
+     */
     let diff = 0
     for (let seed = 1; seed <= 60; seed++) {
       diff += battingRating(exchangePlayer(seed, false).batting) -
         battingRating(normalPlayer(seed, false).batting)
     }
-    // 60人ぶんの合計。丸めのぶんしかずれない
-    expect(Math.abs(diff / 60)).toBeLessThan(1)
+
+    const average = diff / 60
+    expect(average).toBeGreaterThan(5)
+    // ただし天才肌（+20）ほどではない
+    expect(average).toBeLessThan(16)
   })
 
   it('投手は球速とスタミナが上がる', () => {
@@ -111,12 +120,14 @@ describe('留学生', () => {
     expect(stamina).toBeGreaterThan(0)
   })
 
-  it('投手の総合が突き抜けない（制球と変化球を引いている）', () => {
+  it('投手も、突き抜けはしない（制球と変化球を引いている）', () => {
     let diff = 0
     for (let seed = 1; seed <= 60; seed++) {
       diff += overallRating(exchangePlayer(seed, true)) - overallRating(normalPlayer(seed, true))
     }
-    expect(diff / 60).toBeLessThan(4)
+    // 上乗せは入るが、制球と変化球を引いているぶん野手ほどは伸びない
+    expect(diff / 60).toBeGreaterThan(4)
+    expect(diff / 60).toBeLessThan(14)
   })
 
   it('身体能力の伸び代が上乗せされる', () => {

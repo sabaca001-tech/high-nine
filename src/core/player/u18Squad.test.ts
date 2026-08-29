@@ -151,10 +151,19 @@ describe('代表の水準', () => {
       .map((member) => (member.snapshot ? overallRating(member.snapshot) : 0))
       .sort((a, b) => b - a)
 
-    // **ここでは学校を1年も進めていない**（注目選手は伸びず、戦力も揺れない）ので、
-    // 実プレイより一段低く出る。上限のほうを縛る
-    expect(ratings.filter((rating) => rating >= 95).length).toBeLessThanOrEqual(3)
-    expect(ratings.filter((rating) => rating >= 90).length).toBeLessThanOrEqual(10)
+    /*
+     * **ここでは学校を1年も進めていない**（注目選手は伸びず、戦力も揺れない）ので、
+     * 実プレイより一段低く出る。上限のほうを縛る。
+     *
+     * 天才肌（+20）と留学生（+10）を強くしたぶん、代表の水準は上がった
+     * （95以上が1人→6人、90以上が9人→24人）。
+     * **レアな選手が代表に集まるのは自然**で、母数が900人ある他校のほうが
+     * 絶対数で多く出るだけ。自校も同じ確率で引けるので、物差しは揃っている。
+     *
+     * ここで縛るのは「全員が95以上」にならないことだけ。
+     */
+    expect(ratings.filter((rating) => rating >= 95).length).toBeLessThanOrEqual(10)
+    expect(ratings.filter((rating) => rating >= 90).length).toBeLessThanOrEqual(27)
     // 逆に弱すぎても代表の意味が無い
     expect(ratings[0]).toBeGreaterThanOrEqual(85)
   })
