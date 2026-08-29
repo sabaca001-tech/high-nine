@@ -46,6 +46,32 @@ describe('recruitCount', () => {
       }
     }
   })
+
+  it('強豪以上は、部員が埋まっていても10人は来る', () => {
+    /*
+     * **一律で4人を下限にしていた。** 部員の多い年の名門校に
+     * 5人しか来ない、ということが起きていた。
+     * 名門に入りたい中学生は毎年いるはずで、
+     * 部員が埋まっているならベンチ入り争いが激しくなるだけでよい。
+     */
+    for (const remaining of [20, 25, 30, 40]) {
+      // 評判64以上が強豪校（B）
+      expect(recruitCount(64, remaining)).toBeGreaterThanOrEqual(10)
+      expect(recruitCount(80, remaining)).toBeGreaterThanOrEqual(11)
+      expect(recruitCount(95, remaining)).toBeGreaterThanOrEqual(12)
+    }
+  })
+
+  it('格が上がるほど下限も上がる', () => {
+    const full = 40
+    const counts = [20, 40, 55, 70, 80, 95].map((reputation) =>
+      recruitCount(reputation, full),
+    )
+
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i]).toBeGreaterThanOrEqual(counts[i - 1])
+    }
+  })
 })
 
 describe('advanceSeason', () => {

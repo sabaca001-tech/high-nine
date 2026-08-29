@@ -11,7 +11,8 @@ import { draftBonus } from '@/core/player/u18'
 import type { Grade, Player } from '@/core/types/player'
 import { snapshotOf } from '@/core/types/player'
 import type { GraduateRecord } from '@/core/types/season'
-import { REPUTATION_INITIAL } from '@/core/types/season'
+import { REPUTATION_INITIAL, reputationGrade } from '@/core/types/season'
+import type { ReputationGrade } from '@/core/types/season'
 import { GRADUATION_MONTH } from '@/core/types/career'
 
 /** 部員数の目安。評判が高いほど多くの入部希望者が来る */
@@ -33,9 +34,30 @@ const MIN_PITCHERS = 2
  */
 const PITCHER_RECRUITS = 2
 
-/** 1年で入る新入生の下限・上限。強豪校ならベンチ入り争いが起きる規模になる */
-const MIN_RECRUITS = 4
+/** 1年で入る新入生の上限。強豪校ならベンチ入り争いが起きる規模になる */
 const MAX_RECRUITS = 16
+
+/**
+ * **評判ごとの最低入部人数。**
+ *
+ * 一律で4人を下限にしていたので、部員が多い年の名門校に
+ * **5人しか来ない**ということが起きていた。
+ * 名門に入りたい中学生は毎年いるはずで、
+ * 「今年は不作だった」で片づく話ではない。
+ *
+ * 部員が埋まっているなら、そのぶんベンチ入り争いが激しくなるだけでよい。
+ */
+const MIN_RECRUITS_BY_GRADE: Record<ReputationGrade, number> = {
+  S: 12,
+  A: 11,
+  // 強豪以上は最低10人
+  B: 10,
+  C: 7,
+  D: 6,
+  E: 5,
+  F: 4,
+  G: 4,
+}
 
 /**
  * 評判から新入生の実力補正を求める。
@@ -106,10 +128,18 @@ const RECRUIT_MAX_TALENT = 7
  */
 const REPUTATION_TALENT_RATE = 0.45
 
-/** 評判が高いほど多くの新入生が来る */
+/**
+ * 評判が高いほど多くの新入生が来る。
+ *
+ * 部員が埋まっていれば少なくなるが、**評判ごとの下限は割らない**
+ * （`MIN_RECRUITS_BY_GRADE`）。名門校に5人しか来ないのは不自然で、
+ * 部員が多い年は入部希望者が減るのではなく、
+ * **ベンチ入り争いが激しくなる**というだけの話。
+ */
 export function recruitCount(reputation: number, remaining: number): number {
   const target = BASE_ROSTER_SIZE + Math.floor(reputation / 12)
-  return Math.max(MIN_RECRUITS, Math.min(MAX_RECRUITS, target - remaining))
+  const floor = MIN_RECRUITS_BY_GRADE[reputationGrade(reputation)]
+  return Math.max(floor, Math.min(MAX_RECRUITS, target - remaining))
 }
 
 /** 新入生を迎える。新規開始時と毎年4月の両方で使う */
