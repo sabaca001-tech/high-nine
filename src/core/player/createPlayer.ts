@@ -125,6 +125,14 @@ const PERSONALITY_WEIGHTS: { value: Personality; weight: number }[] = [
 ]
 
 /**
+ * 天才肌を除いた重み。**他校の選手を作るときに使う。**
+ * 元の表から取り除くだけなので、他の性格の出やすさの比は変わらない。
+ */
+const PERSONALITY_WEIGHTS_NO_GENIUS = PERSONALITY_WEIGHTS.filter(
+  (entry) => entry.value !== '天才肌',
+)
+
+/**
  * 天才肌の入学時の上乗せ。素質そのものが違う。
  *
  * **8では「レアなのに普通の新入生」だった。** 50人に1人しか出ないのに、
@@ -317,6 +325,18 @@ export type CreatePlayerOptions = {
    */
   talentBonus?: number
   /**
+   * 天才肌が出うるか。**省略時は出る。**
+   *
+   * **他校では出さない。**（`rivalRoster` / `opponent`）
+   * 天才肌を「弱点なしで全部よく伸びる」当たりにしたので、
+   * 母数900人の他校で普通に出ると、その2%が
+   * U18代表の枠を埋めて自校の選手が押し出される
+   * （実測で代表の総合90以上が9人 → 24人になった）。
+   *
+   * 引き当てる楽しみは**自分のチームのもの**にしておく。
+   */
+  allowGenius?: boolean
+  /**
    * 選手ごとの素質の振れ幅（±）。省略時は `TALENT_SPREAD`。
    * **0を渡すと `talentBonus` どおりの能力になる。**
    * スカウトのように「素質◯◯」と示してから入学させる場合に使う。
@@ -343,7 +363,9 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
 
   // 性格は能力より先に決める。天才肌は素質そのものが違うので、
   // 決まった性格が入学時の能力にも効く
-  const personality = rng.weighted(PERSONALITY_WEIGHTS)
+  const personality = rng.weighted(
+    options.allowGenius === false ? PERSONALITY_WEIGHTS_NO_GENIUS : PERSONALITY_WEIGHTS,
+  )
   const genius = personality === '天才肌'
 
   // 選手ごとの素質。全能力をまとめて上下させるので、総合にそのまま出る。
@@ -625,6 +647,11 @@ export function createInitialRoster(
   perGrade = 8,
   /** 生成する学年。既定は3学年すべて */
   grades: Grade[] = [3, 2, 1],
+  /**
+   * 天才肌が出うるか。**診断で「互角」を測るときだけ false にする。**
+   * 他校には出ない（`allowGenius`）ので、揃えないと自校だけ有利になる
+   */
+  allowGenius = true,
 ): Player[] {
   const players: Player[] = []
   let counter = 0
@@ -643,6 +670,7 @@ export function createInitialRoster(
           // 初期部員が県内のちょうど真ん中の水準（平均総合43）で、
           // 「弱いチームを強くする」という出発点になっていなかった
           talentBonus: INITIAL_TALENT,
+          allowGenius,
           // 在校生は入学年が異なるので、記録の起点は加入月に揃える
           enrolledAt: { year: 1, month: 4 },
           takenNames: players.map((player) => player.name),

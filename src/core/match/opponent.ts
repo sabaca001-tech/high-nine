@@ -74,6 +74,8 @@ function createDisposableOpponent(rng: Rng, strength: number, fixedName?: string
           // そのまま足していた頃は、学校が分からない使い捨ての相手だけが
           // 一段強く、甲子園の代表校より強い「名も無い相手」が出ていた
           talentBonus: Math.round(rosterTalentOf(strength)),
+          // 他校に天才肌は出さない（`rivalRoster` と揃える）
+          allowGenius: false,
         }),
       )
     }

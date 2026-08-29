@@ -81,7 +81,7 @@ describe('バランス確認', () => {
     let walks = 0
 
     for (let seed = 0; seed < trials; seed++) {
-      const players = createInitialRoster(createRng(seed))
+      const players = createInitialRoster(createRng(seed), 8, [3, 2, 1], false)
       const result = simulateGame(createRng(seed * 13 + 1), {
         players,
         lineup: autoLineup(players),
@@ -158,7 +158,8 @@ describe('バランス確認', () => {
       let runs = 0
 
       for (let seed = 0; seed < trials; seed++) {
-        const base = createInitialRoster(createRng(seed))
+        // 天才肌は他校に出ないので、釣り合いを測る診断では出さない
+        const base = createInitialRoster(createRng(seed), 8, [3, 2, 1], false)
         const players: Player[] = base.map((player) =>
           player.isPitcher
             ? player

@@ -9,7 +9,12 @@ import { isHit, outsOf } from '@/core/types/match'
 import { mercyLeadAt, simulateGame } from './simulateGame'
 
 function makeSetup(seed: number, strength = 0): { setup: MatchSetup; players: Player[] } {
-  const players = createInitialRoster(createRng(seed))
+  /*
+   * **天才肌は出さない。** 他校には出ない仕組みにしたので、
+   * 自校だけ出すと「互角の相手」を測る診断が自校寄りに傾く
+   * （実測で勝率が65%まで上がった）。
+   */
+  const players = createInitialRoster(createRng(seed), 8, [3, 2, 1], false)
   return {
     players,
     setup: {

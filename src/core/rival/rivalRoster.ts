@@ -218,6 +218,9 @@ export function rivalRoster(
         talentBonus:
           Math.round(rosterTalentOf(school.strength)) + classBonus(school, enrolledYear) + grown,
         talentSpread: ROSTER_TALENT_SPREAD,
+        // **他校に天才肌は出さない。** 母数が900人あるので、
+        // 2%でも代表の枠がそれで埋まり、自校の選手が押し出される
+        allowGenius: false,
         takenNames,
       })
       takenNames.push(player.name)
@@ -279,6 +282,8 @@ function materializeStar(star: RivalPlayer, slot: Player, grade: Grade, grown: n
     talentSpread: 0,
     // 名前は注目選手のものを使うので、留学生としては作らない
     exchange: false,
+    // 他校なので天才肌も出さない（素質は `rating` で決まっている）
+    allowGenius: false,
   })
 
   return {
