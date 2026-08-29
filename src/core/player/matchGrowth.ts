@@ -18,6 +18,10 @@
  * 初戦で負けた年と優勝した年で3年後の姿がほとんど変わらなかった。
  * 練習（`CARD_GROWTH_SCALE`）を下げて、そのぶんを試合に寄せてある。
  *
+ * **その日の仕事を果たしたなら、能力は下がらない。**
+ * 投げて抑えた日に打席が凡打続きでも、打撃を落とさない
+ * （9回無失点で能力が下がる、という結果になっていた）。
+ *
  * **伸びにくさは練習と同じ**（`growthChanceFor`）。
  * 見ていなかった頃は、Aの能力もGの能力も同じように +1 されていて、
  * 練習では遠いはずのA以上が試合だけで積み上がっていた。
@@ -148,9 +152,30 @@ export function applyMatchGrowth(
 
   // **投打は別々に数える。** まとめて1つの点数にすると、
   // 完封した投手のミートが伸びたり、猛打賞の日に制球が落ちたりする
-  if (params.pitching) apply(performancePoints(undefined, params.pitching), PITCHING_KEYS)
+  const pitchingPoints = params.pitching
+    ? performancePoints(undefined, params.pitching)
+    : 0
+
+  if (params.pitching) apply(pitchingPoints, PITCHING_KEYS)
+
   if (params.batting) {
-    apply(performancePoints(params.batting, undefined), battingKeysFor(player, params.batting))
+    const battingPoints = performancePoints(params.batting, undefined)
+
+    /*
+     * **投げて結果を出した日は、打席の不振で能力を下げない。**
+     *
+     * 投打を別々に数えるようにしたとき、
+     * 「9回を無失点に抑えたが4打数0安打」という試合で
+     * **投球ぶんは伸びるのに打撃ぶんは落ちる**という結果になっていた。
+     * その日の仕事を果たした選手の能力が下がるのは、どう見ても変。
+     *
+     * 逆（打ったが打たれた）は相殺しない。投げて打たれたのは、
+     * 打撃で取り返せる類の失敗ではない。
+     */
+    apply(
+      pitchingPoints > 0 && battingPoints < 0 ? 0 : battingPoints,
+      battingKeysFor(player, params.batting),
+    )
   }
 
   return { player: current, changes }

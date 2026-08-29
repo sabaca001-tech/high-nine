@@ -176,6 +176,44 @@ describe('applyMatchGrowth', () => {
     )
   })
 
+  it('9回を無失点に抑えた日は、打てなくても能力が下がらない', () => {
+    /*
+     * **投打を別々に数えたときの落とし穴。**
+     * 「9回無失点だが4打数0安打2三振」という試合で、
+     * 投球ぶんは伸びるのに打撃ぶんは落ちていた
+     * （実測で500試合すべてに、下がった能力があった）。
+     * その日の仕事を果たした選手の能力が下がるのは、どう見ても変。
+     */
+    const rng = createRng(17)
+
+    for (let i = 0; i < 300; i++) {
+      const result = applyMatchGrowth(rng, pitcher, {
+        pitching: pitching({ outs: 27, hits: 4, strikeouts: 6 }),
+        batting: batting({ atBats: 4, hits: 0, strikeouts: 2 }),
+        stage: 'pref',
+      })
+
+      expect(result.changes.every((change) => change.after >= change.before)).toBe(true)
+    }
+  })
+
+  it('打ち込まれた日は、打っていても投球が落ちる', () => {
+    // 相殺するのは片方向だけ。投げて打たれたのは打撃で取り返せる失敗ではない
+    const rng = createRng(19)
+    let dropped = 0
+
+    for (let i = 0; i < 200; i++) {
+      const result = applyMatchGrowth(rng, pitcher, {
+        pitching: pitching({ outs: 6, hits: 12, earnedRuns: 9 }),
+        batting: batting({ atBats: 4, hits: 3, rbi: 2 }),
+        stage: 'pref',
+      })
+      if (result.changes.some((change) => change.after < change.before)) dropped++
+    }
+
+    expect(dropped).toBeGreaterThan(0)
+  })
+
   it('投手は、打った日でも主に投手能力が伸びる', () => {
     /*
      * **打った結果がそのまま打撃能力に乗っていた。**
