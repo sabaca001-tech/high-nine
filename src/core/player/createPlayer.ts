@@ -146,10 +146,23 @@ export const GENIUS_TALENT_BONUS = 20
 /**
  * 留学生の出現率。**天才肌と同じくらいの珍しさ**にしてある。
  *
- * 部員10人の代でおよそ5年に1人。他校も同じ率で作られるので、
- * 全国を見れば毎年どこかの学校に入ってくる。
+ * 部員10人の代でおよそ5年に1人。
  */
 export const EXCHANGE_RATE = 0.02
+
+/**
+ * 他校での留学生の出現率。
+ *
+ * **同じ2%だと、全国では多すぎた。** 他校は900校・13,500人いるので、
+ * 2%なら270人。他校の名簿を開くたびにカタカナの名前が並び、
+ * 「珍しい選手」に見えなくなっていた。
+ *
+ * 5分の1にすると全国で50人ほど。
+ * **全国を見ればどこかの学校に居る**という見え方は残しつつ、
+ * 当たったときの珍しさが戻る。
+ * （天才肌は他校では0にしてあるが、留学生はこの見え方のほうを取っている）
+ */
+export const RIVAL_EXCHANGE_RATE = 0.004
 
 /**
  * 留学生の入学時の上乗せ。
@@ -325,6 +338,11 @@ export type CreatePlayerOptions = {
    */
   talentBonus?: number
   /**
+   * 留学生の出現率。**省略時は自校の率**（`EXCHANGE_RATE`）。
+   * 他校では低くしてある（`RIVAL_EXCHANGE_RATE`）。
+   */
+  exchangeRate?: number
+  /**
    * 天才肌が出うるか。**省略時は出る。**
    *
    * **他校では出さない。**（`rivalRoster` / `opponent`）
@@ -359,7 +377,7 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const isPitcher = options.isPitcher ?? rng.chance(PITCHER_RATE)
 
   // **留学生。** 身体能力に寄った体つきで入ってくる
-  const exchange = options.exchange ?? rng.chance(EXCHANGE_RATE)
+  const exchange = options.exchange ?? rng.chance(options.exchangeRate ?? EXCHANGE_RATE)
 
   // 性格は能力より先に決める。天才肌は素質そのものが違うので、
   // 決まった性格が入学時の能力にも効く
@@ -648,10 +666,12 @@ export function createInitialRoster(
   /** 生成する学年。既定は3学年すべて */
   grades: Grade[] = [3, 2, 1],
   /**
-   * 天才肌が出うるか。**診断で「互角」を測るときだけ false にする。**
-   * 他校には出ない（`allowGenius`）ので、揃えないと自校だけ有利になる
+   * 天才肌と留学生を出すか。**診断で「互角」を測るときだけ false にする。**
+   *
+   * 天才肌は他校に出ず、留学生も他校では5分の1の率なので、
+   * 揃えないと**自校だけ有利**になる（実測で勝率が67%まで上がった）。
    */
-  allowGenius = true,
+  allowRare = true,
 ): Player[] {
   const players: Player[] = []
   let counter = 0
@@ -670,7 +690,8 @@ export function createInitialRoster(
           // 初期部員が県内のちょうど真ん中の水準（平均総合43）で、
           // 「弱いチームを強くする」という出発点になっていなかった
           talentBonus: INITIAL_TALENT,
-          allowGenius,
+          allowGenius: allowRare,
+          ...(allowRare ? {} : { exchangeRate: 0 }),
           // 在校生は入学年が異なるので、記録の起点は加入月に揃える
           enrolledAt: { year: 1, month: 4 },
           takenNames: players.map((player) => player.name),

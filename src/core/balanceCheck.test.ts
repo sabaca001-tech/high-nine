@@ -158,7 +158,7 @@ describe('バランス確認', () => {
       let runs = 0
 
       for (let seed = 0; seed < trials; seed++) {
-        // 天才肌は他校に出ないので、釣り合いを測る診断では出さない
+        // 天才肌・留学生は他校では出ない（低い）ので、釣り合いを測る診断では出さない
         const base = createInitialRoster(createRng(seed), 8, [3, 2, 1], false)
         const players: Player[] = base.map((player) =>
           player.isPitcher

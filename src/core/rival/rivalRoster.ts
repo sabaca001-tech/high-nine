@@ -17,7 +17,7 @@
 
 import { createRng } from '@/core/rng/random'
 import { dayOfCell, seasonProgressOfDay } from '@/core/calendar/days'
-import { createPlayer, GRADE_BASE } from '@/core/player/createPlayer'
+import { createPlayer, GRADE_BASE, RIVAL_EXCHANGE_RATE } from '@/core/player/createPlayer'
 import { overallRating, teamPoints } from '@/core/player/rating'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import type { Grade, Player } from '@/core/types/player'
@@ -221,6 +221,8 @@ export function rivalRoster(
         // **他校に天才肌は出さない。** 母数が900人あるので、
         // 2%でも代表の枠がそれで埋まり、自校の選手が押し出される
         allowGenius: false,
+        // 留学生も他校では珍しくする（同じ2%だと全国で270人になる）
+        exchangeRate: RIVAL_EXCHANGE_RATE,
         takenNames,
       })
       takenNames.push(player.name)

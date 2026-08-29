@@ -3,7 +3,7 @@
 import type { Rng } from '@/core/rng/random'
 import { autoLineup } from '@/core/lineup/autoLineup'
 import { rosterTalentOf } from '@/core/rival/rivalRoster'
-import { createPlayer } from '@/core/player/createPlayer'
+import { createPlayer, RIVAL_EXCHANGE_RATE } from '@/core/player/createPlayer'
 import type { Lineup } from '@/core/types/lineup'
 import type { Grade, Player } from '@/core/types/player'
 
@@ -76,6 +76,7 @@ function createDisposableOpponent(rng: Rng, strength: number, fixedName?: string
           talentBonus: Math.round(rosterTalentOf(strength)),
           // 他校に天才肌は出さない（`rivalRoster` と揃える）
           allowGenius: false,
+          exchangeRate: RIVAL_EXCHANGE_RATE,
         }),
       )
     }
