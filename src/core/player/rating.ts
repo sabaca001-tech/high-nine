@@ -248,8 +248,11 @@ export function abilityPoints(value: number): number {
  */
 const POINT_SCALE = 5
 
-/** 弾道1段ぶんの評価点。**いちばん軽い能力（肩力）より軽く**なるように置く */
-const TRAJECTORY_POINTS = 10
+/**
+ * 弾道1段ぶんの評価点。**いちばん軽い能力（肩力）より軽く**なるように置く。
+ * 打撃の重みを上げて肩力を軽くしたぶん、ここも下げてある（10 → 8）。
+ */
+const TRAJECTORY_POINTS = 8
 
 /** 特殊能力ぶんの評価点（`skillRatingBonus` を点数に換算する） */
 const SKILL_POINTS = 5
@@ -273,18 +276,22 @@ export function playerPoints(player: Player): number {
  *
  *   パワー ＝ ミート ＞ 守備 ＞ 走力 ＞ 捕球 ＞ 肩力 ＞ 弾道
  *
- * **打撃の価値をさらに上げてある**（.24 → .28）。
+ * **打撃の価値を段階的に上げてきた**（.24 → .28 → .32）。
  * 打てなければ試合にならないし、守備の穴は守る位置を選べば隠せる。
  * 守備は「守れるかどうか」で起用が決まるぶん走力より重く、
  * 肩は効く場面が限られるので能力の中ではいちばん軽い。
+ *
+ * **走力はあまり削っていない**（.12 → .11）。
+ * 内野安打と、単打を二塁打にする走塁で打撃成績そのものに効くので
+ * （`hitRate` と `doubleShare`）、実測の貢献に見合う位置に置いてある。
  */
 const BATTER_WEIGHTS = {
-  meet: 0.28,
-  power: 0.28,
-  fielding: 0.16,
-  speed: 0.12,
-  catching: 0.09,
-  arm: 0.07,
+  meet: 0.32,
+  power: 0.32,
+  fielding: 0.13,
+  speed: 0.11,
+  catching: 0.07,
+  arm: 0.05,
 }
 
 function batterPoints(b: BattingAbilities): number {
@@ -310,14 +317,18 @@ function batterPoints(b: BattingAbilities): number {
  * （`Pitch.level`）で、球種は何種類投げられるか。
  * 曲がらない球を6種類持っているより、大きく曲がる球が2つあるほうが強い。
  * スタミナがいちばん軽いのは、継投で補える唯一の項目だから。
+ *
+ * **球速をさらに重くしてある**（.26 → .32）。
+ * 打席の判定は球威（球速7割）で決まるので、球速はそのまま
+ * 「打たれにくさ」に直結する。ドラフトの分かれ目（150km/h）でもある。
  */
 export const PITCHER_WEIGHTS = {
-  velocity: 0.26,
-  control: 0.21,
-  breakAmount: 0.16,
-  sharpness: 0.13,
-  life: 0.1,
-  variety: 0.08,
+  velocity: 0.32,
+  control: 0.19,
+  breakAmount: 0.15,
+  sharpness: 0.12,
+  life: 0.09,
+  variety: 0.07,
   stamina: 0.06,
 }
 
