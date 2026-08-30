@@ -80,9 +80,15 @@ export function playHalf(rng: Rng, ctx: HalfContext): number {
   // 回の頭に立っている投手は、その回まだ1点も取られていない
   defenseTeam.inningRunsAtEntry = 0
 
+  /**
+   * この半回で最初の打者か。
+   * **大差での継投は回の頭だけ**にするために見る（`maybeChangePitcher`）。
+   */
+  let atInningStart = true
+
   while (outs < 3) {
     if (ctx.autoSubstitute) {
-      maybeChangePitcher(rng, defenseTeam, ctx, runsThisHalf)
+      maybeChangePitcher(rng, defenseTeam, ctx, runsThisHalf, atInningStart)
       // 競った場面なら代打、大差が付いていれば控えに経験を積ませる。
       // 点差の条件が重ならないので、同じ打者に両方は起きない
       maybePinchHit(rng, offense, ctx, outs, bases)
@@ -125,6 +131,8 @@ export function playHalf(rng: Rng, ctx: HalfContext): number {
     // 失策で入った点は投手の責任にしない
     recordPitching(defenseTeam, pitcher, result, runs, result === 'error' ? 0 : runs)
     defenseTeam.faced += 1
+
+    atInningStart = false
 
     const order = ctx.nextOrder()
     ctx.plays.push({
@@ -407,11 +415,19 @@ function maybeChangePitcher(
   team: MatchTeam,
   ctx: HalfContext,
   runsThisHalf: number,
+  /** この半回の最初の打者か。大差での交代はここだけで判断する */
+  atInningStart: boolean,
 ): void {
   const current = findPlayer(team, team.pitcherId)
   if (!current) return
 
-  if (isGarbageTime(team, ctx)) {
+  /*
+   * **大差の交代は回の頭だけ。**
+   * 打者ごとに判定していた頃は、13-2の試合で
+   * 「0回」「⅓回」「⅓回」と3人が並ぶような継投になっていた。
+   * 経験を積ませるのが目的なら、1イニングは任せないと意味が無い。
+   */
+  if (atInningStart && isGarbageTime(team, ctx)) {
     // 大差では**若い投手**を優先する。経験を積ませるのが目的なので、
     // いちばん良い2番手ではなく下級生から出す。
     //

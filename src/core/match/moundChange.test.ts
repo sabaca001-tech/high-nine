@@ -140,6 +140,41 @@ describe('守備から投手を上げる', () => {
   })
 })
 
+describe('大差での継投', () => {
+  it('1イニングに何人も代えない', () => {
+    /*
+     * **打者ごとに判定していた。** 13-2のような試合で
+     * 「0回」「⅓回」「⅓回」と3人が並ぶ継投になっていた。
+     * 経験を積ませるのが目的なら、1イニングは任せないと意味が無い。
+     */
+    let pitchers = 0
+    let noOuts = 0
+    let games = 0
+
+    for (let seed = 0; seed < 60; seed++) {
+      const players = createInitialRoster(createRng(seed), 8, [3, 2, 1], false)
+      const result = simulateGame(createRng(seed * 13 + 1), {
+        players,
+        lineup: autoLineup(players),
+        opponentName: '相手校',
+        // 大差が付きやすいよう、格下と当てる
+        opponentStrength: -40,
+        kind: 'friendly',
+        mercy: false,
+      })
+
+      games++
+      pitchers += result.pitchingLines.length
+      noOuts += result.pitchingLines.filter((line) => line.outs === 0).length
+    }
+
+    // 9回で5人を超えるなら、回をまたがずに代えている
+    expect(pitchers / games).toBeLessThan(3.2)
+    // 1アウトも取らずに降りる投手は、ほとんど出ない
+    expect(noOuts / games).toBeLessThan(0.05)
+  })
+})
+
 describe('疲労を持った先発', () => {
   it('1人も相手にしないうちに降ろされない', () => {
     /*
