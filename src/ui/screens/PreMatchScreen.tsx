@@ -39,33 +39,44 @@ export function PreMatchScreen() {
 
   return (
     <AppLayout title="スタメン確認" subtitle={`${game.year}年目 ${game.month}月`}>
+      {/*
+        **2段に分ける。** 1行に5つ（ラベル・校名・県・格付け・評価点）並べていた頃は、
+        375pxでは入りきらず「1回戦の相／手」「B／6,816」と改行され、
+        いちばん読みたい校名だけが「広瀬東…」と省略されていた。
+        上段を校名の専用にすれば、8文字の校名（最長）でも収まる。
+      */}
       <div className={styles.opponent}>
-        <span className={styles.label}>
-          {setup.roundName ? `${setup.roundName}の相手` : '練習試合の相手'}
-        </span>
-        <span className={styles.name}>{setup.opponentName}</span>
-        {setup.awayRegionName && (
-          <span className={styles.away}>{setup.awayRegionName}へ遠征</span>
-        )}
-        {/* 全国大会ではどこの代表かを出す。同じ学校と何年も当たるため */}
-        {setup.opponentRegionName && (
-          <span className={styles.away}>{setup.opponentRegionName}代表</span>
-        )}
-        {/*
-          力の差を言葉で出す。勝てば評判がどれだけ動くかがここで読めるので、
-          「格上に挑む」ことに意味が生まれる。
-        */}
-        <span className={styles.matchup}>
-          {matchupLabel(teamRating(game.players, game.lineup), setup.opponentStrength)}
-        </span>
-        {/* 言葉だけでなく数字も出す。自分のスタメンと同じ物差しで比べられる */}
-        <span className={styles.opponentRating}>
-          {teamPointsLabel(
-            school
-              ? lineupPointsOf(school, game.year, seasonProgressOfCell(game.boardPosition))
-              : teamPointsFromRating(opponentRating(setup.opponentStrength)),
+        <div className={styles.opponentTop}>
+          <span className={styles.name}>{setup.opponentName}</span>
+          {setup.awayRegionName && (
+            <span className={styles.away}>{setup.awayRegionName}へ遠征</span>
           )}
-        </span>
+          {/* 全国大会ではどこの代表かを出す。同じ学校と何年も当たるため */}
+          {setup.opponentRegionName && (
+            <span className={styles.away}>{setup.opponentRegionName}代表</span>
+          )}
+        </div>
+
+        <div className={styles.opponentBottom}>
+          <span className={styles.label}>
+            {setup.roundName ? `${setup.roundName}の相手` : '練習試合の相手'}
+          </span>
+          {/*
+            力の差を言葉で出す。勝てば評判がどれだけ動くかがここで読めるので、
+            「格上に挑む」ことに意味が生まれる。
+          */}
+          <span className={styles.matchup}>
+            {matchupLabel(teamRating(game.players, game.lineup), setup.opponentStrength)}
+          </span>
+          {/* 言葉だけでなく数字も出す。自分のスタメンと同じ物差しで比べられる */}
+          <span className={styles.opponentRating}>
+            {teamPointsLabel(
+              school
+                ? lineupPointsOf(school, game.year, seasonProgressOfCell(game.boardPosition))
+                : teamPointsFromRating(opponentRating(setup.opponentStrength)),
+            )}
+          </span>
+        </div>
       </div>
 
       {/*
