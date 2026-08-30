@@ -25,6 +25,24 @@ import { velocityGrade, velocityScore, VELOCITY_MAX } from '@/core/types/player'
 const RANK_ORDER = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
 import type { BattingAbilities, PitchingAbilities, Player } from '@/core/types/player'
 
+/** 能力値だけを指定した投手を作る（describe をまたいで使う） */
+function makePitcher(values: Partial<PitchingAbilities>): Player {
+  const base = createPlayer(createRng(2), { id: 'p', grade: 3, isPitcher: true })
+  return {
+    ...base,
+    pitching: {
+      velocity: 138,
+      control: 60,
+      stamina: 60,
+      life: 60,
+      sharpness: 60,
+      pitches: [{ direction: 'left', name: 'スライダー', level: 4 }],
+      ...values,
+    },
+    skills: [],
+  }
+}
+
 describe('toRank', () => {
   it('境界値が正しくランク分けされる', () => {
     expect(toRank(100)).toBe('S')
@@ -326,19 +344,39 @@ describe('評価の優先順', () => {
     expect(trajectoryGain).toBeGreaterThan(0)
   })
 
-  it('投手は 球速 ＞ 制球 ＞ 変化量 ＞ キレ ＞ ノビ ＞ 球種 ＞ スタミナ の順に重い', () => {
+  it('投手は 制球 ＞ 変化量 ＞ ノビ ＞ キレ ＞ 球種 ＞ スタミナ の順に重い', () => {
     // 重み（同じ値・同じ伸びを与えたときの効き）で見る
     const weights = PITCHER_WEIGHTS
-    expect(weights.velocity).toBeGreaterThan(weights.control)
     expect(weights.control).toBeGreaterThan(weights.breakAmount)
-    expect(weights.breakAmount).toBeGreaterThan(weights.sharpness)
-    expect(weights.sharpness).toBeGreaterThan(weights.life)
-    expect(weights.life).toBeGreaterThan(weights.variety)
+    expect(weights.breakAmount).toBeGreaterThan(weights.life)
+    expect(weights.life).toBeGreaterThan(weights.sharpness)
+    expect(weights.sharpness).toBeGreaterThan(weights.variety)
     expect(weights.variety).toBeGreaterThan(weights.stamina)
 
     // 重みの合計は1。野手と同じ土俵で比べるため
     const total = Object.values(weights).reduce((sum, value) => sum + value, 0)
     expect(total).toBeCloseTo(1, 6)
+  })
+
+  it('球速は足さずに掛かる（遅ければ他が良くても点数が伸びない）', () => {
+    /*
+     * **重みを足し込む形では、球速が遅くても他が良ければ点数が並んでいた。**
+     * 実際には球速がその投手の持ち球すべての効きを決めるので、
+     * 他の能力にまとめて掛かるほうが実態に合う。
+     */
+    const skilled = { control: 85, stamina: 85, life: 85, sharpness: 85 }
+    const slow = playerPoints(makePitcher({ ...skilled, velocity: 128 }))
+    const fast = playerPoints(makePitcher({ ...skilled, velocity: 148 }))
+
+    // 球速20km/hの差で、点数が1.3倍以上になる
+    expect(fast).toBeGreaterThan(slow * 1.3)
+
+    // 掛け算なので、能力の低い投手ほど球速の差は点数に出にくい
+    const weak = { control: 40, stamina: 40, life: 40, sharpness: 40 }
+    const weakGap =
+      playerPoints(makePitcher({ ...weak, velocity: 148 })) -
+      playerPoints(makePitcher({ ...weak, velocity: 128 }))
+    expect(fast - slow).toBeGreaterThan(weakGap)
   })
 
   it('変化量は「平均」で見る（曲がらない球を増やしても上がらない）', () => {

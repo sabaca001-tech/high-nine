@@ -69,10 +69,12 @@ const VELOCITY_WEIGHT = 0.8
  * 打率が跳ね上がる。尺度を変えたぶんをここで戻す。
  *
  * 狙いは「球速の重要度を上げる」ことで、投手全体の底上げ／引き下げではない。
- * **`velocityScore` の対応表か `VELOCITY_WEIGHT` を触ったら、ここも測り直す**
- * （`balanceCheck.test.ts` の打率と平均得点を見る）。
+ * **`velocityScore` の対応表か `VELOCITY_WEIGHT`、生成の帯（`VELOCITY_INTERCEPT`）を
+ * 触ったら、ここも測り直す**（`balanceCheck.test.ts` の打率と平均得点を見る）。
+ * 新入生の球速を3km/h下げたとき、打率が .265 → .272 に動いたので
+ * -11 → -17 に合わせ直した。
  */
-const STUFF_BASELINE = -11
+const STUFF_BASELINE = -17
 
 /**
  * 球速が三振に効く分。球速スコア1点あたりの三振率への加算。
@@ -128,14 +130,18 @@ export function breakingScore(pitching: PitchingAbilities): number {
 }
 
 /**
- * ノビの効き方。**50で等倍**（±15%の伸縮）。
+ * ノビの効き方。**50で等倍**（±22%の伸縮）。
  *
  * 中央を等倍にしてあるので、ノビを足したことで
  * 投手全体が強くなったり弱くなったりしない
  * （動くのは「どの投手が強いか」だけ）。
+ *
+ * **±15%から広げてある。** 評価点でノビを重く見るようにした
+ * （`PITCHER_WEIGHTS.life` ＝ .09 → .19）ので、試合での効きも揃える。
+ * 選ぶ側と判定する側で物差しが違ってはいけない。
  */
 function qualityFactor(value: number): number {
-  return 0.85 + (value / 100) * 0.3
+  return 0.78 + (value / 100) * 0.44
 }
 
 export function simulateAtBat(rng: Rng, ctx: AtBatContext): PlayResult {

@@ -451,9 +451,15 @@ function maybeChangePitcher(
   /*
    * 現状よりはっきり良くならないなら代えない（消耗ぶんを見込んで比べる）。
    * **打ち込まれているときは、多少落ちても代える。**
-   * 「今日は合っていない」ときに同じ投手を続けても好転しない
+   * 「今日は合っていない」ときに同じ投手を続けても好転しない。
+   *
+   * **崩壊した日は、控えの質を問わない。**
+   * 比で足切りしていた頃は、エースと2番手の差が大きいチームだと
+   * **6点取られても控えが基準に届かず、そのまま投げ切って**いた
+   * （実測で54%）。誰が出ても同じなら、まだ壊れていないほうを使う。
    */
-  if (pitcherValue(reliever) < pitcherValue(current) * (hit ? 0.62 : 0.7)) return
+  const blownOut = runsAllowedBy(team) >= BLOWN_OUT_RUNS
+  if (!blownOut && pitcherValue(reliever) < pitcherValue(current) * (hit ? 0.62 : 0.7)) return
   // 交代のタイミングには幅を持たせる（打ち込まれているときは迷わない）
   if (!hit && rng.chance(0.2)) return
 
@@ -461,6 +467,17 @@ function maybeChangePitcher(
   // 出てきた投手は、この回の失点を引き継がない
   team.inningRunsAtEntry = runsThisHalf
 }
+
+/** いまの投手がこの試合で取られた点 */
+function runsAllowedBy(team: MatchTeam): number {
+  return team.pitching.find((entry) => entry.playerId === team.pitcherId)?.runs ?? 0
+}
+
+/**
+ * ここまで取られたら「今日は誰が出ても同じ」と見なす。
+ * 控えの質を問わずに代える。
+ */
+const BLOWN_OUT_RUNS = 6
 
 /**
  * 打ち込まれているか。

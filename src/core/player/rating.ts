@@ -318,32 +318,61 @@ function batterPoints(b: BattingAbilities): number {
  * 曲がらない球を6種類持っているより、大きく曲がる球が2つあるほうが強い。
  * スタミナがいちばん軽いのは、継投で補える唯一の項目だから。
  *
- * **球速をさらに重くしてある**（.26 → .32）。
- * 打席の判定は球威（球速7割）で決まるので、球速はそのまま
- * 「打たれにくさ」に直結する。ドラフトの分かれ目（150km/h）でもある。
+ * **球速だけは足さずに掛ける**（`velocityFactor`）。
+ * 重みを足し込む形では、球速が遅くても他が良ければ点数が並んでしまう。
+ * 実際には球速がその投手の持ち球すべての効きを決めるので、
+ * **他の能力にまとめて掛かる**ほうが実態に合う。
+ *
+ *   制球 ＞ 変化量 ＞ ノビ ＞ キレ ＞ 球種 ＞ スタミナ（× 球速）
+ *
+ * **ノビを重くしてある**（.09 → .19）。
+ * ノビはストレートの威力そのもの（`straightScore`）で、
+ * 球速を重く見るならノビも同じ側の能力として重い。
  */
 export const PITCHER_WEIGHTS = {
-  velocity: 0.32,
-  control: 0.19,
-  breakAmount: 0.15,
-  sharpness: 0.12,
-  life: 0.09,
-  variety: 0.07,
-  stamina: 0.06,
+  control: 0.28,
+  breakAmount: 0.21,
+  life: 0.19,
+  sharpness: 0.17,
+  variety: 0.08,
+  stamina: 0.07,
 }
+
+/**
+ * 球速の倍率。**他の能力すべてに掛かる。**
+ *
+ * | 球速 | 120 | 130 | 135 | 140 | 145 | 150 |
+ * |---|---|---|---|---|---|---|
+ * | ランク | F | D | C | B | A | S |
+ * | 倍率 | 0.65 | 0.95 | 1.07 | 1.19 | 1.31 | 1.43 |
+ *
+ * **125km/hと150km/hで1.7倍の差**が付く。
+ * 足し込む形だった頃と同じくらいの開きだが、
+ * **他の能力にまとめて掛かる**ので「球が遅いと何を磨いても伸びない」
+ * という構図になる。
+ */
+export function velocityFactor(velocity: number): number {
+  const grade = velocityGrade(velocity)
+  return VELOCITY_FACTOR_MIN + (VELOCITY_FACTOR_MAX - VELOCITY_FACTOR_MIN) * (grade / 100)
+}
+
+/** 球速が最低のときの倍率。0にはしない（他の能力が消える） */
+const VELOCITY_FACTOR_MIN = 0.35
+
+/** 球速が最高（155km/h以上）のときの倍率 */
+const VELOCITY_FACTOR_MAX = 1.55
 
 function pitcherPoints(p: PitchingAbilities): number {
   const weighted =
-    // 球速は**高校生の物差し**で見る（評価点も高校生どうしを比べる値）
-    abilityPoints(velocityGrade(p.velocity)) * PITCHER_WEIGHTS.velocity +
     abilityPoints(p.control) * PITCHER_WEIGHTS.control +
     abilityPoints(breakAmountScore(p.pitches)) * PITCHER_WEIGHTS.breakAmount +
-    abilityPoints(p.sharpness) * PITCHER_WEIGHTS.sharpness +
     abilityPoints(p.life) * PITCHER_WEIGHTS.life +
+    abilityPoints(p.sharpness) * PITCHER_WEIGHTS.sharpness +
     abilityPoints(varietyScore(p.pitches)) * PITCHER_WEIGHTS.variety +
     abilityPoints(p.stamina) * PITCHER_WEIGHTS.stamina
 
-  return weighted * POINT_SCALE
+  // 球速は**高校生の物差し**で見る（評価点も高校生どうしを比べる値）
+  return weighted * velocityFactor(p.velocity) * POINT_SCALE
 }
 
 /**
