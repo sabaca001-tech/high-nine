@@ -174,6 +174,9 @@ export function migrate(raw: unknown): GameState | null {
   if (version < 43) {
     data = migrateV42ToV43(data)
   }
+  if (version < 44) {
+    data = migrateV43ToV44(data)
+  }
 
   if (typeof data.version !== 'number' || data.version !== SAVE_VERSION) return null
 
@@ -1148,6 +1151,20 @@ function migrateV42ToV43(raw: Record<string, unknown>): Record<string, unknown> 
     version: 43,
     matchState: { ...matchState, tournamentMatch: raw.tournament !== null },
   }
+}
+
+/**
+ * v43 → v44: 卒業生に「卒業後の伸びしろ」を持たせる。
+ *
+ * 大学でもプロでも伸び幅が全員同じ乱数だったので、
+ * 「大学で化けた」「プロで伸びなかった」という差が出なかった。
+ *
+ * **既存のOBには配らない。** 省略時は1.0（標準）として扱われるので、
+ * 途中から急に伸び方が変わることはない。
+ * 新しく卒業する選手から個体差が付く。
+ */
+function migrateV43ToV44(raw: Record<string, unknown>): Record<string, unknown> {
+  return { ...raw, version: 44 }
 }
 
 /** 最低限の形チェック。全項目は見ないが、壊れたデータで画面が落ちるのを防ぐ */

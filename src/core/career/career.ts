@@ -7,7 +7,7 @@
 
 import type { Rng } from '@/core/rng/random'
 import type { Alumnus, CareerEntry, CareerPath, CareerStatus, ProSeason } from '@/core/types/career'
-import { ageAt, isCareerActive, isInHallOfFame } from '@/core/types/career'
+import { ageAt, growthOf, isCareerActive, isInHallOfFame } from '@/core/types/career'
 
 /** プロ球団名（実在球団を想起させない独自の名称） */
 const PRO_TEAMS = [
@@ -88,6 +88,23 @@ const PRO_PRODIGY_SCALE = 0.85
  * 高卒の下限（`DRAFT_CHANCE_MIN`）と同じくらいに置く。
  */
 const COLLEGE_DRAFT_CHANCE = 0.3
+
+/**
+ * 卒業後の伸びしろの幅。
+ *
+ * **1.0を中心に置かない。** 中心を1.0にすると平均が上がって
+ * プロの水準そのものが動くので、0.4〜1.5（平均0.95）にしてある。
+ *
+ * **年ごとに引き直さないのが要点。** 毎年乱数を引いていた頃も
+ * 1年ぶんの幅はあったが、4年も積むと平均に寄って
+ * **誰も化けないし、誰も伸び悩まない**。
+ * 卒業の時点で決めて持ち回ると、その選手は4年間ずっとよく伸びる
+ * （あるいはずっと伸びない）。
+ *
+ * 実測：大学4年での伸びは 下位1割-4 / 中央5 / 上位1割15 / 最大29。
+ */
+const GROWTH_MIN = 0.4
+const GROWTH_MAX = 1.5
 
 /** プロで戦力外になる実力の下限 */
 const RELEASE_THRESHOLD = 22
@@ -214,6 +231,14 @@ export function createAlumnus(
   // 高校からそのままプロへ行く選手は、この時点でプロの物差しに置き換わる
   const ability = path === 'pro' ? toProAbility(rng, base.rating).ability : base.rating
 
+  /*
+   * **卒業後の伸びしろは選手ごとに決める。**
+   * 全員が同じ乱数から引いていた頃は、「大学で化けた」も
+   * 「プロでまったく伸びなかった」も起きず、
+   * 送り出したあとの物語が誰でも同じ形になっていた。
+   */
+  const growth = round2(GROWTH_MIN + rng.float() * (GROWTH_MAX - GROWTH_MIN))
+
   const status: CareerStatus =
     path === 'pro' ? 'pro' : path === 'college' ? 'college' : path === 'corporate' ? 'corporate' : 'retired'
   const team =
@@ -233,6 +258,7 @@ export function createAlumnus(
     team,
     collegeYears: path === 'college' ? 1 : 0,
     proSeasons: [],
+    growth,
     note: path === 'none' ? '高校で競技を終えた' : null,
     careerLog: [
       entryOf(base.year, base.year, status, team, ability, graduationText(path, team)),
@@ -322,7 +348,7 @@ function advanceCollege(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate 
    * 大学で軒並み水準に達し、**大卒のプロ入りが高卒より多い**という
    * 逆転が起きていた。伸びるのは事実だが、そこまで一律ではない。
    */
-  const ability = clamp(alumnus.ability + rng.int(-4, 7))
+  const ability = clamp(alumnus.ability + Math.round(rng.int(-4, 7) * growthOf(alumnus)))
   const years = alumnus.collegeYears + 1
 
   if (years <= COLLEGE_LENGTH) {
@@ -388,10 +414,16 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
   const season = simulateProSeason(rng, alumnus, year)
   const proSeasons = [...alumnus.proSeasons, season]
 
-  // 年齢による変化。5年目までは伸び、その後は下がっていく。
-  // プロの物差し（20〜60）は高校より幅が狭いので、振れ幅も小さくする
+  /*
+   * 年齢による変化。5年目までは伸び、その後は下がっていく。
+   * プロの物差し（20〜60）は高校より幅が狭いので、振れ幅も小さくする。
+   *
+   * **伸びしろは選手ごと**（`growth`）。伸びる側にだけ掛けるので、
+   * 衰えの早さは変わらない（誰でも歳は取る）。
+   */
   const years = proSeasons.length
-  const drift = years <= 5 ? rng.int(-1, 4) : rng.int(-6, 1)
+  const raw = years <= 5 ? rng.int(-1, 4) : rng.int(-6, 1)
+  const drift = raw > 0 ? Math.round(raw * growthOf(alumnus)) : raw
   const ability = clamp(alumnus.ability + drift)
 
   const updated: Alumnus = { ...alumnus, proSeasons, ability }

@@ -249,6 +249,57 @@ describe('大学の進行', () => {
     expect(found).toBe(true)
   })
 
+  it('卒業後の伸びしろは選手ごとに違う', () => {
+    /*
+     * **毎年乱数を引いていた頃は、4年も積むと平均に寄って
+     * 誰も化けないし誰も伸び悩まなかった。**
+     * 卒業の時点で決めて持ち回ると、その選手は4年間ずっとよく伸びる
+     * （あるいはずっと伸びない）。
+     */
+    const growths = new Set<number>()
+    for (let seed = 0; seed < 60; seed++) {
+      const alumnus = makeCollege(70)
+      growths.add(alumnus.growth ?? 1)
+    }
+    // makeCollege は固定なので、createAlumnus 側で個体差が付くことを見る
+    const created = Array.from({ length: 60 }, (_, i) =>
+      createAlumnus(
+        createRng(i + 300),
+        {
+          id: `g${i}`,
+          name: `選手${i}`,
+          isPitcher: false,
+          position: 'SS',
+          year: 3,
+          rating: 70,
+          skills: [],
+          highSchool: emptyCareerStats(),
+        },
+        60,
+      ),
+    )
+
+    const values = created.map((alumnus) => alumnus.growth ?? 1)
+    expect(new Set(values).size).toBeGreaterThan(20)
+    expect(Math.min(...values)).toBeLessThan(0.7)
+    expect(Math.max(...values)).toBeGreaterThan(1.2)
+  })
+
+  it('伸びしろが高い選手ほど、大学の4年で伸びる', () => {
+    const after = (growth: number): number => {
+      let total = 0
+      for (let seed = 0; seed < 40; seed++) {
+        let alumnus: Alumnus = { ...makeCollege(70), growth }
+        const rng = createRng(seed + 700)
+        for (let i = 0; i < 4; i++) alumnus = advanceCareer(rng, alumnus, 4 + i).alumnus
+        total += alumnus.ability - 70
+      }
+      return total / 40
+    }
+
+    expect(after(1.5)).toBeGreaterThan(after(0.4) + 4)
+  })
+
   it('大学で伸び切らなければプロには行けない', () => {
     let pro = 0
     for (let seed = 0; seed < 120; seed++) {
