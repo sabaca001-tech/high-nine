@@ -1249,7 +1249,13 @@ function retireThirdYears(
       lineup.slots.map((slot) => slot.playerId),
       players,
     ),
-    graduates: [...records, ...state.graduates].slice(0, GRADUATES_LIMIT),
+    /*
+     * **ここでも `trimGraduates` を通す。**
+     * 素の `slice` で切っていたので、引退の処理を通るたびに
+     * **プロOBまで人数だけで押し出されて**いた
+     * （世代交代の側だけ守っても、こちらで落ちる）。
+     */
+    graduates: trimGraduates([...records, ...state.graduates], GRADUATES_LIMIT),
   }
 }
 

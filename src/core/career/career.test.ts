@@ -447,7 +447,7 @@ describe('OB名鑑の対象', () => {
     expect(isCareerPending(done())).toBe(false)
   })
 
-  it('上限で切ってもプロは落とさない', () => {
+  it('上限はプロ以外にだけ掛かる', () => {
     const list: Alumnus[] = [
       ...Array.from({ length: 8 }, (_, i) => ({ ...done(), id: `n${i}` })),
       { ...pro(), id: 'p1' },
@@ -455,8 +455,21 @@ describe('OB名鑑の対象', () => {
     ]
     const trimmed = trimGraduates(list, 5)
 
-    expect(trimmed).toHaveLength(5)
+    // プロ以外は5人まで。プロはそれとは別に残る
+    expect(trimmed.filter((alumnus) => !isInHallOfFame(alumnus))).toHaveLength(5)
     expect(trimmed.some((alumnus) => alumnus.id === 'p1')).toBe(true)
+  })
+
+  it('プロだけで上限を超えても、誰も落とさない', () => {
+    /*
+     * **全体を上限で切っていた頃の穴。** プロを優先して残してはいたが、
+     * プロOBだけで上限に達すると古い順に押し出されていた。
+     * 「うちから出たプロ」は何年経っても消えてはいけない。
+     */
+    const pros: Alumnus[] = Array.from({ length: 12 }, (_, i) => ({ ...pro(), id: `p${i}` }))
+    const trimmed = trimGraduates(pros, 5)
+
+    expect(trimmed).toHaveLength(12)
   })
 
   it('上限を超えていなければそのまま返す', () => {

@@ -258,25 +258,28 @@ function graduationText(path: CareerPath, team: string | null): string {
 }
 
 /**
- * 卒業生の記録を上限まで切り詰める。
+ * 卒業生の記録を切り詰める。
  *
- * **プロに届いた選手は絶対に落とさない。** 単純に新しい順で切ると、
- * 何年も経ったあとに古いプロOBが押し出されて名鑑から消える。
- * 落とすのは高校で終えた選手など、記録として残す価値が薄いものから。
+ * **プロに届いた選手は落とさない。人数の上限も掛けない。**
+ * 全体を上限で切っていた頃は、プロを優先して残してはいたものの、
+ * **プロOBだけで上限に達すると古い順に押し出されて**いた。
+ * 「うちから出たプロ」は何年経っても消えてはいけない記録なので、
+ * 上限は**プロ以外にだけ**掛ける。
  *
- * 落とした選手の高校成績も歴代記録から消える点は承知のうえ
- * （セーブの大きさに上限が要るため）。
+ * プロ以外（高校で終えた選手・大学在学中・社会人）は
+ * 新しい順に `limit` 人まで。落とした選手の高校成績も歴代記録から消えるが、
+ * セーブの大きさに上限が要るため承知のうえ。
+ *
+ * プロOBは1人あたり約850バイトで、実測では72年プレイでも13人。
+ * 強いチームでも年に数人なので、無制限にしても膨らまない。
  */
 export function trimGraduates(graduates: Alumnus[], limit: number): Alumnus[] {
-  if (graduates.length <= limit) return graduates
-
-  const kept = graduates.filter(isInHallOfFame)
-  if (kept.length >= limit) return kept.slice(0, limit)
-
   const rest = graduates.filter((alumnus) => !isInHallOfFame(alumnus))
+  if (rest.length <= limit) return graduates
+
   // 元の並び（新しい順）を保つため、id ではなく元配列の順で拾い直す
-  const survivors = new Set([...kept, ...rest.slice(0, limit - kept.length)])
-  return graduates.filter((alumnus) => survivors.has(alumnus))
+  const survivors = new Set(rest.slice(0, limit))
+  return graduates.filter((alumnus) => isInHallOfFame(alumnus) || survivors.has(alumnus))
 }
 
 /** 1年ぶん進めた結果。ニュースは世代交代画面に出す */
