@@ -37,10 +37,11 @@ const CORPORATE_TEAMS = ['大和重工', '中央銀行', '第一製鉄', '日本
  *
  * **プロ入りは滅多に出ない水準に置く。** 76にしていた頃は
  * 3年育てれば誰でも届き、毎年のようにプロが出ていた。
- * 総合82は無戦略プレイでは10年に一度も届かない水準で、
- * 育て切った主軸だけが指名される。
+ * 86でも、評判が育ったチームでは主軸が毎年のように届いていた
+ * （72年で140人＝年2人がプロ入り）。
+ * **特筆した選手だけ**が指名される水準に置き直してある。
  */
-const PRO_THRESHOLD = 86
+const PRO_THRESHOLD = 91
 
 /**
  * 水準に届いた選手が実際に指名される確率。
@@ -50,8 +51,8 @@ const PRO_THRESHOLD = 86
  * 実際の高校野球でも、注目された選手全員が指名されるわけではない。
  * 抜けて上（`PRO_SURE`）まで行けばほぼ確実に指名される。
  */
-const DRAFT_CHANCE_MIN = 0.35
-const PRO_SURE = 95
+const DRAFT_CHANCE_MIN = 0.25
+const PRO_SURE = 98
 const COLLEGE_THRESHOLD = 62
 const CORPORATE_THRESHOLD = 46
 
@@ -82,6 +83,12 @@ const PRO_PRODIGY_SCALE = 0.85
  * プロ入り後の能力は**高校とは別の物差し**（おおむね20〜60）。
  * 高校の基準（プロ入りが82以上）と混ぜて読まないこと。
  */
+/**
+ * 大学で水準に届いた選手が指名される確率。
+ * 高卒の下限（`DRAFT_CHANCE_MIN`）と同じくらいに置く。
+ */
+const COLLEGE_DRAFT_CHANCE = 0.3
+
 /** プロで戦力外になる実力の下限 */
 const RELEASE_THRESHOLD = 22
 
@@ -308,17 +315,29 @@ export function advanceCareer(rng: Rng, alumnus: Alumnus, year: number): CareerU
 
 /** 大学。4年で卒業し、そこでの実力で進路が分かれる */
 function advanceCollege(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
-  // 大学の4年間はまだ伸びる時期。ただし伸び幅には個人差がある
-  const ability = clamp(alumnus.ability + rng.int(-3, 9))
+  /*
+   * 大学の4年間はまだ伸びる時期。ただし伸び幅には個人差がある。
+   *
+   * **+3/年（4年で+12）は伸びすぎだった。** 高卒でプロに届かなかった選手が
+   * 大学で軒並み水準に達し、**大卒のプロ入りが高卒より多い**という
+   * 逆転が起きていた。伸びるのは事実だが、そこまで一律ではない。
+   */
+  const ability = clamp(alumnus.ability + rng.int(-4, 7))
   const years = alumnus.collegeYears + 1
 
   if (years <= COLLEGE_LENGTH) {
     return { alumnus: { ...alumnus, ability, collegeYears: years }, news: null }
   }
 
-  // 卒業。大学での到達点で進路が決まる
-  // 大学経由でも指名は確約されない
-  if (ability >= PRO_THRESHOLD - 4 && rng.chance(0.55)) {
+  /*
+   * 卒業。大学での到達点で進路が決まる。
+   *
+   * **大卒のほうが甘かった。** 高卒の水準から4を引いたところで、
+   * しかも55%で指名していたので、大学へ進んだ選手の多くがプロに入っていた。
+   * 4年かけて伸びたぶんはもう `ability` に乗っているので、
+   * **水準は高卒と同じ**でよい（むしろ即戦力として見られるぶん厳しい）。
+   */
+  if (ability >= PRO_THRESHOLD && rng.chance(COLLEGE_DRAFT_CHANCE)) {
     const team = rng.pick(PRO_TEAMS)
     // 大学経由でも、プロに入る時点で物差しが変わるのは同じ
     const pro = toProAbility(rng, ability)

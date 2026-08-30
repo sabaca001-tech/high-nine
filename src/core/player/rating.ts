@@ -344,9 +344,9 @@ export const PITCHER_WEIGHTS = {
  * | 球速 | 120 | 130 | 135 | 140 | 145 | 150 |
  * |---|---|---|---|---|---|---|
  * | ランク | F | D | C | B | A | S |
- * | 倍率 | 0.65 | 0.95 | 1.07 | 1.19 | 1.31 | 1.43 |
+ * | 倍率 | 0.61 | 0.98 | 1.12 | 1.27 | 1.41 | 1.56 |
  *
- * **125km/hと150km/hで1.7倍の差**が付く。
+ * **125km/hと150km/hで1.9倍の差**が付く。
  * 足し込む形だった頃と同じくらいの開きだが、
  * **他の能力にまとめて掛かる**ので「球が遅いと何を磨いても伸びない」
  * という構図になる。
@@ -357,10 +357,10 @@ export function velocityFactor(velocity: number): number {
 }
 
 /** 球速が最低のときの倍率。0にはしない（他の能力が消える） */
-const VELOCITY_FACTOR_MIN = 0.35
+const VELOCITY_FACTOR_MIN = 0.25
 
 /** 球速が最高（155km/h以上）のときの倍率 */
-const VELOCITY_FACTOR_MAX = 1.55
+const VELOCITY_FACTOR_MAX = 1.7
 
 function pitcherPoints(p: PitchingAbilities): number {
   const weighted =

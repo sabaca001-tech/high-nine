@@ -251,9 +251,9 @@ const TALENT_SPREAD = 18
  * 800人中104人が150km/h以上（＝S）だった。
  * 実際の高校生で150km/hは全国に数人なので、ランクとして意味を成さない。
  *
- *  平均的な1年（base36）で124km/h、平均的な3年（base50）で134km/h、
- *  素質に恵まれた3年（base66）で137km/h、
- *  全国屈指（base90）で146km/h。そこから先は練習で伸ばす領域。
+ *  平均的な1年（base36）で121km/h、平均的な3年（base50）で131km/h、
+ *  素質に恵まれた3年（base66）で134km/h、
+ *  全国屈指（base90）で143km/h。そこから先は練習で伸ばす領域。
  */
 function velocityFor(rng: Rng, base: number, grade: Grade): number {
   return Math.min(
@@ -279,7 +279,7 @@ function velocityFromBase(base: number): number {
  * 入学時から140km/h近い投手が普通に居ると、
  * **球速を上げる練習の意味も、速球投手を採る意味も薄れる**。
  */
-const VELOCITY_INTERCEPT = 105
+const VELOCITY_INTERCEPT = 102
 
 /** ここまでは素質どおりに速くなる（素質60＝138km/h） */
 const VELOCITY_KNEE = 60

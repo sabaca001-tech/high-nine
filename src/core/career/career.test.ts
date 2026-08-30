@@ -68,12 +68,12 @@ describe('decidePath', () => {
   })
 
   it('評判が高いと進路が有利になる', () => {
-    // プロ入りの水準（82）に近い選手で比べる
+    // プロ入りの水準（91）に近い選手で比べる
     const proRate = (reputation: number): number => {
       let pro = 0
       const rng = createRng(3)
       for (let i = 0; i < 300; i++) {
-        if (decidePath(rng, 80, reputation) === 'pro') pro++
+        if (decidePath(rng, 89, reputation) === 'pro') pro++
       }
       return pro / 300
     }
@@ -231,16 +231,37 @@ describe('大学の進行', () => {
   })
 
   it('大学で伸びるとプロ入りできる', () => {
+    /*
+     * **大卒のほうが甘かった。** 高卒の水準から4を引いたところで
+     * 55%で指名していたので、72年で大卒110人・高卒30人という
+     * 逆転が起きていた。いまは水準も確率も高卒と揃えてあるので、
+     * 大学で伸び切った選手だけが届く。
+     */
     let found = false
-    for (let seed = 0; seed < 40 && !found; seed++) {
+    for (let seed = 0; seed < 200 && !found; seed++) {
       const rng = createRng(seed)
-      let alumnus = makeCollege(70)
+      let alumnus = makeCollege(84)
       for (let i = 0; i < 4; i++) {
         alumnus = advanceCareer(rng, alumnus, 4 + i).alumnus
       }
       if (alumnus.status === 'pro') found = true
     }
     expect(found).toBe(true)
+  })
+
+  it('大学で伸び切らなければプロには行けない', () => {
+    let pro = 0
+    for (let seed = 0; seed < 120; seed++) {
+      const rng = createRng(seed + 500)
+      let alumnus = makeCollege(66)
+      for (let i = 0; i < 4; i++) {
+        alumnus = advanceCareer(rng, alumnus, 4 + i).alumnus
+      }
+      if (alumnus.status === 'pro') pro++
+    }
+
+    // 高卒の時点で水準に遠い選手が、大学の4年で覆すことはまず無い
+    expect(pro / 120).toBeLessThan(0.05)
   })
 })
 
