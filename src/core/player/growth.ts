@@ -208,16 +208,21 @@ function motivationMultiplierFor(player: Player): number {
  *
  * | 能力 | 60 | 70 | 75 | 80 | 85 | 90 |
  * |---|---|---|---|---|---|---|
- * | 以前 | 0.7 | 0.38 | 0.24 | 0.13 | 0.07 | 0.03 |
- * | いま | 0.7 | 0.40 | 0.28 | 0.20 | 0.15 | 0.10 |
+ * | 打ち止めだった頃 | 0.7 | 0.38 | 0.24 | 0.13 | 0.07 | 0.03 |
+ * | 緩めすぎた頃 | 0.7 | 0.40 | 0.28 | 0.20 | 0.15 | 0.10 |
+ * | いま | 0.62 | 0.33 | 0.23 | 0.16 | 0.11 | 0.07 |
+ *
+ * **もう一段絞ってある。** 育て切った3年生が評価点1400を超え、
+ * 上の帯（A以上）が「時間をかければ誰でも届く」場所になっていた。
+ * 打ち止め（0.03）の倍は残してあるので、伸ばし続ければ届く。
  */
 function diminishingMultiplier(current: number): number {
-  if (current >= 90) return 0.1
-  if (current >= 85) return 0.15
-  if (current >= 80) return 0.2
-  if (current >= 75) return 0.28
-  if (current >= 70) return 0.4
-  if (current >= 60) return 0.7
+  if (current >= 90) return 0.07
+  if (current >= 85) return 0.11
+  if (current >= 80) return 0.16
+  if (current >= 75) return 0.23
+  if (current >= 70) return 0.33
+  if (current >= 60) return 0.62
   return 1.0
 }
 

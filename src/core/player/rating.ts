@@ -242,9 +242,10 @@ export function abilityPoints(value: number): number {
 }
 
 /**
- * 評価点の刻み。
+ * 評価点の刻み（野手）。
  * 平凡な高校生（オールD＝50）で325点、
  * 全国区（オールA＝85）で850点あたりになるように置いた。
+ * **投手は別（`PITCHER_POINT_SCALE`）**。球速の倍率が掛かるぶん低い。
  */
 const POINT_SCALE = 5
 
@@ -372,8 +373,22 @@ function pitcherPoints(p: PitchingAbilities): number {
     abilityPoints(p.stamina) * PITCHER_WEIGHTS.stamina
 
   // 球速は**高校生の物差し**で見る（評価点も高校生どうしを比べる値）
-  return weighted * velocityFactor(p.velocity) * POINT_SCALE
+  return weighted * velocityFactor(p.velocity) * PITCHER_POINT_SCALE
 }
+
+/**
+ * 投手の評価点の刻み。**野手（`POINT_SCALE` ＝ 5）より低い。**
+ *
+ * 球速を掛け算にしたとき、倍率（最大1.56）がそのまま上乗せになって
+ * **投手だけ点数の桁が変わって**しまった
+ * （U18代表で投手の中央値1198・最高1348、野手は993・1107）。
+ * 育て切った3年生が1400を超えることもあり、
+ * 「エース1人でチーム評価が決まる」状態になっていた。
+ *
+ * **球速の効きは残したまま、それ以外を下げる**のがここ。
+ * 倍率が中央（130km/h前後）の投手で、野手と同じくらいの点数になる。
+ */
+const PITCHER_POINT_SCALE = 3.9
 
 /**
  * 持ち球の変化量を、能力値と同じ 0〜100 に直す。
