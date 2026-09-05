@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatInnings } from '@/core/player/careerStats'
 import {
   allTimeRoster,
@@ -8,8 +9,10 @@ import {
 } from '@/core/season/hallOfFame'
 import type { HallEntry } from '@/core/season/hallOfFame'
 import { POSITION_LABELS } from '@/core/types/player'
+import type { Position } from '@/core/types/player'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
+import { AbilityGrid } from '@/ui/components/AbilityGrid'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
 import styles from './RecordsScreen.module.css'
 
@@ -19,6 +22,47 @@ import styles from './RecordsScreen.module.css'
  * 通算成績は積み上がっても、**卒業した瞬間に見えなくなる**のでは
  * 積み上げる意味が薄い。在校生と卒業生を同じ土俵に並べる場所を作る。
  */
+/**
+ * ベストナインの1人。**押すと能力が開く。**
+ *
+ * 名前と成績だけを並べていた頃は、
+ * 「歴代最強の4番」がどんな能力だったのかがここからは分からなかった。
+ * 在校生は今の能力、卒業生は**卒業時**の能力を出す。
+ */
+function BestNineRow({ position, entry }: { position: Position; entry: HallEntry }) {
+  const [open, setOpen] = useState(false)
+  const canOpen = entry.abilities !== undefined
+
+  return (
+    <div className={styles.entry}>
+      <button
+        type="button"
+        className={styles.row}
+        onClick={() => setOpen((value) => !value)}
+        disabled={!canOpen}
+        aria-expanded={open}
+      >
+        <span className={styles.position}>{POSITION_LABELS[position]}</span>
+        <PlayerPortrait playerId={entry.id} size={30} cap />
+        <span className={styles.identity}>
+          <span className={styles.name}>{entry.name}</span>
+          <span className={styles.note}>{entry.note}</span>
+        </span>
+        <span className={styles.line}>{summaryOf(entry, position === 'P')}</span>
+        {canOpen && <span className={styles.caret}>{open ? '▲' : '▼'}</span>}
+      </button>
+
+      {open && entry.abilities && (
+        <AbilityGrid
+          abilities={entry.abilities}
+          isPitcher={entry.isPitcher}
+          title={entry.note.includes('卒') ? '卒業時の能力' : 'いまの能力'}
+        />
+      )}
+    </div>
+  )
+}
+
 export function RecordsScreen() {
   const game = useGameStore((s) => s.game)
   const setScreen = useGameStore((s) => s.setScreen)
@@ -42,15 +86,7 @@ export function RecordsScreen() {
           </p>
         ) : (
           nine.map(({ position, entry }) => (
-            <div key={position} className={styles.row}>
-              <span className={styles.position}>{POSITION_LABELS[position]}</span>
-              <PlayerPortrait playerId={entry.id} size={30} cap />
-              <span className={styles.identity}>
-                <span className={styles.name}>{entry.name}</span>
-                <span className={styles.note}>{entry.note}</span>
-              </span>
-              <span className={styles.line}>{summaryOf(entry, position === 'P')}</span>
-            </div>
+            <BestNineRow key={position} position={position} entry={entry} />
           ))
         )}
       </section>

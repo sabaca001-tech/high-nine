@@ -10,7 +10,8 @@
 
 import type { CareerStats } from '@/core/player/careerStats'
 import { average, era, inningsPitched, ops, strikeoutRate } from '@/core/player/careerStats'
-import type { Player, Position } from '@/core/types/player'
+import type { AbilitySnapshot, Player, Position } from '@/core/types/player'
+import { snapshotOf } from '@/core/types/player'
 import type { GraduateRecord } from '@/core/types/season'
 
 /** 歴代記録に載る1人。在校生か卒業生かは問わない */
@@ -22,6 +23,15 @@ export type HallEntry = {
   /** 在校生なら学年、卒業生なら卒業年 */
   note: string
   stats: CareerStats
+  /**
+   * そのときの能力。**在校生は今の値、卒業生は卒業時の値。**
+   *
+   * 名前と成績だけを並べていた頃は、
+   * 「歴代最強の4番」がどんな能力だったのかが名鑑を開かないと分からず、
+   * 卒業生に至っては開いても高校時代の姿が見られなかった。
+   * 古いセーブの卒業生には無いので省略可。
+   */
+  abilities?: AbilitySnapshot
 }
 
 /** 在校生と卒業生をひとつの名簿にまとめる */
@@ -36,6 +46,8 @@ export function allTimeRoster(
     isPitcher: player.isPitcher,
     note: `${player.grade}年`,
     stats: player.stats,
+    // 在校生は「いまの能力」。年・月は使わないので0でよい
+    abilities: snapshotOf(player, 0, 0),
   }))
 
   const past = graduates.map((graduate) => ({
@@ -45,6 +57,8 @@ export function allTimeRoster(
     isPitcher: graduate.isPitcher,
     note: `${graduate.year}年目卒`,
     stats: graduate.highSchool,
+    // 卒業生は卒業時の姿。古いセーブには無い
+    ...(graduate.finalAbilities ? { abilities: graduate.finalAbilities } : {}),
   }))
 
   return [...current, ...past]

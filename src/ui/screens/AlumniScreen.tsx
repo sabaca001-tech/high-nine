@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Alumnus, CareerStatus, ProSeason } from '@/core/types/career'
-import { ageAt, CAREER_STATUS_LABELS, careerTotals, isInHallOfFame } from '@/core/types/career'
-import { ABILITY_LABELS } from '@/core/types/player'
-import type { AbilitySnapshot } from '@/core/types/player'
 import {
-  pointsFromRating,
-  proVelocityRank,
-  toRank,
-  velocityRank,
-} from '@/core/player/rating'
+  ageAt,
+  CAREER_STATUS_LABELS,
+  careerTotals,
+  currentAbilities,
+  isInHallOfFame,
+} from '@/core/types/career'
+import { pointsFromRating } from '@/core/player/rating'
 import { AbilityChart } from '@/ui/components/AbilityChart'
+import { AbilityGrid } from '@/ui/components/AbilityGrid'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
 import { PlayerPortrait } from '@/ui/components/PlayerPortrait'
@@ -148,7 +148,7 @@ function AlumnusCard({ alumnus }: { alumnus: Alumnus }) {
           {open && (
             <>
               <CareerTimeline alumnus={alumnus} />
-              <FinalAbilities alumnus={alumnus} />
+              <AbilityHistory alumnus={alumnus} />
               <AbilityChart
                 title="実力の推移（プロ基準）"
                 points={alumnus.proSeasons.map((season) => ({
@@ -169,7 +169,7 @@ function AlumnusCard({ alumnus }: { alumnus: Alumnus }) {
       {!hasStats && (
         <>
           <CareerTimeline alumnus={alumnus} />
-          <FinalAbilities alumnus={alumnus} />
+          <AbilityHistory alumnus={alumnus} />
         </>
       )}
     </div>
@@ -202,40 +202,39 @@ function CareerTimeline({ alumnus }: { alumnus: Alumnus }) {
   )
 }
 
-/** 卒業時の各能力。総合だけでは何が武器だったのかが分からない */
-function FinalAbilities({ alumnus }: { alumnus: Alumnus }) {
-  const abilities = alumnus.finalAbilities
-  if (!abilities) return null
+/**
+ * 能力の移り変わり。**卒業時と、いまの姿を並べる。**
+ *
+ * 卒業時だけを出していた頃は、プロで何年も投げた選手を開いても
+ * **高校3年の夏の能力**しか見られなかった。
+ * 総合（`ability`）は年ごとに動いているのに、その中身が読めない。
+ */
+function AbilityHistory({ alumnus }: { alumnus: Alumnus }) {
+  const final = alumnus.finalAbilities
+  if (!final) return null
 
-  const keys: (keyof AbilitySnapshot)[] = alumnus.isPitcher
-    ? ['velocity', 'control', 'stamina', 'sharpness', 'life', 'fielding']
-    : ['meet', 'power', 'speed', 'arm', 'fielding', 'catching']
+  const now = currentAbilities(alumnus)
+  // 卒業直後は同じ値なので、2つ並べても読むものが無い
+  const changed = now !== null && alumnus.ability !== alumnus.rating
 
   return (
-    <div className={styles.finals}>
-      <h3 className={styles.blockTitle}>卒業時の能力</h3>
-      <div className={styles.finalGrid}>
-        {keys.map((key) => {
-          const value = abilities[key]
-          if (typeof value !== 'number') return null
-          return (
-            <span key={key} className={styles.final}>
-              <span className={styles.finalLabel}>{ABILITY_LABELS[key as 'meet']}</span>
-              <span className={styles.finalValue}>
-                {/*
-                  **球速はプロに入っても落ちない。** 変わるのは比べる相手のほうで、
-                  150km/h は高校生なら一級品でも、プロでは普通。
-                  プロ入りした選手だけプロの物差しでランクを付ける
-                */}
-                {key === 'velocity'
-                  ? `${value} ${isInHallOfFame(alumnus) ? proVelocityRank(value) : velocityRank(value)}`
-                  : toRank(value)}
-              </span>
-            </span>
-          )
-        })}
-      </div>
-    </div>
+    <>
+      {/*
+        **卒業時は高校の物差しで見る。** そのときは高校生だった。
+        プロ入りしても球速そのものは落ちないので、
+        同じ152km/hが「高校ではS、プロではB」と並ぶ形になる
+        （変わるのは比べる相手のほう）。
+      */}
+      <AbilityGrid abilities={final} isPitcher={alumnus.isPitcher} title="卒業時の能力" />
+      {changed && now && (
+        <AbilityGrid
+          abilities={now}
+          isPitcher={alumnus.isPitcher}
+          proVelocity={isInHallOfFame(alumnus)}
+          title={`いまの能力（${CAREER_STATUS_LABELS[alumnus.status]}）`}
+        />
+      )}
+    </>
   )
 }
 

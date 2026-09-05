@@ -1,0 +1,52 @@
+/* ある時点の能力を、ランクと実数で並べる */
+.wrap {
+  margin-top: var(--sp-2);
+}
+
+.title {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--text-sub);
+}
+
+.grid {
+  display: grid;
+  /* 375pxで3列。「コントロール」が入る幅を確保する */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--bg-base);
+}
+
+.label {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  /* 「コントロール」で折り返させない。入らなければ省略する */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ランクは数値の前に小さく添える */
+.rank {
+  margin-right: 2px;
+  font-size: var(--fs-xs);
+}

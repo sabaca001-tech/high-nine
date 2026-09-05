@@ -52,6 +52,38 @@
   border-bottom: none;
 }
 
+/* ベストナインの1人ぶん。押すと下に能力が開く */
+.entry {
+  border-bottom: 1px solid var(--line);
+}
+
+.entry:last-child {
+  border-bottom: none;
+}
+
+/* 行そのものをボタンにする。開けるかどうかは矢印で示す */
+.entry .row {
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  /* 指で押せる高さを確保する */
+  min-height: var(--tap-min);
+}
+
+.entry .row:disabled {
+  cursor: default;
+}
+
+.caret {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--accent);
+}
+
 .position {
   flex: 0 0 auto;
   min-width: 3.2em;

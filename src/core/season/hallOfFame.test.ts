@@ -138,6 +138,17 @@ describe('allTimeRoster', () => {
           position: 'SS',
           isPitcher: false,
           stats: emptyCareerStats(),
+          // 能力も名鑑に出すので、在校生には必ず入っている
+          batting: {
+            trajectory: 2,
+            meet: 60,
+            power: 55,
+            speed: 50,
+            arm: 45,
+            fielding: 58,
+            catching: 40,
+          },
+          pitching: null,
         } as never,
       ],
       [
@@ -155,5 +166,9 @@ describe('allTimeRoster', () => {
     expect(roster.map((e) => e.id)).toEqual(['p1', 'a1'])
     expect(roster[0].note).toBe('2年')
     expect(roster[1].note).toBe('3年目卒')
+
+    // 在校生は今の能力が付く。卒業生は卒業時の能力（この stub には無い）
+    expect(roster[0].abilities?.meet).toBe(60)
+    expect(roster[1].abilities).toBeUndefined()
   })
 })

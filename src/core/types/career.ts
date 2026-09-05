@@ -183,6 +183,43 @@ export function growthOf(alumnus: Alumnus): number {
   return alumnus.growth ?? 1
 }
 
+/**
+ * **いまの各能力**（プロ入り後・大学在学中も含む）。
+ *
+ * 卒業後の実力は総合（`ability`）ひとつしか持っていない。
+ * 毎年の各能力まで残すとセーブが選手あたり数百バイト増えるうえ、
+ * **プロで何が伸びたか**は成績（`proSeasons`）のほうが雄弁なので、
+ * 卒業時の能力（`finalAbilities`）を実力の比で伸縮させて出す。
+ *
+ * つまりこれは**表示のための見込み**で、判定には使わない。
+ * 得意・不得意の形は卒業時のまま保たれる。
+ *
+ * **球速だけは動かさない。** プロに入っても球速そのものは落ちない
+ * （変わるのは比べる相手のほう）。
+ */
+export function currentAbilities(alumnus: Alumnus): AbilitySnapshot | null {
+  const base = alumnus.finalAbilities
+  if (!base) return null
+
+  const rate = alumnus.rating > 0 ? alumnus.ability / alumnus.rating : 1
+  const scale = (value: number | undefined): number | undefined =>
+    value === undefined ? undefined : Math.max(1, Math.min(100, Math.round(value * rate)))
+
+  return {
+    ...base,
+    meet: scale(base.meet) ?? base.meet,
+    power: scale(base.power) ?? base.power,
+    speed: scale(base.speed) ?? base.speed,
+    arm: scale(base.arm) ?? base.arm,
+    fielding: scale(base.fielding) ?? base.fielding,
+    catching: scale(base.catching) ?? base.catching,
+    ...(base.control === undefined ? {} : { control: scale(base.control) }),
+    ...(base.stamina === undefined ? {} : { stamina: scale(base.stamina) }),
+    ...(base.life === undefined ? {} : { life: scale(base.life) }),
+    ...(base.sharpness === undefined ? {} : { sharpness: scale(base.sharpness) }),
+  }
+}
+
 /** プロで通算成績を集計する */
 export function careerTotals(alumnus: Alumnus): {
   years: number
