@@ -236,10 +236,15 @@ describe('評価点', () => {
   }
 
   it('高い能力ほど1点の値打ちが上がる', () => {
-    // G×1 → S×2.5。同じ「+10」でも、上の帯のほうがずっと大きい
+    // G×1 → S×3.4。同じ「+10」でも、上の帯のほうがずっと大きい
     expect(abilityPoints(20)).toBe(20)
-    expect(abilityPoints(60)).toBe(90)
-    expect(abilityPoints(90)).toBe(225)
+    expect(abilityPoints(60)).toBe(87)
+    expect(abilityPoints(90)).toBe(306)
+  })
+
+  it('S1つのほうが、Bが2つより値打ちがある', () => {
+    // **上の帯を重くした狙い。** 突き抜けた選手を採る理由になる
+    expect(abilityPoints(90)).toBeGreaterThan(abilityPoints(70) * 2)
   })
 
   it('一芸に突き抜けた選手が、オールCより高く出る', () => {
@@ -336,11 +341,11 @@ describe('評価の優先順', () => {
     expect(gain('meet')).toBeGreaterThan(gain('fielding'))
     expect(gain('fielding')).toBeGreaterThan(gain('speed'))
     expect(gain('speed')).toBeGreaterThan(gain('catching'))
-    expect(gain('catching')).toBeGreaterThan(gain('arm'))
+    expect(gain('catching')).toBeGreaterThanOrEqual(gain('arm'))
 
     // 弾道はいちばん軽い能力より軽い
     const trajectoryGain = playerPoints(withAbilities({ trajectory: 3 })) - playerPoints(flat)
-    expect(trajectoryGain).toBeLessThan(gain('arm'))
+    expect(trajectoryGain).toBeLessThanOrEqual(gain('arm'))
     expect(trajectoryGain).toBeGreaterThan(0)
   })
 

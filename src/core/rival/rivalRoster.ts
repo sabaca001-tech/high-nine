@@ -107,9 +107,46 @@ const PITCHERS_PER_GRADE = 2
  * 普通に起きていて（実測でスタメン平均67.3対69.8）、
  * 「名門は強い」という一覧の読み方そのものが成り立たなかった。
  *
- * 個人差は注目選手（`stars`）が担うので、名簿のほうは学校の格に寄せる。
+ * 個人差は注目選手（`stars`）と**傑物**（下記）が担うので、
+ * 名簿のほうは学校の格に寄せる。
  */
 const ROSTER_TALENT_SPREAD = 5
+
+/**
+ * **傑物。** ごく稀に、学校の格を超えた選手が現れる。
+ *
+ * 振れ幅を絞った結果、他校の選手は**その学校の格どおり**に並ぶようになり、
+ * U18代表の30人が横一線（総合86〜93）で顔ぶれの違いが出なくなっていた。
+ * 「今年の代表にはとんでもないのが1人いる」という年が無いと、
+ * 代表を見に行く意味も、そこへ届くかどうかの手応えも生まれない。
+ *
+ * **平均は下げ、最高だけを上げる。** 素質の底上げ（`STANDOUT_BONUS`）は
+ * 大きいが、出るのは**300人に1人**なので名簿全体の水準は動かない。
+ *
+ * 代表の候補になるのは上位60校（`CANDIDATE_SCHOOLS`）の900人ほどなので、
+ * **その代の傑物は2〜3人**。30人の中に数人だけ抜けた選手がいる形になる。
+ */
+const STANDOUT_CHANCE = 0.003
+const STANDOUT_BONUS = { min: 18, max: 40 }
+
+/**
+ * その選手が傑物か。**種から決まる**ので、名簿を作り直しても同じ選手が傑物になる。
+ * 乱数カーソルを消費しないので、他の選手の生成にも影響しない。
+ */
+function standoutBonusOf(seed: number): number {
+  let hash = Math.imul(seed ^ 0x9e3779b9, 2246822519) >>> 0
+  hash = Math.imul(hash ^ (hash >>> 13), 3266489917)
+  hash = (hash ^ (hash >>> 16)) >>> 0
+
+  const roll = (hash & 0xffff) / 0xffff
+  if (roll >= STANDOUT_CHANCE) return 0
+
+  // 当たった中でも幅を持たせる（全員が同じ上乗せでは、また横一線になる）
+  const within = ((hash >>> 16) & 0xffff) / 0xffff
+  return Math.round(
+    STANDOUT_BONUS.min + within * (STANDOUT_BONUS.max - STANDOUT_BONUS.min),
+  )
+}
 
 /**
  * 他校の部員が**1年で伸びる量**。
@@ -216,7 +253,11 @@ export function rivalRoster(
         // **代ごとの当たり外れ**を足す。良い代を抱えた学校は3年かけて台頭し、
         // その代が卒業すると落ちる
         talentBonus:
-          Math.round(rosterTalentOf(school.strength)) + classBonus(school, enrolledYear) + grown,
+          Math.round(rosterTalentOf(school.strength)) +
+          classBonus(school, enrolledYear) +
+          grown +
+          // ごく稀に、学校の格を超えた傑物が現れる
+          standoutBonusOf(playerSeed(school.rosterSeed, enrolledYear, i)),
         talentSpread: ROSTER_TALENT_SPREAD,
         // **他校に天才肌は出さない。** 母数が900人あるので、
         // 2%でも代表の枠がそれで埋まり、自校の選手が押し出される

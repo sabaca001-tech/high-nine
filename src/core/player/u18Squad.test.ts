@@ -153,16 +153,19 @@ describe('代表の水準', () => {
 
     /*
      * **ここでは学校を1年も進めていない**（注目選手は伸びず、戦力も揺れない）ので、
-     * 実プレイより一段低く出る。上限のほうを縛る。
+     * 実プレイより一段低く出る。
      *
-     * **他校には天才肌が出ない**（`allowGenius`）ので、
-     * 代表の水準は自校が引き当てたときの伸びしろを残した位置にある
-     * （実測で95以上0人・90以上5人・最高93）。
+     * **横一線にならないことのほうが大事。** 全員が同じくらいの能力だと、
+     * 「今年の代表にはとんでもないのが1人いる」という年が生まれず、
+     * 代表を見に行く意味も、そこへ届くかどうかの手応えも出てこない。
+     * 傑物（`STANDOUT_CHANCE`）が数人だけ混ざる形にしてある。
      */
-    expect(ratings.filter((rating) => rating >= 95).length).toBeLessThanOrEqual(3)
-    expect(ratings.filter((rating) => rating >= 90).length).toBeLessThanOrEqual(10)
+    // 全員が95以上では、自校の選手がどう育っても届かない
+    expect(ratings.filter((rating) => rating >= 95).length).toBeLessThanOrEqual(10)
+    // 上と下でしっかり開く（横一線でない）
+    expect(ratings[0] - ratings[29]).toBeGreaterThanOrEqual(12)
     // 逆に弱すぎても代表の意味が無い
-    expect(ratings[0]).toBeGreaterThanOrEqual(85)
+    expect(ratings[0]).toBeGreaterThanOrEqual(90)
   })
 })
 

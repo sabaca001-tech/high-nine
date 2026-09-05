@@ -455,10 +455,16 @@ export function createPlayer(rng: Rng, options: CreatePlayerOptions): Player {
   const fielderAbility = (): number => {
     if (!pitching) {
       const index = battingIndex++
-      return clampAbility(base + battingSpread[index] + tilt[index] * EXCHANGE_FIELDER_TILT)
+      return capAtEntry(
+        grade,
+        clampAbility(base + battingSpread[index] + tilt[index] * EXCHANGE_FIELDER_TILT),
+      )
     }
     const cap = pitchingRating(pitching)
-    return clampAbility(rng.int(Math.max(1, Math.round(cap * PITCHER_FIELDING_FLOOR)), cap))
+    return capAtEntry(
+      grade,
+      clampAbility(rng.int(Math.max(1, Math.round(cap * PITCHER_FIELDING_FLOOR)), cap)),
+    )
   }
 
   const player: Player = {
@@ -733,4 +739,29 @@ function rollMotivation(rng: Rng): Motivation {
 
 function clampAbility(value: number): number {
   return Math.min(100, Math.max(1, value))
+}
+
+/**
+ * **生成時の能力の頭。学年ごとに置く。**
+ *
+ * 凸凹（`ABILITY_SPREAD` ＝ ±24）を広げたので、素質の高い新入生に
+ * **入学の時点でパワーS（90以上）**が付くことがあった。
+ * 高校生の1年目でその帯に居るのは違和感があるし、
+ * 3年かけて育てる余地も消える。
+ *
+ * ここで止めるのは**生成だけ**。練習や試合で伸びるぶんは止めない
+ * （`diminishingMultiplier` が別に効く）。
+ */
+function capAtEntry(grade: Grade, value: number): number {
+  return Math.min(value, ENTRY_ABILITY_CAP[grade])
+}
+
+/**
+ * 学年ごとの上限。
+ * 1年でAの上限（84）、2年でSの手前（89）。3年は止めない。
+ */
+const ENTRY_ABILITY_CAP: Record<Grade, number> = {
+  1: 84,
+  2: 89,
+  3: 100,
 }

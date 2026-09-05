@@ -210,20 +210,22 @@ function motivationMultiplierFor(player: Player): number {
  * |---|---|---|---|---|---|---|
  * | 打ち止めだった頃 | 0.7 | 0.38 | 0.24 | 0.13 | 0.07 | 0.03 |
  * | 緩めすぎた頃 | 0.7 | 0.40 | 0.28 | 0.20 | 0.15 | 0.10 |
- * | いま | 0.62 | 0.33 | 0.23 | 0.16 | 0.11 | 0.07 |
+ * | 一段絞った頃 | 0.62 | 0.33 | 0.23 | 0.16 | 0.11 | 0.07 |
+ * | いま | 0.55 | 0.28 | 0.19 | 0.13 | 0.09 | 0.06 |
  *
- * **もう一段絞ってある。** 育て切った3年生が評価点1400を超え、
- * 上の帯（A以上）が「時間をかければ誰でも届く」場所になっていた。
+ * **さらに絞ってある。** 上の帯（A以上）が
+ * 「時間をかければ誰でも届く」場所になっていた。
+ * 60未満（1.0 → 0.9）も少しだけ下げて、全体の速度を落としている。
  * 打ち止め（0.03）の倍は残してあるので、伸ばし続ければ届く。
  */
 function diminishingMultiplier(current: number): number {
-  if (current >= 90) return 0.07
-  if (current >= 85) return 0.11
-  if (current >= 80) return 0.16
-  if (current >= 75) return 0.23
-  if (current >= 70) return 0.33
-  if (current >= 60) return 0.62
-  return 1.0
+  if (current >= 90) return 0.06
+  if (current >= 85) return 0.09
+  if (current >= 80) return 0.13
+  if (current >= 75) return 0.19
+  if (current >= 70) return 0.28
+  if (current >= 60) return 0.55
+  return 0.9
 }
 
 /**
