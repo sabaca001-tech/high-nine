@@ -113,6 +113,27 @@ const RELEASE_THRESHOLD = 22
 const OVERSEAS_THRESHOLD = 62
 
 /**
+ * 海外移籍に必要なタイトルの数。
+ *
+ * **実力だけで決めていた。** プロで数年やって能力が62に届けば
+ * 3割で渡米していたので、**日本で何も残していない選手が海外へ行く**
+ * ことが普通に起きていた。
+ * 実際に海を渡るのは、日本のリーグで頂点を獲った選手だけ。
+ *
+ * 通算で数えるのは、単年のタイトルでは運の要素が強いため。
+ */
+const OVERSEAS_TITLES = 2
+
+/** タイトルを何度も獲った選手は、そのぶん誘いが増える */
+const OVERSEAS_CHANCE_PER_TITLE = 0.12
+const OVERSEAS_CHANCE_MAX = 0.5
+
+/** 通算のタイトル数 */
+function titleCountOf(alumnus: Alumnus): number {
+  return alumnus.proSeasons.reduce((sum, season) => sum + season.titles.length, 0)
+}
+
+/**
  * 卒業時の進路を決める。
  *
  * 学校の評判が高いとスカウトの目に留まりやすく、少し有利になる。
@@ -428,13 +449,28 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
 
   const updated: Alumnus = { ...alumnus, proSeasons, ability }
 
-  // 海外挑戦。実力が抜けていて、まだ若いうちに限る
+  /*
+   * 海外挑戦。**タイトルを獲った選手だけ。**
+   *
+   * 実力（62以上）だけで3割の抽選にしていた頃は、
+   * **日本で何も残していない選手が海を渡って**いた。
+   * 実際に誘いが来るのは、日本のリーグで頂点を獲った選手。
+   *
+   * 何度も獲っているほど誘いは多い（`OVERSEAS_CHANCE_PER_TITLE`）。
+   */
+  const titles = titleCountOf(updated)
+  const overseasChance = Math.min(
+    OVERSEAS_CHANCE_MAX,
+    titles * OVERSEAS_CHANCE_PER_TITLE,
+  )
+
   if (
     updated.status === 'pro' &&
     ability >= OVERSEAS_THRESHOLD &&
+    titles >= OVERSEAS_TITLES &&
     years >= 3 &&
     years <= 9 &&
-    rng.chance(0.3)
+    rng.chance(overseasChance)
   ) {
     const team = rng.pick(OVERSEAS_TEAMS)
     return {
@@ -444,7 +480,7 @@ function advancePro(rng: Rng, alumnus: Alumnus, year: number): CareerUpdate {
         team,
         careerLog: withEntry(alumnus, year, 'mlb', team, ability, `海外リーグの${team}へ移籍`),
       },
-      news: `${alumnus.name}が海外リーグの${team}へ移籍！`,
+      news: `${alumnus.name}が海外リーグの${team}へ移籍！（タイトル${titles}回）`,
     }
   }
 

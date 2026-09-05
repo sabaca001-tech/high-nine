@@ -6,7 +6,7 @@ import type { U18Entry } from '@/core/player/u18Squad'
 import { formatInnings } from '@/core/player/careerStats'
 import { GROWTH_RANGE_LABELS, growthRanking } from '@/core/player/growthReport'
 import type { GrowthRange } from '@/core/player/growthReport'
-import { ABILITY_LABELS } from '@/core/types/player'
+import { ABILITY_LABELS, snapshotOf } from '@/core/types/player'
 import {
   playerPoints,
   pointsFromRating,
@@ -52,6 +52,7 @@ import { OpponentRoster } from '@/ui/components/OpponentRoster'
 import { rankColorOf } from '@/ui/theme/playerColors'
 import { useGameStore } from '@/state/useGameStore'
 import { AppLayout } from '@/ui/components/AppLayout'
+import { AbilityGrid } from '@/ui/components/AbilityGrid'
 import { HELP_TOPICS } from './helpTopics'
 import styles from './DataScreen.module.css'
 
@@ -596,6 +597,14 @@ function U18Tab() {
 }
 
 
+/**
+ * 代表の1人。**押すと能力が開く。**
+ *
+ * 評価点だけを出していた頃は、
+ * 「1,134の外野手」がどういう選手なのか（打つのか、走るのか、守るのか）が
+ * 名簿からは一切読めなかった。
+ * 全国から選ばれた30人は、自分の選手を測る物差しでもある。
+ */
 function U18Row({
   entry,
   slot,
@@ -604,9 +613,19 @@ function U18Row({
   slot?: { order: number; position: string }
 }) {
   const player = entry.player
+  const [open, setOpen] = useState(false)
+
+  const className = entry.ours ? `${styles.u18Row} ${styles.u18Ours}` : styles.u18Row
 
   return (
-    <div className={entry.ours ? `${styles.u18Row} ${styles.u18Ours}` : styles.u18Row}>
+    <div className={styles.u18Entry}>
+      <button
+        type="button"
+        className={className}
+        onClick={() => setOpen((value) => !value)}
+        disabled={player === null}
+        aria-expanded={open}
+      >
       <span className={styles.u18Order}>{slot ? slot.order : '—'}</span>
       <span className={styles.u18Who}>
         <span className={styles.u18Name}>
@@ -631,11 +650,21 @@ function U18Row({
             {pointsRank(playerPoints(player))}
           </span>
           <span className={styles.u18Rating}>{playerPoints(player)}</span>
+          <span className={styles.u18Caret}>{open ? '▲' : '▼'}</span>
         </span>
       ) : (
         <span className={styles.u18Stats}>
           <span className={styles.u18Grade}>{entry.member.grade}年（当時）</span>
         </span>
+      )}
+      </button>
+
+      {open && player && (
+        <AbilityGrid
+          abilities={snapshotOf(player, 0, 0)}
+          isPitcher={player.isPitcher}
+          title={entry.graduated ? '選ばれた時点の能力' : 'いまの能力'}
+        />
       )}
     </div>
   )

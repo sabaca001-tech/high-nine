@@ -354,13 +354,40 @@
 }
 
 /* ── U18日本代表の名簿 ─────────────────────── */
+/* 代表の1人ぶん。押すと下に能力が開く */
+.u18Entry {
+  border-bottom: 1px solid var(--line);
+}
+
+.u18Entry:last-child {
+  border-bottom: none;
+}
+
 .u18Row {
   display: grid;
   grid-template-columns: 22px 1fr auto;
   align-items: center;
   gap: 6px;
   padding: 5px 4px;
-  border-bottom: 1px solid var(--line);
+  /* 行そのものをボタンにする。枠線は親（`u18Entry`）が持つ */
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  /* 指で押せる高さを確保する */
+  min-height: var(--tap-min);
+}
+
+.u18Row:disabled {
+  cursor: default;
+}
+
+/* 卒業した選手は開けないので、矢印も出さない */
+.u18Caret {
+  font-size: 9px;
+  color: var(--accent);
 }
 
 .u18Ours {
