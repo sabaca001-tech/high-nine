@@ -296,10 +296,15 @@ const VELOCITY_KNEE_RATE = 0.26
  * 動くのは「何が得意な選手か」の分かりやすさだけ。
  *
  * **評価点が一芸を正当に評価するようになったので、さらに広げてある**
- * （18→24）。平均で測っていた頃は凸凹が大きいほど損だったが、
+ * （18→24→34）。平均で測っていた頃は凸凹が大きいほど損だったが、
  * いまは「守備は下手だが打つ」が戦力として意味を持つ。
+ *
+ * ランクの倍率で上の帯を重くした（S ×3.4）ので、
+ * **凸凹の大きい選手ほど値打ちが出る**。
+ * 入学の時点でSが付かないよう頭は止めてある（`ENTRY_ABILITY_CAP`）ので、
+ * 広げて増えるのは「何が得意で何が苦手か」の分かりやすさ。
  */
-const ABILITY_SPREAD = 24
+const ABILITY_SPREAD = 34
 
 /**
  * 合計が0になるばらつきを `count` 個作る。
@@ -716,13 +721,18 @@ export function createInitialRoster(
   return players
 }
 
-/** 弾道。1〜2が大半で、4は稀 */
+/**
+ * 弾道。1〜2が大半で、4は稀。
+ *
+ * **入学の時点でばらけさせる。** 低い弾道は上げやすくしてあるので
+ * （`trajectoryCostFor`）、1で入ってきても育てられる。
+ */
 function rollTrajectory(rng: Rng): Trajectory {
   return rng.weighted<Trajectory>([
-    { value: 1, weight: 45 },
-    { value: 2, weight: 35 },
-    { value: 3, weight: 15 },
-    { value: 4, weight: 5 },
+    { value: 1, weight: 42 },
+    { value: 2, weight: 33 },
+    { value: 3, weight: 17 },
+    { value: 4, weight: 8 },
   ])
 }
 

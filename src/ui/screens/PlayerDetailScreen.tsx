@@ -6,7 +6,7 @@ import {
   canPracticePitch,
   PITCH_COST,
   PITCH_PRACTICE_PENALTY,
-  TRAJECTORY_COST,
+  trajectoryCostFor,
   TRAJECTORY_PRACTICE_PENALTY,
   canConvert,
   CONVERT_MAIN_MAX,
@@ -563,14 +563,21 @@ function TrainingTab({ player }: { player: Player }) {
               <span className={styles.focusDesc}>
                 {player.batting.trajectory >= TRAJECTORY_MAX
                   ? 'すでに弾道は最大'
-                  : `溜まりきると弾道が1段上がる。パワーを${TRAJECTORY_COST}上げるのと同じくらいかかる`}
+                  : `溜まりきると弾道が1段上がる。パワーを${trajectoryCostFor(
+                      player.batting.trajectory,
+                    )}上げるのと同じくらいかかる`}
               </span>
             </button>
 
             {focus.type === 'trajectory' && (
               <p className={styles.chartNote}>
                 弾道{player.batting.trajectory} → {player.batting.trajectory + 1}（
-                {Math.round(((player.trajectoryProgress ?? 0) / TRAJECTORY_COST) * 100)}%）
+                {Math.round(
+                  ((player.trajectoryProgress ?? 0) /
+                    trajectoryCostFor(player.batting.trajectory)) *
+                    100,
+                )}
+                %）
                 ／ この間、他の能力の伸びは{TRAJECTORY_PRACTICE_PENALTY}倍になります
               </p>
             )}

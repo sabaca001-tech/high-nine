@@ -32,7 +32,7 @@ import {
   FOCUS_BONUS,
   focusMultiplier,
   PITCH_COST,
-  TRAJECTORY_COST,
+  trajectoryCostFor,
 } from './trainingFocus'
 import type { GrowthPlan } from './trainingFocus'
 
@@ -367,7 +367,8 @@ export function applyPractice(
       const banked = bankedGrowth(current, gain, playerMultiplier * FOCUS_BONUS)
       const progress = round2((current.trajectoryProgress ?? 0) + banked)
 
-      if (progress >= TRAJECTORY_COST) {
+      // 低い弾道ほど上げやすい（`trajectoryCostFor`）
+      if (progress >= trajectoryCostFor(current.batting.trajectory)) {
         const raised = raiseTrajectory(current, 1)
         current = { ...raised.player, trajectoryProgress: 0, focus: DEFAULT_FOCUS }
         if (raised.change) changes.push(raised.change)

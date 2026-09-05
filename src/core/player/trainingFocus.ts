@@ -41,7 +41,7 @@ export type TrainingFocus =
    * 弾道は1〜4の4段階しかなく、1段の重みが他の能力とまるで違う。
    * 日々の練習で1ずつ増える類の値ではないので、
    * **積み上げた練習量を溜めて、届いたところで1段上がる**形にした。
-   * かかる量はパワーを12上げるのと同じくらい（`TRAJECTORY_COST`）。
+   * かかる量は段によって違う（`trajectoryCostFor`。1→2は軽く、3→4は重い）。
    */
   | { type: 'trajectory' }
   /**
@@ -63,11 +63,29 @@ export const DEFAULT_FOCUS: TrainingFocus = { type: 'team' }
 /**
  * 弾道を1段上げるのに必要な練習量（能力値に換算した点数）。
  *
- * **パワーを12上げるのと同じ重み**にしてある。
- * 4段階しかないので、他の能力1点と同じ感覚で上がってしまうと
- * 全員が弾道4になり、打球の質という個性が消える。
+ * **段によって重さが違う。** 一律12にしていた頃は、
+ * **弾道1の選手がライナーを打てるようになるまで**もアーチを描くまでも
+ * 同じ手間がかかっていた。
+ * ゴロしか打てない打者に打球を上げさせるのは、そこまで難しくない。
+ *
+ * | 上げる段 | 1→2 | 2→3 | 3→4 |
+ * |---|---|---|---|
+ * | 必要な練習量 | **5** | 12 | 20 |
+ *
+ * 上の段を重くしてあるのは、4段階しかないので
+ * 他の能力1点と同じ感覚で上がると全員が弾道4になり、
+ * 打球の質という個性が消えるため。
  */
-export const TRAJECTORY_COST = 12
+export const TRAJECTORY_COST_BY_STEP: Record<number, number> = {
+  1: 5,
+  2: 12,
+  3: 20,
+}
+
+/** いまの弾道から、次の段までに必要な練習量 */
+export function trajectoryCostFor(trajectory: number): number {
+  return TRAJECTORY_COST_BY_STEP[trajectory] ?? TRAJECTORY_COST_BY_STEP[3]
+}
 
 /** 弾道の練習中、他の能力にかかる倍率 */
 export const TRAJECTORY_PRACTICE_PENALTY = 0.7
