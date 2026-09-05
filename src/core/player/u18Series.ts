@@ -21,6 +21,8 @@ import { simulateGame } from '@/core/match/simulateGame'
 import type { Lineup } from '@/core/types/lineup'
 import type { BattingLine, PitchingLine } from '@/core/types/match'
 import type { AbilityChange, Player } from '@/core/types/player'
+import { grantSkill } from '@/core/skill/grantSkill'
+import type { SkillId, SkillRank } from '@/core/types/skill'
 import { applyMatchGrowth, performancePoints } from './matchGrowth'
 
 /**
@@ -30,12 +32,19 @@ import { applyMatchGrowth, performancePoints } from './matchGrowth'
 const OPPONENTS: { name: string; strength: number }[] = [
   { name: 'アジア選抜', strength: 18 },
   { name: '南米選抜', strength: 24 },
+  { name: '欧州選抜', strength: 21 },
   { name: '北中米選抜', strength: 30 },
+  { name: '世界選抜', strength: 34 },
 ]
 
 /**
+ * **5試合戦う。** 3試合では、代表に選ばれても得るものが
+ * 県大会を1つ勝つ程度にしかならず、
+ * 「全国から選ばれた」ことの重みが出てこなかった。
+ *
  * 相手の強さは高めに置いてある。
  * 甲子園の決勝より上の水準で、**通用するかどうか**が問われる場にする。
+ * 後半ほど強い相手が来るので、勝ち上がるほど成績を残すのが難しい。
  */
 
 export type U18GameResult = {
@@ -55,12 +64,22 @@ export type U18Performance = {
   pitching: PitchingLine | null
 }
 
+/** 代表で掴んだ特殊能力 */
+export type U18SkillNews = {
+  playerId: string
+  playerName: string
+  skillId: SkillId
+  rank: SkillRank
+}
+
 export type U18SeriesOutcome = {
   /** 成長と代表歴を反映した自校の選手（渡された配列と同じ並び） */
   players: Player[]
   games: U18GameResult[]
   performances: U18Performance[]
   changes: AbilityChange[]
+  /** 代表で身につけた特殊能力 */
+  skills: U18SkillNews[]
 }
 
 /**
@@ -77,7 +96,7 @@ export function playU18Series(
   const ourIds = new Set(ourPlayers.map((player) => player.id))
 
   if (squad.length < 9 || !squad.some((player) => ourIds.has(player.id))) {
-    return { players: ourPlayers, games: [], performances: [], changes: [] }
+    return { players: ourPlayers, games: [], performances: [], changes: [], skills: [] }
   }
 
   const lineup = autoLineup(squad)
@@ -138,6 +157,7 @@ export function playU18Series(
   }
 
   const performances: U18Performance[] = []
+  const skills: U18SkillNews[] = []
 
   players = players.map((player) => {
     const batting = battingById.get(player.id) ?? null
@@ -147,16 +167,55 @@ export function playU18Series(
     const performance = performanceFrom(batting, pitching)
     performances.push({ playerId: player.id, name: player.name, performance, batting, pitching })
 
-    return {
+    let current: Player = {
       ...player,
       u18: [...player.u18, { year, performance }],
       // 代表に呼ばれること自体が自信になる
       trust: Math.min(100, player.trust + 6),
     }
+
+    /*
+     * **活躍したら特殊能力を掴む。**
+     * 世界の強豪と5試合戦って何も残らないのでは、
+     * 代表に呼ばれることが「能力が少し伸びる」だけの出来事になる。
+     *
+     * 大会の勝ち上がり（`applyTournamentGrowth`）と同じ経路にしてある。
+     * **金特に手が届くのは活躍した選手だけ**で、そこも大会と揃えてある。
+     */
+    const chance = Math.min(SKILL_CHANCE_MAX, (performance / 100) * SKILL_CHANCE_RATE)
+    if (rng.chance(chance)) {
+      const canAimGold = performance >= GOLD_PERFORMANCE
+      const rank: SkillRank = canAimGold && rng.chance(GOLD_SHARE) ? 'gold' : 'blue'
+      const result = grantSkill(rng, current, rank)
+      current = result.player
+      if (result.granted && result.skillId) {
+        skills.push({
+          playerId: current.id,
+          playerName: current.name,
+          skillId: result.skillId,
+          rank,
+        })
+      }
+    }
+
+    return current
   })
 
-  return { players, games, performances, changes }
+  return { players, games, performances, changes, skills }
 }
+
+/**
+ * 特殊能力を掴む確率。**活躍度に比例する。**
+ * 5試合を通して活躍した選手（活躍度80）で40%、可もなく不可もなくで22%。
+ */
+const SKILL_CHANCE_RATE = 0.5
+const SKILL_CHANCE_MAX = 0.45
+
+/** 金特に手が届く活躍度。世界を相手に結果を出した選手だけ */
+const GOLD_PERFORMANCE = 70
+
+/** 金特に届く条件を満たした選手のうち、実際に金特になる割合 */
+const GOLD_SHARE = 0.35
 
 /**
  * 大会を通した活躍度（0〜100）。

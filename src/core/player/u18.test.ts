@@ -28,7 +28,7 @@ describe('playU18Series', () => {
       year: 3,
     })
 
-    expect(outcome.games).toHaveLength(3)
+    expect(outcome.games).toHaveLength(5)
     for (const game of outcome.games) {
       expect(game.scoreFor + game.scoreAgainst).toBeGreaterThanOrEqual(0)
     }
@@ -46,6 +46,25 @@ describe('playU18Series', () => {
     const played = outcome.players.filter((player) => player.u18.length > 0)
     expect(played.length).toBeGreaterThan(0)
     expect(played[0].u18[0].year).toBe(3)
+  })
+
+  it('活躍すると特殊能力を掴む', () => {
+    /*
+     * **世界の強豪と5試合戦って何も残らないのでは、
+     * 代表に呼ばれることが「能力が少し伸びる」だけの出来事になる。**
+     * 大会の勝ち上がり（`applyTournamentGrowth`）と同じ経路にしてある。
+     */
+    let granted = 0
+    for (let seed = 0; seed < 30; seed++) {
+      const outcome = playU18Series(createRng(seed + 41), {
+        squad: squadOf(ours),
+        ourPlayers: ours,
+        year: 3,
+      })
+      granted += outcome.skills.length
+    }
+
+    expect(granted).toBeGreaterThan(0)
   })
 
   it('自校の選手が居なければ何も起きない', () => {

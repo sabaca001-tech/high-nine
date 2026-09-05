@@ -1153,6 +1153,20 @@ function callU18(
     })
   }
 
+  /*
+   * **掴んだ特殊能力はその場で知らせる。**
+   * 能力の増減（`ability`）に混ぜると数字の並びに埋もれるので、
+   * 大会での習得（`applyTournamentGrowth`）と同じく1行ずつ出す。
+   */
+  for (const skill of series.skills) {
+    const def = findSkill(skill.skillId)
+    events.push({
+      type: 'message',
+      text: `${skill.playerName}が世界の舞台で「${def?.name ?? skill.skillId}」を掴んだ！`,
+      tone: 'good',
+    })
+  }
+
   if (series.changes.length > 0) events.push({ type: 'ability', changes: series.changes })
 
   return { players: series.players, u18Squad: squad, rngState: rng.state }
